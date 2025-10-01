@@ -254,31 +254,28 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
 
       if (payTypes.length === 0) payTypes = ['Прочее']
 
-      // Распределяем сумму чека пропорционально между способами оплаты
+      // Берём ПЕРВЫЙ (основной) способ оплаты, НЕ делим сумму!
       // ВАЖНО: receipt.net в целых рублях, нужно умножить на 100 для копеек!
       const netAmountCents = (receipt.net || 0) * 100
-      const amountPerType = Math.floor(netAmountCents / payTypes.length)
+      const mainPayType = payTypes[0] // Только первый способ
+      const tenderName = mapToTenderType(mainPayType)
+      const key: SaleKey = `${channelName}__${tenderName}`
 
-      for (const payType of payTypes) {
-        const tenderName = mapToTenderType(payType)
-        const key: SaleKey = `${channelName}__${tenderName}`
-
-        const sale = salesAgg.get(key) || { 
-          channel: channelName, 
-          tender: tenderName, 
-          gross: 0, 
-          discounts: 0, 
-          refunds: 0 
-        }
-
-        sale.gross += amountPerType
-        // discounts и refunds тоже в целых рублях
-        if (receipt.isReturn) {
-          sale.refunds += Math.abs(receipt.returnSum || 0) * 100
-        }
-
-        salesAgg.set(key, sale)
+      const sale = salesAgg.get(key) || { 
+        channel: channelName, 
+        tender: tenderName, 
+        gross: 0, 
+        discounts: 0, 
+        refunds: 0 
       }
+
+      sale.gross += netAmountCents // Вся сумма, НЕ делим!
+      // discounts и refunds тоже в целых рублях
+      if (receipt.isReturn) {
+        sale.refunds += Math.abs(receipt.returnSum || 0) * 100
+      }
+
+      salesAgg.set(key, sale)
     }
 
       // Создаём смену
@@ -381,28 +378,26 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
 
         if (payTypes.length === 0) payTypes = ['Прочее']
 
+        // Берём ПЕРВЫЙ (основной) способ оплаты, НЕ делим сумму!
         const netAmountCents = (receipt.net || 0) * 100
-        const amountPerType = Math.floor(netAmountCents / payTypes.length)
+        const mainPayType = payTypes[0] // Только первый способ
+        const tenderName = mapToTenderType(mainPayType)
+        const key: SaleKey = `${channelName}__${tenderName}`
 
-        for (const payType of payTypes) {
-          const tenderName = mapToTenderType(payType)
-          const key: SaleKey = `${channelName}__${tenderName}`
-
-          const sale = salesAgg.get(key) || { 
-            channel: channelName, 
-            tender: tenderName, 
-            gross: 0, 
-            discounts: 0, 
-            refunds: 0 
-          }
-
-          sale.gross += amountPerType
-          if (receipt.isReturn) {
-            sale.refunds += Math.abs(receipt.returnSum || 0) * 100
-          }
-
-          salesAgg.set(key, sale)
+        const sale = salesAgg.get(key) || { 
+          channel: channelName, 
+          tender: tenderName, 
+          gross: 0, 
+          discounts: 0, 
+          refunds: 0 
         }
+
+        sale.gross += netAmountCents // Вся сумма, НЕ делим!
+        if (receipt.isReturn) {
+          sale.refunds += Math.abs(receipt.returnSum || 0) * 100
+        }
+
+        salesAgg.set(key, sale)
       }
 
       // Создаём смену
