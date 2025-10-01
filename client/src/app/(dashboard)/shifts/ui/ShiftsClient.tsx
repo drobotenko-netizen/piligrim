@@ -147,6 +147,7 @@ export default function ShiftsClient() {
               <THead>
                 <TR>
                   <TH>Дата смены</TH>
+                  <TH>№ смены</TH>
                   <TH>Закрыл</TH>
                   <TH>Кол-во чеков</TH>
                   <TH>Выручка</TH>
@@ -165,6 +166,9 @@ export default function ShiftsClient() {
                   const shiftDate = new Date(shift.openAt).toISOString().slice(0, 10)
                   const receiptsLink = `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
                   
+                  // Вытаскиваем номер смены из note (формат: "Смена iiko #123: ...")
+                  const sessionNumber = shift.note?.match(/#(\d+)/)?.[1] || shift.note || '—'
+                  
                   return (
                     <TR key={shift.id}>
                       <TD>
@@ -181,6 +185,7 @@ export default function ShiftsClient() {
                           })}
                         </a>
                       </TD>
+                      <TD className="text-gray-600">#{sessionNumber}</TD>
                       <TD>{shift.closedBy || '—'}</TD>
                       <TD className="text-center">{shift.stats?.receiptsTotal || 0}</TD>
                       <TD className="font-semibold text-green-700">{rubFmt(totalNetto)}</TD>
@@ -201,7 +206,7 @@ export default function ShiftsClient() {
                 })}
                 {displayShifts.length === 0 && (
                   <TR>
-                    <TD colSpan={8} className="text-center text-gray-500">
+                    <TD colSpan={9} className="text-center text-gray-500">
                       Нет смен. Нажмите "Импортировать из iiko"
                     </TD>
                   </TR>
