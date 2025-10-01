@@ -15,6 +15,9 @@ const personnelItems = [
 ]
 
 const financeItems = [
+  { href: '/shifts', label: 'Смены', icon: CalendarCheck2 },
+  { href: '/finance/expense-docs', label: 'Документы расходов', icon: FileText },
+  { href: '/finance/payments', label: 'Платежи', icon: Banknote },
   { href: '/finance/accounts', label: 'Счета', icon: Wallet },
   { href: '/finance/categories', label: 'Категории', icon: ListTree },
   { href: '/finance/transactions', label: 'Транзакции', icon: ArrowLeftRight },
@@ -22,6 +25,7 @@ const financeItems = [
   { href: '/finance/counterparty-types', label: 'Типы контрагентов', icon: Tags },
   { href: '/finance/reports/cashflow', label: 'ДДС', icon: FileSpreadsheet },
   { href: '/finance/reports/pnl', label: 'ОПиУ', icon: FileSpreadsheet },
+  { href: '/finance/reports/aging', label: 'Долги', icon: TrendingUp },
   { href: '/finance/balances', label: 'Остатки', icon: Calculator },
   { href: '/gsheets/cashflow', label: 'ДДС (Google)', icon: FileSpreadsheet },
 ]
