@@ -226,16 +226,13 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
       console.log(`     Даты: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
       console.log(`     Закрыл: ${closedBy}`)
       
-      // Чеки за ДЕНЬ
-      const dayStart = new Date(dateKey + 'T00:00:00.000Z')
-      const dayEnd = new Date(dateKey + 'T23:59:59.999Z')
-      
+      // Чеки всех смен этого дня по sessionNumber
+      const sessionNums = dayShifts.map((s: any) => s.sessionNumber)
       const shiftReceipts = receipts.filter(r => {
-        const rDate = r.date
-        return rDate >= dayStart && rDate <= dayEnd
+        return sessionNums.includes(r.sessionNumber)
       })
       
-      console.log(`  📄 Чеков за день: ${shiftReceipts.length}`)
+      console.log(`  📄 Чеков в сменах #${sessionNumbers}: ${shiftReceipts.length}`)
 
     // Агрегируем продажи по channel × tenderType
     type SaleKey = string // `${channelName}__${tenderTypeName}`
