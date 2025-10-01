@@ -156,6 +156,21 @@ export class IikoClient {
     return (await res.json()) as any[]
   }
 
+  async getEmployees(params?: { includeDeleted?: boolean }): Promise<any[]> {
+    const key = await this.getToken()
+    const url = new URL(this.baseUrl('/resto/api/v2/employees/list'))
+    url.searchParams.set('key', key)
+    if (params?.includeDeleted) {
+      url.searchParams.set('includeDeleted', 'true')
+    }
+    const res = await fetch(url)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`iiko employees failed ${res.status}: ${text?.slice(0, 200)}`)
+    }
+    return (await res.json()) as any[]
+  }
+
   async getRecipePrepared(params: { date: string; productId: string; departmentId?: string }): Promise<any> {
     const key = await this.getToken()
     const url = new URL(this.baseUrl('/resto/api/v2/assemblyCharts/getPrepared'))

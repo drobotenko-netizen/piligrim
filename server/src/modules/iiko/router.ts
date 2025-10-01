@@ -1548,6 +1548,53 @@ export function createIikoRouter() {
     }
   })
 
+  // GET /iiko/employees - список сотрудников из iiko
+  router.get('/employees', async (req, res) => {
+    try {
+      const employees = await client.getEmployees()
+      res.json({ items: employees, count: employees.length })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
+  // GET /iiko/cashshifts - прямой запрос к iiko API для просмотра смен
+  router.get('/cashshifts', async (req, res) => {
+    try {
+      const { from, to } = req.query
+      if (!from || !to) {
+        return res.status(400).json({ error: 'from and to dates required (YYYY-MM-DD)' })
+      }
+
+      const shifts = await client.getCashShifts({
+        openDateFrom: String(from),
+        openDateTo: String(to),
+        status: 'ANY'
+      })
+
+      // Получаем сотрудников для маппинга UUID → имя
+      let employees: any[] = []
+      try {
+        employees = await client.getEmployees()
+      } catch (e) {
+        console.warn('Failed to load employees:', e)
+      }
+
+      const employeeMap = new Map(employees.map(e => [e.id, e]))
+
+      // Обогащаем смены именами сотрудников
+      const enriched = shifts.map(shift => ({
+        ...shift,
+        responsibleUserName: employeeMap.get(shift.responsibleUserId)?.name || shift.responsibleUserId,
+        managerName: employeeMap.get(shift.managerId)?.name || shift.managerId
+      }))
+
+      res.json({ items: enriched, count: enriched.length })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   // POST /iiko/import/shifts - импорт смен из чеков iiko
   router.post('/import/shifts', async (req, res) => {
     try {
