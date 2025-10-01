@@ -28,30 +28,30 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
   const { revenue, expenses, totals } = data
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Отчёт о прибылях и убытках (P&L)</h1>
-        <div className="flex gap-3">
-          <Select value={String(y)} onValueChange={v => setY(Number(v))}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[y-1, y, y+1].map(yy => (<SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>))}
-            </SelectContent>
-          </Select>
-          <Select value={String(m)} onValueChange={v => setM(Number(v))}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(mm => (
-                <SelectItem key={mm} value={String(mm)}>{MONTHS[mm-1]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <Card>
+      <CardContent className="p-4 space-y-3 flex flex-col h-[calc(100vh-4rem)] min-h-0">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">P&L - Отчёт о прибылях и убытках</h2>
+          <div className="flex items-center gap-2">
+            <Select value={String(y)} onValueChange={v => setY(Number(v))}>
+              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[y-1, y, y+1].map(yy => (<SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>))}
+              </SelectContent>
+            </Select>
+            <Select value={String(m)} onValueChange={v => setM(Number(v))}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(mm => (
+                  <SelectItem key={mm} value={String(mm)}>{MONTHS[mm-1]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
 
-      <Card>
-        <CardContent className="p-6">
-          <Table>
+        <div className="flex-1 overflow-auto">
+          <Table className="w-full">
             <TBody>
               {/* Выручка */}
               <TR className="bg-blue-50">
