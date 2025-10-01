@@ -94,13 +94,14 @@ export default function ShiftsClient() {
             <Table>
               <THead>
                 <TR>
-                  <TH>Дата открытия</TH>
-                  <TH>Дата закрытия</TH>
-                  <TH>Открыл</TH>
+                  <TH>Дата смены</TH>
                   <TH>Закрыл</TH>
-                  <TH>Нетто выручка</TH>
-                  <TH>Продаж</TH>
-                  <TH>Примечание</TH>
+                  <TH>Кол-во чеков</TH>
+                  <TH>Выручка</TH>
+                  <TH>Возвраты (шт)</TH>
+                  <TH>Возвраты (₽)</TH>
+                  <TH>Удаления (шт)</TH>
+                  <TH>Удаления (₽)</TH>
                 </TR>
               </THead>
               <TBody>
@@ -109,35 +110,47 @@ export default function ShiftsClient() {
                     sum + (s.grossAmount - s.discounts - s.refunds), 0
                   ) || 0
                   
+                  const shiftDate = new Date(shift.openAt).toISOString().slice(0, 10)
+                  const receiptsLink = `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
+                  
                   return (
                     <TR key={shift.id}>
-                      <TD>{new Date(shift.openAt).toLocaleString('ru')}</TD>
-                      <TD>{shift.closeAt ? new Date(shift.closeAt).toLocaleString('ru') : '—'}</TD>
-                      <TD>{shift.openedBy || '—'}</TD>
-                      <TD>{shift.closedBy || '—'}</TD>
-                      <TD className="font-semibold">{rubFmt(totalNetto)}</TD>
                       <TD>
-                        <details className="cursor-pointer">
-                          <summary className="text-blue-600 hover:underline">
-                            {shift.sales?.length || 0} позиций
-                          </summary>
-                          <div className="mt-2 text-sm space-y-1">
-                            {shift.sales?.map((s: any, idx: number) => (
-                              <div key={idx}>
-                                {s.channel?.name} × {s.tenderType?.name}: {rubFmt(s.grossAmount - s.discounts - s.refunds)}
-                              </div>
-                            ))}
-                          </div>
-                        </details>
+                        <a 
+                          href={receiptsLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline font-semibold"
+                        >
+                          {new Date(shift.openAt).toLocaleDateString('ru', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric' 
+                          })}
+                        </a>
                       </TD>
-                      <TD>{shift.note || '—'}</TD>
+                      <TD>{shift.closedBy || '—'}</TD>
+                      <TD className="text-center">{shift.stats?.receiptsTotal || 0}</TD>
+                      <TD className="font-semibold text-green-700">{rubFmt(totalNetto)}</TD>
+                      <TD className="text-center text-orange-600">
+                        {shift.stats?.receiptsReturns || 0}
+                      </TD>
+                      <TD className="text-orange-600">
+                        {shift.stats?.sumReturns ? rubFmt(shift.stats.sumReturns) : '—'}
+                      </TD>
+                      <TD className="text-center text-red-600">
+                        {shift.stats?.receiptsDeleted || 0}
+                      </TD>
+                      <TD className="text-red-600">
+                        {shift.stats?.sumDeleted ? rubFmt(shift.stats.sumDeleted) : '—'}
+                      </TD>
                     </TR>
                   )
                 })}
                 {shifts.length === 0 && (
                   <TR>
-                    <TD colSpan={6} className="text-center text-gray-500">
-                      Нет смен
+                    <TD colSpan={8} className="text-center text-gray-500">
+                      Нет смен. Нажмите "Импортировать из iiko"
                     </TD>
                   </TR>
                 )}

@@ -7,7 +7,7 @@ import { requireRole, getUserId } from '../../utils/auth'
 export function createShiftsRouter(prisma: PrismaClient) {
   const router = Router()
 
-  // GET /api/shifts - список смен
+  // GET /api/shifts - список смен с детализацией из iiko чеков
   router.get('/', async (req, res) => {
     try {
       const tenant = await getTenant(prisma, req as any)
@@ -20,7 +20,7 @@ export function createShiftsRouter(prisma: PrismaClient) {
         if (to) where.openAt.lt = new Date(String(to))
       }
 
-      const items = await prisma.shift.findMany({
+      const shifts = await prisma.shift.findMany({
         where,
         include: {
           sales: {
@@ -32,6 +32,44 @@ export function createShiftsRouter(prisma: PrismaClient) {
         },
         orderBy: { openAt: 'desc' }
       })
+
+      // Обогащаем данные статистикой из iiko чеков
+      const items = await Promise.all(shifts.map(async (shift) => {
+        const shiftDate = shift.openAt
+        const dayStart = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate())
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+
+        // Получаем чеки за этот день
+        const receipts = await prisma.iikoReceipt.findMany({
+          where: {
+            date: { gte: dayStart, lt: dayEnd }
+          }
+        })
+
+        // Статистика по чекам
+        const receiptsTotal = receipts.filter(r => !r.isDeleted).length
+        const receiptsReturns = receipts.filter(r => r.isReturn && !r.isDeleted).length
+        const receiptsDeleted = receipts.filter(r => r.isDeleted).length
+        
+        const sumReturns = receipts
+          .filter(r => r.isReturn && !r.isDeleted)
+          .reduce((sum, r) => sum + Math.abs(r.returnSum || 0) * 100, 0)
+        
+        const sumDeleted = receipts
+          .filter(r => r.isDeleted)
+          .reduce((sum, r) => sum + Math.abs(r.net || 0) * 100, 0)
+
+        return {
+          ...shift,
+          stats: {
+            receiptsTotal,
+            receiptsReturns,
+            receiptsDeleted,
+            sumReturns,
+            sumDeleted
+          }
+        }
+      }))
 
       res.json({ items })
     } catch (e: any) {
