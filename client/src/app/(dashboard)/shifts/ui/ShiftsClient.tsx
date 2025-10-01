@@ -198,7 +198,7 @@ export default function ShiftsClient() {
                     </TR>
                   )
                 })}
-                {shifts.length === 0 && (
+                {displayShifts.length === 0 && (
                   <TR>
                     <TD colSpan={8} className="text-center text-gray-500">
                       Нет смен. Нажмите "Импортировать из iiko"
