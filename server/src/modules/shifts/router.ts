@@ -33,6 +33,8 @@ export function createShiftsRouter(prisma: PrismaClient) {
         orderBy: { openAt: 'desc' }
       })
 
+      console.log(`📊 Found ${shifts.length} shifts in DB`)
+      
       // Обогащаем данные статистикой из iiko чеков
       const items = await Promise.all(shifts.map(async (shift) => {
         const shiftDate = shift.openAt

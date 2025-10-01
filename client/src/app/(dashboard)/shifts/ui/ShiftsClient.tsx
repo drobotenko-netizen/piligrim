@@ -23,6 +23,7 @@ export default function ShiftsClient() {
     try {
       const res = await fetch(`${API_BASE}/api/shifts`, { credentials: 'include' })
       const data = await res.json()
+      console.log('📥 Loaded shifts from API:', data.items?.length || 0)
       setShifts(data.items || [])
     } catch (e) {
       console.error(e)
