@@ -13,7 +13,13 @@ export default function ShiftsClient() {
   const [importing, setImporting] = useState(false)
   const [reconciliation, setReconciliation] = useState<any[]>([])
   const [viewMode, setViewMode] = useState<'merge' | 'separate'>('merge')
-  const [importDays, setImportDays] = useState(30)
+  
+  // Период по умолчанию: последние 30 дней
+  const defaultTo = new Date().toISOString().slice(0, 10)
+  const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  
+  const [dateFrom, setDateFrom] = useState(defaultFrom)
+  const [dateTo, setDateTo] = useState(defaultTo)
 
   useEffect(() => {
     loadShifts()
@@ -46,16 +52,13 @@ export default function ShiftsClient() {
   }
 
   async function importFromIiko() {
-    if (!confirm(`Импортировать смены из iiko за последние ${importDays} дней?`)) return
+    if (!confirm(`Импортировать смены из iiko с ${dateFrom} по ${dateTo}?`)) return
     
     setImporting(true)
     try {
-      const to = new Date()
-      const from = new Date(to.getTime() - importDays * 24 * 60 * 60 * 1000)
-      
       const payload = {
-        fromDate: from.toISOString().slice(0, 10),
-        toDate: to.toISOString().slice(0, 10),
+        fromDate: dateFrom,
+        toDate: dateTo,
         mergeByDay: false // Всегда импортируем раздельно
       }
       
@@ -140,18 +143,20 @@ export default function ShiftsClient() {
         
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Период:</span>
-            <select 
-              value={importDays} 
-              onChange={(e) => setImportDays(Number(e.target.value))}
+            <span className="text-sm text-gray-600">с</span>
+            <input 
+              type="date" 
+              value={dateFrom} 
+              onChange={(e) => setDateFrom(e.target.value)}
               className="border rounded px-2 py-1 text-sm"
-            >
-              <option value={7}>7 дней</option>
-              <option value={14}>14 дней</option>
-              <option value={30}>30 дней</option>
-              <option value={60}>60 дней</option>
-              <option value={90}>90 дней</option>
-            </select>
+            />
+            <span className="text-sm text-gray-600">по</span>
+            <input 
+              type="date" 
+              value={dateTo} 
+              onChange={(e) => setDateTo(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+            />
           </div>
           
           <Button 
