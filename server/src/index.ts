@@ -26,6 +26,9 @@ import { installPrismaAuditMiddleware } from './utils/prisma-audit-mw'
 import { createIikoRouter } from './modules/iiko/router'
 import { createGSheetsRouter, createGSheetsImportRouter } from './modules/gsheets/router'
 import balancesRouter from './modules/balances/router'
+import { createChannelsRouter } from './modules/channels/router'
+import { createTenderTypesRouter } from './modules/tender-types/router'
+import { createShiftsRouter } from './modules/shifts/router'
 
 const prisma = new PrismaClient()
 installPrismaAuditMiddleware(prisma)
@@ -81,6 +84,9 @@ app.use('/api/gsheets', createGSheetsRouter())
 app.use('/api/gsheets', createGSheetsImportRouter(prisma))
 app.use('/api/counterparties', createCounterpartiesRouter(prisma))
 app.use('/api/counterparty-types', createCounterpartyTypesRouter(prisma))
+app.use('/api/channels', createChannelsRouter(prisma))
+app.use('/api/tender-types', createTenderTypesRouter(prisma))
+app.use('/api/shifts', createShiftsRouter(prisma))
 app.use('/api/balances', balancesRouter)
 app.use('/api/auth/otp', createOtpRouter(prisma))
 app.use('/api/admin/users', createAdminUsersRouter(prisma))

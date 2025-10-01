@@ -10,57 +10,63 @@ datasource db {
 // Note: SQLite не поддерживает enum — используем String + валидацию на уровне API
 
 model Tenant {
-  id        String     @id @default(cuid())
-  name      String
-  positions Position[]
-  employees Employee[]
-  timesheets Timesheet[]
-  adjustments Adjustment[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  payouts    Payout[]
-  positionRates PositionRate[]
-  accounts   Account[]
-  categories Category[]
-  transactions Transaction[]
+  id             String         @id @default(cuid())
+  name           String
+  positions      Position[]
+  employees      Employee[]
+  timesheets     Timesheet[]
+  adjustments    Adjustment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  payouts        Payout[]
+  positionRates  PositionRate[]
+  accounts       Account[]
+  categories     Category[]
+  transactions   Transaction[]
   counterparties Counterparty[]
-  statements Statement[]
-  users      User[]
-  userRoles  UserRole[]
-  auditLogs  AuditLog[]
+  statements     Statement[]
+  users          User[]
+  userRoles      UserRole[]
+  auditLogs      AuditLog[]
+  channels       Channel[]
+  tenderTypes    TenderType[]
+  shifts         Shift[]
+  expenseDocs    ExpenseDoc[]
+  payments       Payment[]
+  cashTxs        CashTx[]
 }
 
 model Position {
-  id           String    @id @default(cuid())
-  tenantId     String
-  tenant       Tenant    @relation(fields: [tenantId], references: [id])
-  name         String
-  baseHourRate Int?      // копейки, опционально
-  kind         String    // 'SHIFTS_PLUS_REVENUE' | 'SALARY' | 'SALARY_PLUS_TASKS'
+  id                String         @id @default(cuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id])
+  name              String
+  baseHourRate      Int? // копейки, опционально
+  kind              String // 'SHIFTS_PLUS_REVENUE' | 'SALARY' | 'SALARY_PLUS_TASKS'
   revenuePercentBps Int? // базисные пункты % выручки (0-10000)
-  salaryAmount  Int?     // оклад в копейках
-  department   String?   // 'KITCHEN' | 'HALL' | 'OFFICE'
-  employees    Employee[]
-  rates        PositionRate[]
+  salaryAmount      Int? // оклад в копейках
+  department        String? // 'KITCHEN' | 'HALL' | 'OFFICE'
+  employees         Employee[]
+  rates             PositionRate[]
 }
 
 model Employee {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   tenantId         String
-  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
   positionId       String?
-  position         Position? @relation(fields: [positionId], references: [id])
+  position         Position?     @relation(fields: [positionId], references: [id])
   fullName         String
-  active           Boolean  @default(true)
-  hiredAt          DateTime @default(now())
+  active           Boolean       @default(true)
+  hiredAt          DateTime      @default(now())
   firedAt          DateTime?
   personalHourRate Int?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
   timesheets       Timesheet[]
   adjustments      Adjustment[]
   payouts          Payout[]
-  transactions    Transaction[]
+  transactions     Transaction[]
 }
 
 model Timesheet {
@@ -69,8 +75,8 @@ model Timesheet {
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id])
-  workDate   DateTime  // date (00:00)
-  minutes    Int       // количество минут за день
+  workDate   DateTime // date (00:00)
+  minutes    Int // количество минут за день
   status     String   @default("draft") // 'draft' | 'approved'
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -85,27 +91,29 @@ model Adjustment {
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id])
   date       DateTime
-  kind       String   // 'bonus' | 'fine' | 'deduction'
-  amount     Int      // копейки, положительное
+  kind       String // 'bonus' | 'fine' | 'deduction'
+  amount     Int // копейки, положительное
   reason     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
 
 model Account {
-  id       String   @id @default(cuid())
-  tenantId String
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  name     String
-  kind     String   // 'cash' | 'bank' | 'card' | 'safe'
-  active   Boolean  @default(true)
-  payouts  Payout[]
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  name         String
+  kind         String // 'cash' | 'bank' | 'card' | 'safe'
+  active       Boolean       @default(true)
+  payouts      Payout[]
   transactions Transaction[] @relation("AccountTransactions")
-  statements Statement[]
-  createdBy String?
-  updatedBy String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  statements   Statement[]
+  payments     Payment[]
+  cashTxs      CashTx[]
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Payout {
@@ -118,8 +126,8 @@ model Payout {
   // период начисления, за который платим
   year       Int
   month      Int
-  amount     Int      // копейки, положительное
-  method     String   // 'cash' | 'card'
+  amount     Int // копейки, положительное
+  method     String // 'cash' | 'card'
   accountId  String?
   account    Account? @relation(fields: [accountId], references: [id])
   note       String?
@@ -130,47 +138,49 @@ model Payout {
 }
 
 model PositionRate {
-  id         String   @id @default(cuid())
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  positionId String
-  position   Position @relation(fields: [positionId], references: [id])
-  year       Int
-  month      Int
-  baseHourRate Int?
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  positionId        String
+  position          Position @relation(fields: [positionId], references: [id])
+  year              Int
+  month             Int
+  baseHourRate      Int?
   revenuePercentBps Int?
-  salaryAmount Int?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  salaryAmount      Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([positionId, year, month])
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  name      String
-  type      String   // 'expense' | 'income'
-  activity  String   // 'OPERATING' | 'INVESTING' | 'FINANCING'
-  parentId  String?
-  parent    Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryHierarchy")
-  fund      String?  // Связь с фондом из Google Sheets
-  active    Boolean  @default(true)
-  createdBy String?
-  updatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  name         String
+  type         String // 'expense' | 'income'
+  kind         String? // 'COGS' | 'OPEX' | 'CAPEX' | 'TAX' | 'FEE' | 'OTHER'
+  activity     String // 'OPERATING' | 'INVESTING' | 'FINANCING'
+  parentId     String?
+  parent       Category?     @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[]    @relation("CategoryHierarchy")
+  fund         String? // Связь с фондом из Google Sheets
+  active       Boolean       @default(true)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   transactions Transaction[]
+  expenseDocs  ExpenseDoc[]
 }
 
 model Statement {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
   accountId   String
-  account     Account  @relation(fields: [accountId], references: [id])
+  account     Account         @relation(fields: [accountId], references: [id])
   periodYear  Int
   periodMonth Int
   opening     Int
@@ -178,80 +188,80 @@ model Statement {
   source      String?
   createdBy   String?
   updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   lines       StatementLine[]
 
   @@unique([accountId, periodYear, periodMonth])
 }
 
 model StatementLine {
-  id           String   @id @default(cuid())
-  statementId  String
-  statement    Statement @relation(fields: [statementId], references: [id])
-  paymentDate  DateTime
-  amount       Int
-  description  String?
-  externalId   String?
+  id                   String    @id @default(cuid())
+  statementId          String
+  statement            Statement @relation(fields: [statementId], references: [id])
+  paymentDate          DateTime
+  amount               Int
+  description          String?
+  externalId           String?
   matchedTransactionId String?
-  status       String?
-  createdBy    String?
-  createdAt    DateTime @default(now())
+  status               String?
+  createdBy            String?
+  createdAt            DateTime  @default(now())
 }
 
 // ===== RBAC & Users =====
 
 model User {
-  id         String   @id @default(cuid())
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  fullName   String
-  phone      String   @unique
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  roles      UserRole[]
-  auditLogs  AuditLog[]
+  id        String     @id @default(cuid())
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  fullName  String
+  phone     String     @unique
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  roles     UserRole[]
+  auditLogs AuditLog[]
 }
 
 model Role {
-  id         String   @id @default(cuid())
-  name       String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  users      UserRole[]
-  rolePerms  RolePermission[]
+  id        String           @id @default(cuid())
+  name      String           @unique
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  users     UserRole[]
+  rolePerms RolePermission[]
 }
 
 model Permission {
-  id         String   @id @default(cuid())
-  name       String   @unique
+  id          String           @id @default(cuid())
+  name        String           @unique
   description String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  rolePerms  RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  rolePerms   RolePermission[]
 }
 
 model UserRole {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
   userId    String
-  user      User   @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
   roleId    String
-  role      Role   @relation(fields: [roleId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id])
   createdAt DateTime @default(now())
 
   @@unique([tenantId, userId, roleId])
 }
 
 model RolePermission {
-  id            String @id @default(cuid())
-  roleId        String
-  role          Role   @relation(fields: [roleId], references: [id])
-  permissionId  String
-  permission    Permission @relation(fields: [permissionId], references: [id])
-  createdAt     DateTime @default(now())
+  id           String     @id @default(cuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  createdAt    DateTime   @default(now())
 
   @@unique([roleId, permissionId])
 }
@@ -265,7 +275,7 @@ model AuditLog {
   action    String
   entity    String
   entityId  String?
-  diff      String?  // JSON
+  diff      String? // JSON
   ip        String?
   ua        String?
   createdAt DateTime @default(now())
@@ -274,45 +284,46 @@ model AuditLog {
 }
 
 model Counterparty {
-  id        String   @id @default(cuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  name      String
-  kind      String?
-  active    Boolean  @default(true)
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  name         String
+  kind         String?
+  active       Boolean       @default(true)
   transactions Transaction[]
-  createdBy String?
-  updatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  expenseDocs  ExpenseDoc[]
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Transaction {
-  id            String   @id @default(cuid())
-  tenantId      String
-  tenant        Tenant   @relation(fields: [tenantId], references: [id])
-  kind          String   // 'expense' | 'income' | 'transfer' | 'adjustment'
-  paymentDate   DateTime
-  accrualYear   Int?
-  accrualMonth  Int?
-  accountId     String?
-  account       Account? @relation("AccountTransactions", fields: [accountId], references: [id])
-  fromAccountId String?
-  toAccountId   String?
-  categoryId    String?
-  category      Category? @relation(fields: [categoryId], references: [id])
-  employeeId    String?
-  employee      Employee? @relation(fields: [employeeId], references: [id])
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  kind           String // 'expense' | 'income' | 'transfer' | 'adjustment'
+  paymentDate    DateTime
+  accrualYear    Int?
+  accrualMonth   Int?
+  accountId      String?
+  account        Account?      @relation("AccountTransactions", fields: [accountId], references: [id])
+  fromAccountId  String?
+  toAccountId    String?
+  categoryId     String?
+  category       Category?     @relation(fields: [categoryId], references: [id])
+  employeeId     String?
+  employee       Employee?     @relation(fields: [employeeId], references: [id])
   counterpartyId String?
   counterparty   Counterparty? @relation(fields: [counterpartyId], references: [id])
-  method        String?
-  amount        Int
-  note          String?
-  source        String?
-  createdBy     String?
-  updatedBy     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  method         String?
+  amount         Int
+  note           String?
+  source         String?
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([paymentDate])
   @@index([accrualYear, accrualMonth])
@@ -321,54 +332,207 @@ model Transaction {
   @@index([categoryId])
 }
 
+// ===== Cafe Finance Lite v3 Models =====
+
+// Справочник каналов продаж
+model Channel {
+  id         String      @id @default(cuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  name       String // 'Dine-in', 'Pickup', 'Grab', 'Foodpanda'
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  shiftSales ShiftSale[]
+}
+
+// Справочник способов оплаты
+model TenderType {
+  id         String      @id @default(cuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  name       String // 'cash', 'card', 'qr', 'aggregator'
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  shiftSales ShiftSale[]
+}
+
+// Смены
+model Shift {
+  id        String      @id @default(cuid())
+  tenantId  String
+  tenant    Tenant      @relation(fields: [tenantId], references: [id])
+  openAt    DateTime
+  closeAt   DateTime?
+  openedBy  String?
+  closedBy  String?
+  note      String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  sales     ShiftSale[]
+
+  @@index([openAt])
+  @@index([closeAt])
+}
+
+// Продажи по сменам (канал × способ оплаты)
+model ShiftSale {
+  id           String     @id @default(cuid())
+  shiftId      String
+  shift        Shift      @relation(fields: [shiftId], references: [id])
+  channelId    String
+  channel      Channel    @relation(fields: [channelId], references: [id])
+  tenderTypeId String
+  tenderType   TenderType @relation(fields: [tenderTypeId], references: [id])
+  grossAmount  Int // в копейках
+  discounts    Int        @default(0)
+  refunds      Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([shiftId])
+}
+
+// Документы расходов (с учётом долгов)
+model ExpenseDoc {
+  id            String              @id @default(cuid())
+  tenantId      String
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  vendorId      String?
+  vendor        Counterparty?       @relation(fields: [vendorId], references: [id])
+  categoryId    String
+  category      Category            @relation(fields: [categoryId], references: [id])
+  operationDate DateTime // дата счёта/акта
+  postingPeriod DateTime // 1-е число месяца учёта
+  amount        Int // сумма документа (копейки)
+  paidAmount    Int                 @default(0) // суммарно оплачено
+  status        String // 'draft'|'unpaid'|'partial'|'paid'|'void'
+  activity      String // 'operating'|'investing'|'financing'
+  memo          String?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  payments      Payment[]
+  allocations   PaymentAllocation[]
+
+  @@index([postingPeriod])
+  @@index([status])
+  @@index([vendorId])
+}
+
+// Платежи
+model Payment {
+  id           String              @id @default(cuid())
+  tenantId     String
+  tenant       Tenant              @relation(fields: [tenantId], references: [id])
+  expenseDocId String? // если null - разовый платёж
+  expenseDoc   ExpenseDoc?         @relation(fields: [expenseDocId], references: [id])
+  accountId    String
+  account      Account             @relation(fields: [accountId], references: [id])
+  date         DateTime
+  amount       Int // копейки
+  activity     String? // для переопределения вида деятельности
+  memo         String?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  allocations  PaymentAllocation[]
+  cashTxs      CashTx[]
+
+  @@index([date])
+  @@index([expenseDocId])
+}
+
+// Распределение платежей на документы
+model PaymentAllocation {
+  id           String     @id @default(cuid())
+  paymentId    String
+  payment      Payment    @relation(fields: [paymentId], references: [id])
+  expenseDocId String
+  expenseDoc   ExpenseDoc @relation(fields: [expenseDocId], references: [id])
+  amount       Int // копейки
+  createdAt    DateTime   @default(now())
+
+  @@index([paymentId])
+  @@index([expenseDocId])
+}
+
+// Денежные операции (реальные движения денег)
+model CashTx {
+  id                     String   @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id])
+  accountId              String
+  account                Account  @relation(fields: [accountId], references: [id])
+  date                   DateTime
+  direction              String // 'in'|'out'
+  amount                 Int // копейки
+  sourceType             String // 'shift'|'payment'|'bank_fee'|'transfer'
+  sourceId               String
+  memo                   String?
+  activity               String // 'operating'|'investing'|'financing'
+  matchedStatementLineId String?
+  paymentId              String? // связь с Payment если источник - платёж
+  payment                Payment? @relation(fields: [paymentId], references: [id])
+  createdAt              DateTime @default(now())
+
+  @@index([date])
+  @@index([activity])
+  @@index([direction])
+  @@index([accountId])
+}
+
 // ===== iiko Receipts staging (для локального хранения чеков) =====
 
 model IikoReceipt {
-  id             String   @id @default(cuid())
-  orderNum       String
-  date           DateTime
-  waiter         String?
-  register       String?
-  customerName   String?
-  customerPhone  String?
-  orderType      String?
+  id                  String            @id @default(cuid())
+  orderNum            String
+  date                DateTime
+  waiter              String?
+  register            String?
+  customerName        String?
+  customerPhone       String?
+  orderType           String?
   deliveryServiceType String?
-  isReturn       Boolean?
-  returnSum      Int?      // сумма возврата по чеку (целая)
-  isDeleted      Boolean?  // флаг удаленного чека
+  isReturn            Boolean?
+  returnSum           Int? // сумма возврата по чеку (целая)
+  isDeleted           Boolean? // флаг удаленного чека
   deletedWithWriteoff Boolean? // удален с/без списания
-  orderDeleted   String?   // статус удаления чека (DELETED/NOT_DELETED)
-  openTime       DateTime? // время открытия чека
-  closeTime      DateTime? // время закрытия чека
-  rawJson        String?   // полный OLAP-ряд по чеку
-  payTypesJson   String?   // JSON-массив типов оплат
-  guests         Int?
-  net            Int?      // сумма по чеку (целое)
-  cost           Int?      // себестоимость (целое)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  items          IikoReceiptItem[]
+  orderDeleted        String? // статус удаления чека (DELETED/NOT_DELETED)
+  openTime            DateTime? // время открытия чека
+  closeTime           DateTime? // время закрытия чека
+  rawJson             String? // полный OLAP-ряд по чеку
+  payTypesJson        String? // JSON-массив типов оплат
+  guests              Int?
+  net                 Int? // сумма по чеку (целое)
+  cost                Int? // себестоимость (целое)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  items               IikoReceiptItem[]
 
+  @@unique([orderNum, date])
   @@index([date])
   @@index([isDeleted])
-  @@unique([orderNum, date])
   @@index([orderNum, date])
 }
 
 model IikoReceiptItem {
-  receiptId    String
-  lineNo       Int
-  dishId       String?
-  dishName     String?
-  size         String?
-  qty          Int?
-  net          Int?
-  cost         Int?
-  measureUnit  String?
-  returnSum    Int?
-  rawJson      String?   // полный OLAP-ряд по позиции
+  receiptId   String
+  lineNo      Int
+  dishId      String?
+  dishName    String?
+  size        String?
+  qty         Int?
+  net         Int?
+  cost        Int?
+  measureUnit String?
+  returnSum   Int?
+  rawJson     String? // полный OLAP-ряд по позиции
 
-  receipt      IikoReceipt @relation(fields: [receiptId], references: [id])
+  receipt IikoReceipt @relation(fields: [receiptId], references: [id])
 
   @@id([receiptId, lineNo])
 }
@@ -378,9 +542,9 @@ model IikoOlapRowKV {
   id        String   @id @default(cuid())
   date      DateTime
   orderNum  String
-  level     String   // 'RECEIPT' | 'ITEM'
-  itemKey   String?  // идентификатор позиции (например, DishId)
-  col       String   // имя колонки из OLAP (как в API)
+  level     String // 'RECEIPT' | 'ITEM'
+  itemKey   String? // идентификатор позиции (например, DishId)
+  col       String // имя колонки из OLAP (как в API)
   valStr    String?
   valNum    Float?
   createdAt DateTime @default(now())
@@ -390,14 +554,14 @@ model IikoOlapRowKV {
 }
 
 model IikoImportCheckpoint {
-  jobName   String  @id
+  jobName   String   @id
   cursor    String?
   updatedAt DateTime @updatedAt
 }
 
 // ===== GSheets staging for cashflow =====
 model GsCashflowRow {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   spreadsheet String
   sheet       String
   rowNum      Int
@@ -405,17 +569,16 @@ model GsCashflowRow {
   monthNum    Int?
   date        DateTime?
   dateText    String?
-  amount      Int?     // в копейках
+  amount      Int? // в копейках
   wallet      String?
   supplier    String?
   comment     String?
   fund        String?
-  flowType    String?  // Поступление | Выбытие
-  activity    String?  // Операционная и т.п.
-  raw         String?  // JSON исходной строки
-  createdAt   DateTime @default(now())
+  flowType    String? // Поступление | Выбытие
+  activity    String? // Операционная и т.п.
+  raw         String? // JSON исходной строки
+  createdAt   DateTime  @default(now())
 
   @@unique([spreadsheet, sheet, rowNum])
   @@index([spreadsheet, sheet])
 }
-
