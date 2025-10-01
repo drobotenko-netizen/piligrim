@@ -85,42 +85,125 @@ export function createReportsRouter(prisma: PrismaClient) {
     res.json({ items: Array.from(map.values()), months, total: totalNet })
   })
 
-  // ОПиУ: агрегирование по accrualYear/Month, fallback на paymentDate при отсутствии
+  // ОПиУ (P&L): начисленный результат по posting_period с разбивкой на COGS/Валовую/OPEX
   router.get('/pnl', async (req, res) => {
-    if (!prisma.transaction) return res.json({ items: [], totals: { income: 0, expense: 0, net: 0 } })
-    const y = Number(req.query.y)
-    const m = Number(req.query.m)
-    if (!y || !m) return res.status(400).json({ error: 'y/m required' })
-    const start = new Date(Date.UTC(y, m - 1, 1))
-    const end = new Date(Date.UTC(y, m, 1))
-    const tx = await prisma.transaction.findMany({
-      where: {
-        kind: { in: ['income', 'expense', 'adjustment'] },
-        OR: [
-          { AND: [{ accrualYear: y }, { accrualMonth: m }] },
-          { AND: [{ accrualYear: null }, { accrualMonth: null }, { paymentDate: { gte: start, lt: end } }] }
-        ]
-      },
-      include: { category: true }
-    })
-    type Row = { activity: string; type: 'income'|'expense'; categoryId: string | null; categoryName: string; amount: number }
-    const rows: Row[] = []
-    for (const t of tx) {
-      const activity = t.activity || t.category?.activity || 'OPERATING'
-      const type: 'income'|'expense' = t.kind === 'income' ? 'income' : 'expense'
-      const amount = t.kind === 'income' ? t.amount : t.amount
-      rows.push({ activity, type, categoryId: t.categoryId || null, categoryName: t.category?.name || '', amount })
+    try {
+      const y = Number(req.query.y)
+      const m = Number(req.query.m)
+      if (!y || !m) return res.status(400).json({ error: 'y/m required' })
+      
+      const postingPeriod = new Date(Date.UTC(y, m - 1, 1))
+
+      // 1. Выручка из смен (по posting_period = месяц закрытия)
+      const shifts = await prisma.shift.findMany({
+        where: {
+          closeAt: {
+            gte: new Date(Date.UTC(y, m - 1, 1)),
+            lt: new Date(Date.UTC(y, m, 1))
+          }
+        },
+        include: {
+          sales: {
+            include: {
+              channel: true,
+              tenderType: true
+            }
+          }
+        }
+      })
+
+      let totalRevenue = 0
+      const revenueByChannel: Record<string, number> = {}
+
+      shifts.forEach(shift => {
+        shift.sales.forEach(sale => {
+          const netto = sale.grossAmount - sale.discounts - sale.refunds
+          totalRevenue += netto
+          const channelName = sale.channel.name
+          revenueByChannel[channelName] = (revenueByChannel[channelName] || 0) + netto
+        })
+      })
+
+      // 2. Расходы из ExpenseDoc по posting_period
+      const expenses = await prisma.expenseDoc.findMany({
+        where: {
+          postingPeriod,
+          status: { not: 'void' }
+        },
+        include: {
+          category: true,
+          vendor: true
+        }
+      })
+
+      let cogs = 0
+      let opex = 0
+      let capex = 0
+      let tax = 0
+      let fee = 0
+      let other = 0
+
+      const expensesByKind: Record<string, any[]> = {
+        COGS: [],
+        OPEX: [],
+        CAPEX: [],
+        TAX: [],
+        FEE: [],
+        OTHER: []
+      }
+
+      expenses.forEach(exp => {
+        const kind = exp.category.kind || 'OTHER'
+        const amount = exp.amount
+
+        expensesByKind[kind] = expensesByKind[kind] || []
+        expensesByKind[kind].push({
+          categoryName: exp.category.name,
+          vendorName: exp.vendor?.name,
+          amount
+        })
+
+        if (kind === 'COGS') cogs += amount
+        else if (kind === 'OPEX') opex += amount
+        else if (kind === 'CAPEX') capex += amount
+        else if (kind === 'TAX') tax += amount
+        else if (kind === 'FEE') fee += amount
+        else other += amount
+      })
+
+      const grossProfit = totalRevenue - cogs
+      const operatingProfit = grossProfit - opex
+      const netProfit = operatingProfit - tax - fee - other
+
+      res.json({
+        period: { year: y, month: m },
+        revenue: {
+          total: totalRevenue,
+          byChannel: revenueByChannel
+        },
+        expenses: {
+          cogs: { total: cogs, items: expensesByKind.COGS },
+          opex: { total: opex, items: expensesByKind.OPEX },
+          capex: { total: capex, items: expensesByKind.CAPEX },
+          tax: { total: tax, items: expensesByKind.TAX },
+          fee: { total: fee, items: expensesByKind.FEE },
+          other: { total: other, items: expensesByKind.OTHER }
+        },
+        totals: {
+          revenue: totalRevenue,
+          cogs,
+          grossProfit,
+          opex,
+          operatingProfit,
+          tax,
+          fee,
+          other,
+          netProfit
+        }
+      })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
     }
-    const map = new Map<string, { activity: string; type: string; categoryName: string; sum: number }>()
-    let totalIncome = 0, totalExpense = 0
-    for (const r of rows) {
-      const key = `${r.activity}__${r.type}__${r.categoryName}`
-      const agg = map.get(key) || { activity: r.activity, type: r.type, categoryName: r.categoryName, sum: 0 }
-      agg.sum += r.amount
-      map.set(key, agg)
-      if (r.type === 'income') totalIncome += r.amount; else totalExpense += r.amount
-    }
-    res.json({ items: Array.from(map.values()), totals: { income: totalIncome, expense: totalExpense, net: totalIncome - totalExpense } })
   })
 
   // Отчёт Aging: долги по поставщикам с bucket'ами по срокам

@@ -27,13 +27,14 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     const bodySchema = z.object({
       name: z.string().trim().min(1),
       type: z.enum(['expense','income']),
+      kind: z.enum(['COGS','OPEX','CAPEX','TAX','FEE','OTHER']).optional().nullable(),
       activity: z.enum(['OPERATING','INVESTING','FINANCING']),
       parentId: z.string().optional().nullable(),
       fund: z.string().optional().nullable()
     })
     const parsed = bodySchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ error: 'bad request', details: parsed.error.flatten() })
-    const { name, type, activity, parentId, fund } = parsed.data
+    const { name, type, kind, activity, parentId, fund } = parsed.data
     
     // Проверяем: если есть parentId, то это статья и можно привязать фонд
     // Если нет parentId, то это корневая категория и фонд должен быть null
@@ -42,7 +43,7 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     }
     
     const tenant = await getTenant(prisma, req as any)
-    const created = await prisma.category.create({ data: { tenantId: tenant.id, name, type, activity, parentId, fund, createdBy: getUserId(req as any) } })
+    const created = await prisma.category.create({ data: { tenantId: tenant.id, name, type, kind, activity, parentId, fund, createdBy: getUserId(req as any) } })
     res.json({ data: created })
   })
 
@@ -52,6 +53,7 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     const bodySchema = z.object({
       name: z.string().trim().optional(),
       type: z.enum(['expense','income']).optional(),
+      kind: z.enum(['COGS','OPEX','CAPEX','TAX','FEE','OTHER']).nullable().optional(),
       activity: z.enum(['OPERATING','INVESTING','FINANCING']).optional(),
       parentId: z.string().nullable().optional(),
       fund: z.string().nullable().optional(),
@@ -74,6 +76,7 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     const patch: any = {}
     if (body.name !== undefined) patch.name = body.name
     if (body.type !== undefined) patch.type = body.type
+    if (body.kind !== undefined) patch.kind = body.kind
     if (body.activity !== undefined) patch.activity = body.activity
     if (body.parentId !== undefined) patch.parentId = body.parentId
     if (body.fund !== undefined) patch.fund = body.fund
