@@ -1598,7 +1598,7 @@ export function createIikoRouter() {
   // POST /iiko/import/shifts - импорт смен из чеков iiko
   router.post('/import/shifts', async (req, res) => {
     try {
-      const { fromDate, toDate } = req.body
+      const { fromDate, toDate, mergeByDay = true } = req.body
       if (!fromDate || !toDate) {
         return res.status(400).json({ error: 'fromDate and toDate required (YYYY-MM-DD)' })
       }
@@ -1608,7 +1608,8 @@ export function createIikoRouter() {
       const { promisify } = await import('util')
       const execAsync = promisify(exec)
 
-      const cmd = `npx tsx scripts/import-shifts-from-iiko.ts "${fromDate}" "${toDate}"`
+      const mode = mergeByDay ? 'merge' : 'separate'
+      const cmd = `npx tsx scripts/import-shifts-from-iiko.ts "${fromDate}" "${toDate}" "${mode}"`
       const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() })
 
       res.json({ 

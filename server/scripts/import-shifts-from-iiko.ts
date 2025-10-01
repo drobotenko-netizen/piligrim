@@ -23,8 +23,10 @@ function mapToTenderType(payType: string): string {
   return 'Прочее'
 }
 
-async function importShiftsFromIiko(fromDate: string, toDate: string) {
+async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'merge' | 'separate' = 'merge') {
+  const modeText = mode === 'merge' ? 'объединение по дням' : 'раздельные смены'
   console.log(`🔄 Импорт смен из iiko API + чеков: ${fromDate} - ${toDate}`)
+  console.log(`📋 Режим: ${modeText}`)
 
   const tenant = await prisma.tenant.findFirst()
   if (!tenant) {
@@ -183,56 +185,57 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
   let shiftsCreated = 0
   let salesCreated = 0
 
-  // Создаём ОДНУ смену на день, объединяя данные из нескольких смен iiko
-  for (const [dateKey, dayShifts] of shiftsByDay.entries()) {
-    console.log(`\n📅 Обработка ${dateKey}: ${dayShifts.length} смен(ы) iiko`)
+  if (mode === 'merge') {
+    // РЕЖИМ 1: Объединяем смены по дням
+    for (const [dateKey, dayShifts] of shiftsByDay.entries()) {
+      console.log(`\n📅 Обработка ${dateKey}: ${dayShifts.length} смен(ы) iiko`)
 
-    // Проверяем, есть ли уже смена на этот день
-    const existingShift = await prisma.shift.findFirst({
-      where: {
-        tenantId: tenant.id,
-        openAt: {
-          gte: new Date(dateKey + 'T00:00:00.000Z'),
-          lt: new Date(dateKey + 'T23:59:59.999Z')
+      // Проверяем, есть ли уже смена на этот день
+      const existingShift = await prisma.shift.findFirst({
+        where: {
+          tenantId: tenant.id,
+          openAt: {
+            gte: new Date(dateKey + 'T00:00:00.000Z'),
+            lt: new Date(dateKey + 'T23:59:59.999Z')
+          }
         }
+      })
+
+      if (existingShift) {
+        console.log(`  ⏭️  Смена уже существует, пропускаем`)
+        continue
       }
-    })
 
-    if (existingShift) {
-      console.log(`  ⏭️  Смена уже существует, пропускаем`)
-      continue
-    }
-
-    // Берём самую раннюю дату открытия и самую позднюю дату закрытия
-    const openAt = new Date(Math.min(...dayShifts.map((s: any) => new Date(s.openDate).getTime())))
-    const closeAt = new Date(Math.max(...dayShifts.map((s: any) => 
-      s.closeDate ? new Date(s.closeDate).getTime() : new Date().getTime()
-    )))
-    
-    // Берём ответственного из последней закрытой смены
-    const lastShift = dayShifts.sort((a: any, b: any) => 
-      (b.closeDate ? new Date(b.closeDate).getTime() : 0) - 
-      (a.closeDate ? new Date(a.closeDate).getTime() : 0)
-    )[0]
-    
-    const userId = lastShift.responsibleUserId || lastShift.managerId
-    const closedBy = userId ? (employeesMap.get(userId) || userId) : 'unknown'
-    
-    const sessionNumbers = dayShifts.map((s: any) => s.sessionNumber).join(', ')
-    console.log(`  📡 Из iiko API: смены #${sessionNumbers}`)
-    console.log(`     Даты: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
-    console.log(`     Закрыл: ${closedBy}`)
-    
-    // Чеки за ДЕНЬ
-    const dayStart = new Date(dateKey + 'T00:00:00.000Z')
-    const dayEnd = new Date(dateKey + 'T23:59:59.999Z')
-    
-    const shiftReceipts = receipts.filter(r => {
-      const rDate = r.date
-      return rDate >= dayStart && rDate <= dayEnd
-    })
-    
-    console.log(`  📄 Чеков за день: ${shiftReceipts.length}`)
+      // Берём самую раннюю дату открытия и самую позднюю дату закрытия
+      const openAt = new Date(Math.min(...dayShifts.map((s: any) => new Date(s.openDate).getTime())))
+      const closeAt = new Date(Math.max(...dayShifts.map((s: any) => 
+        s.closeDate ? new Date(s.closeDate).getTime() : new Date().getTime()
+      )))
+      
+      // Берём ответственного из последней закрытой смены
+      const lastShift = dayShifts.sort((a: any, b: any) => 
+        (b.closeDate ? new Date(b.closeDate).getTime() : 0) - 
+        (a.closeDate ? new Date(a.closeDate).getTime() : 0)
+      )[0]
+      
+      const userId = lastShift.responsibleUserId || lastShift.managerId
+      const closedBy = userId ? (employeesMap.get(userId) || userId) : 'unknown'
+      
+      const sessionNumbers = dayShifts.map((s: any) => s.sessionNumber).join(', ')
+      console.log(`  📡 Из iiko API: смены #${sessionNumbers}`)
+      console.log(`     Даты: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
+      console.log(`     Закрыл: ${closedBy}`)
+      
+      // Чеки за ДЕНЬ
+      const dayStart = new Date(dateKey + 'T00:00:00.000Z')
+      const dayEnd = new Date(dateKey + 'T23:59:59.999Z')
+      
+      const shiftReceipts = receipts.filter(r => {
+        const rDate = r.date
+        return rDate >= dayStart && rDate <= dayEnd
+      })
+      
+      console.log(`  📄 Чеков за день: ${shiftReceipts.length}`)
 
     // Агрегируем продажи по channel × tenderType
     type SaleKey = string // `${channelName}__${tenderTypeName}`
@@ -321,6 +324,133 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
       console.log(`    📊 ${sale.channel} × ${sale.tender}: ${sale.gross / 100} ₽`)
     }
   }
+  } else {
+    // РЕЖИМ 2: Создаём отдельную смену для каждой смены iiko
+    for (const iikoShift of iikoShifts) {
+      if (!iikoShift.openDate) continue
+      
+      const openAt = new Date(iikoShift.openDate)
+      const closeAt = iikoShift.closeDate ? new Date(iikoShift.closeDate) : new Date()
+      const dateKey = openAt.toISOString().slice(0, 10)
+      
+      console.log(`\n📅 Обработка смены #${iikoShift.sessionNumber} (${dateKey})`)
+
+      // Проверяем, есть ли уже такая смена
+      const existingShift = await prisma.shift.findFirst({
+        where: {
+          tenantId: tenant.id,
+          openAt,
+          closeAt
+        }
+      })
+
+      if (existingShift) {
+        console.log(`  ⏭️  Смена уже существует, пропускаем`)
+        continue
+      }
+
+      const userId = iikoShift.responsibleUserId || iikoShift.managerId
+      const closedBy = userId ? (employeesMap.get(userId) || userId) : 'unknown'
+      
+      console.log(`  📡 Из iiko API:`)
+      console.log(`     Даты: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
+      console.log(`     Закрыл: ${closedBy}`)
+      
+      // Чеки за ДЕНЬ (т.к. у чеков нет точного времени)
+      const dayStart = new Date(dateKey + 'T00:00:00.000Z')
+      const dayEnd = new Date(dateKey + 'T23:59:59.999Z')
+      
+      const shiftReceipts = receipts.filter(r => {
+        const rDate = r.date
+        return rDate >= dayStart && rDate <= dayEnd
+      })
+      
+      console.log(`  📄 Чеков за день: ${shiftReceipts.length}`)
+
+      // Агрегируем продажи
+      type SaleKey = string
+      const salesAgg = new Map<SaleKey, { channel: string; tender: string; gross: number; discounts: number; refunds: number }>()
+
+      for (const receipt of shiftReceipts) {
+        const channelName = mapToChannel(receipt.orderType, receipt.deliveryServiceType)
+        
+        let payTypes: string[] = []
+        try {
+          if (receipt.payTypesJson) {
+            const parsed = JSON.parse(receipt.payTypesJson)
+            if (Array.isArray(parsed)) {
+              payTypes = parsed
+            }
+          }
+        } catch {}
+
+        if (payTypes.length === 0) payTypes = ['Прочее']
+
+        const netAmountCents = (receipt.net || 0) * 100
+        const amountPerType = Math.floor(netAmountCents / payTypes.length)
+
+        for (const payType of payTypes) {
+          const tenderName = mapToTenderType(payType)
+          const key: SaleKey = `${channelName}__${tenderName}`
+
+          const sale = salesAgg.get(key) || { 
+            channel: channelName, 
+            tender: tenderName, 
+            gross: 0, 
+            discounts: 0, 
+            refunds: 0 
+          }
+
+          sale.gross += amountPerType
+          if (receipt.isReturn) {
+            sale.refunds += Math.abs(receipt.returnSum || 0) * 100
+          }
+
+          salesAgg.set(key, sale)
+        }
+      }
+
+      // Создаём смену
+      const shift = await prisma.shift.create({
+        data: {
+          tenantId: tenant.id,
+          openAt,
+          closeAt,
+          openedBy: closedBy,
+          closedBy: closedBy,
+          note: `Смена iiko #${iikoShift.sessionNumber}: ${shiftReceipts.length} чеков`
+        }
+      })
+
+      shiftsCreated++
+      console.log(`  ✅ Смена создана: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
+
+      // Создаём продажи
+      for (const [key, sale] of salesAgg.entries()) {
+        const channelId = channelMap.get(sale.channel)
+        const tenderTypeId = tenderTypeMap.get(sale.tender)
+
+        if (!channelId || !tenderTypeId) {
+          console.warn(`  ⚠️  Пропуск: канал=${sale.channel}, способ=${sale.tender}`)
+          continue
+        }
+
+        await prisma.shiftSale.create({
+          data: {
+            shiftId: shift.id,
+            channelId,
+            tenderTypeId,
+            grossAmount: sale.gross,
+            discounts: sale.discounts,
+            refunds: sale.refunds
+          }
+        })
+
+        salesCreated++
+        console.log(`    📊 ${sale.channel} × ${sale.tender}: ${sale.gross / 100} ₽`)
+      }
+    }
+  }
 
   console.log(`\n✨ Импорт завершён:`)
   console.log(`  Смен создано: ${shiftsCreated}`)
@@ -330,8 +460,9 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
 // Запуск из командной строки
 const fromDate = process.argv[2] || '2025-01-01'
 const toDate = process.argv[3] || new Date().toISOString().slice(0, 10)
+const mode = (process.argv[4] === 'separate' ? 'separate' : 'merge') as 'merge' | 'separate'
 
-importShiftsFromIiko(fromDate, toDate)
+importShiftsFromIiko(fromDate, toDate, mode)
   .then(() => {
     console.log('✅ Готово!')
     prisma.$disconnect()

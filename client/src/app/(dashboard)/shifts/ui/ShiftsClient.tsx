@@ -11,6 +11,7 @@ export default function ShiftsClient() {
   const [shifts, setShifts] = useState<any[]>([])
   const [importing, setImporting] = useState(false)
   const [reconciliation, setReconciliation] = useState<any[]>([])
+  const [mergeMode, setMergeMode] = useState(true) // true = объединять, false = раздельно
 
   useEffect(() => {
     loadShifts()
@@ -42,7 +43,8 @@ export default function ShiftsClient() {
   }
 
   async function importFromIiko() {
-    if (!confirm('Импортировать смены из iiko за последние 30 дней?')) return
+    const mode = mergeMode ? 'объединять смены в одну за день' : 'создавать отдельную смену для каждой кассы'
+    if (!confirm(`Импортировать смены из iiko за последние 30 дней?\n\nРежим: ${mode}`)) return
     
     setImporting(true)
     try {
@@ -55,7 +57,8 @@ export default function ShiftsClient() {
         credentials: 'include',
         body: JSON.stringify({
           fromDate: from.toISOString().slice(0, 10),
-          toDate: to.toISOString().slice(0, 10)
+          toDate: to.toISOString().slice(0, 10),
+          mergeByDay: mergeMode
         })
       })
       
@@ -79,13 +82,24 @@ export default function ShiftsClient() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Смены (импорт из iiko)</h1>
-        <Button 
-          onClick={importFromIiko} 
-          disabled={importing}
-          className="bg-orange-500 hover:bg-orange-600 text-white"
-        >
-          {importing ? 'Импортируем...' : 'Импортировать из iiko'}
-        </Button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input 
+              type="checkbox" 
+              checked={mergeMode}
+              onChange={(e) => setMergeMode(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span>Объединять смены за день</span>
+          </label>
+          <Button 
+            onClick={importFromIiko} 
+            disabled={importing}
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+          >
+            {importing ? 'Импортируем...' : 'Импортировать из iiko'}
+          </Button>
+        </div>
       </div>
 
       {(
