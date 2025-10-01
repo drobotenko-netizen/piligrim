@@ -37,8 +37,8 @@ export default function ShiftsClient() {
     }
   }
 
-  function rubFmt(n: number) {
-    return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2 }).format(n) + ' ₽'
+  function rubFmt(cents: number) {
+    return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2 }).format(cents / 100) + ' ₽'
   }
 
   async function importFromIiko() {
@@ -115,7 +115,7 @@ export default function ShiftsClient() {
                       <TD>{shift.closeAt ? new Date(shift.closeAt).toLocaleString('ru') : '—'}</TD>
                       <TD>{shift.openedBy || '—'}</TD>
                       <TD>{shift.closedBy || '—'}</TD>
-                      <TD className="font-semibold">{rubFmt(totalNetto / 100)}</TD>
+                      <TD className="font-semibold">{rubFmt(totalNetto)}</TD>
                       <TD>
                         <details className="cursor-pointer">
                           <summary className="text-blue-600 hover:underline">
@@ -124,7 +124,7 @@ export default function ShiftsClient() {
                           <div className="mt-2 text-sm space-y-1">
                             {shift.sales?.map((s: any, idx: number) => (
                               <div key={idx}>
-                                {s.channel?.name} × {s.tenderType?.name}: {rubFmt((s.grossAmount - s.discounts - s.refunds) / 100)}
+                                {s.channel?.name} × {s.tenderType?.name}: {rubFmt(s.grossAmount - s.discounts - s.refunds)}
                               </div>
                             ))}
                           </div>
@@ -171,11 +171,11 @@ export default function ShiftsClient() {
                     <TR key={idx} className={isDiff ? 'bg-red-50' : ''}>
                       <TD>{r.date}</TD>
                       <TD>{r.receiptsCount}</TD>
-                      <TD>{rubFmt(r.receiptsTotal / 100)}</TD>
+                      <TD>{rubFmt(r.receiptsTotal)}</TD>
                       <TD>{r.shiftsCount}</TD>
-                      <TD>{rubFmt(r.shiftsTotal / 100)}</TD>
+                      <TD>{rubFmt(r.shiftsTotal)}</TD>
                       <TD className={isDiff ? 'text-red-600 font-bold' : 'text-green-600'}>
-                        {diff > 0 ? '+' : ''}{rubFmt(diff / 100)}
+                        {diff > 0 ? '+' : ''}{rubFmt(diff)}
                       </TD>
                       <TD>
                         {isDiff ? (
