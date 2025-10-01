@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client'
+import { IikoClient } from '../src/modules/iiko/client'
 
 const prisma = new PrismaClient()
+const iikoClient = new IikoClient()
 
 // Маппинг orderType + deliveryServiceType → Channel
 function mapToChannel(orderType: string | null, deliveryServiceType: string | null): string {
@@ -22,11 +24,25 @@ function mapToTenderType(payType: string): string {
 }
 
 async function importShiftsFromIiko(fromDate: string, toDate: string) {
-  console.log(`🔄 Импорт смен из iiko чеков: ${fromDate} - ${toDate}`)
+  console.log(`🔄 Импорт смен из iiko API + чеков: ${fromDate} - ${toDate}`)
 
   const tenant = await prisma.tenant.findFirst()
   if (!tenant) {
     throw new Error('Tenant not found')
+  }
+
+  // Получаем смены напрямую из iiko API
+  let iikoShifts: any[] = []
+  try {
+    iikoShifts = await iikoClient.getCashShifts({
+      openDateFrom: fromDate,
+      openDateTo: toDate,
+      status: 'CLOSED'
+    })
+    console.log(`📡 Получено смен из iiko API: ${iikoShifts.length}`)
+  } catch (e) {
+    console.warn(`⚠️  Не удалось получить смены из iiko API: ${e}`)
+    console.log(`   Используем группировку по чекам`)
   }
 
   // Получаем или создаём каналы и способы оплаты
@@ -78,6 +94,18 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
 
   console.log(`📄 Найдено чеков: ${receipts.length}`)
 
+  // Создаём map смен iiko по датам для быстрого поиска
+  const iikoShiftsMap = new Map<string, any>()
+  for (const iikoShift of iikoShifts) {
+    if (iikoShift.openDate) {
+      const dateKey = new Date(iikoShift.openDate).toISOString().slice(0, 10)
+      // Если в один день несколько смен - берём последнюю закрытую
+      if (!iikoShiftsMap.has(dateKey) || iikoShift.closeDate) {
+        iikoShiftsMap.set(dateKey, iikoShift)
+      }
+    }
+  }
+
   // Группируем чеки по дням
   const dayMap = new Map<string, any[]>()
   
@@ -112,13 +140,45 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
       continue
     }
 
-    // Находим минимальное и максимальное время
-    const times = dayReceipts
-      .map(r => r.closeTime || r.openTime || r.date)
-      .filter(t => t != null) as Date[]
+    // Получаем данные о смене из iiko API (если есть)
+    const iikoShift = iikoShiftsMap.get(dateKey)
     
-    const openAt = times.length > 0 ? new Date(Math.min(...times.map(t => t.getTime()))) : new Date(dateKey + 'T09:00:00.000Z')
-    const closeAt = times.length > 0 ? new Date(Math.max(...times.map(t => t.getTime()))) : new Date(dateKey + 'T23:00:00.000Z')
+    let openAt: Date
+    let closeAt: Date
+    let closedBy = 'unknown'
+    
+    if (iikoShift && iikoShift.openDate && iikoShift.closeDate) {
+      // Используем даты из iiko API
+      openAt = new Date(iikoShift.openDate)
+      closeAt = new Date(iikoShift.closeDate)
+      console.log(`  📡 Даты из iiko API: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
+    } else {
+      // Fallback: определяем из чеков
+      const times = dayReceipts
+        .map(r => r.closeTime || r.openTime || r.date)
+        .filter(t => t != null) as Date[]
+      
+      openAt = times.length > 0 ? new Date(Math.min(...times.map(t => t.getTime()))) : new Date(dateKey + 'T09:00:00.000Z')
+      closeAt = times.length > 0 ? new Date(Math.max(...times.map(t => t.getTime()))) : new Date(dateKey + 'T23:00:00.000Z')
+    }
+
+    // Определяем кто закрыл смену - берём самого частого официанта из чеков
+    const waiterCounts = new Map<string, number>()
+    dayReceipts.forEach(r => {
+      if (r.waiter) {
+        waiterCounts.set(r.waiter, (waiterCounts.get(r.waiter) || 0) + 1)
+      }
+    })
+    
+    let maxCount = 0
+    for (const [waiter, count] of waiterCounts.entries()) {
+      if (count > maxCount) {
+        maxCount = count
+        closedBy = waiter
+      }
+    }
+    
+    console.log(`  👤 Закрыл смену: ${closedBy} (по ${maxCount} чекам)`)
 
     // Агрегируем продажи по channel × tenderType
     type SaleKey = string // `${channelName}__${tenderTypeName}`
@@ -173,8 +233,8 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
         tenantId: tenant.id,
         openAt,
         closeAt,
-        openedBy: 'iiko-import',
-        closedBy: 'iiko-import',
+        openedBy: closedBy,
+        closedBy: closedBy,
         note: `Импорт из iiko: ${dayReceipts.length} чеков`
       }
     })

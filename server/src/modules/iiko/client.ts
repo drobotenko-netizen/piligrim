@@ -141,6 +141,21 @@ export class IikoClient {
     return await res.json()
   }
 
+  async getCashShifts(params: { openDateFrom: string; openDateTo: string; status?: string }): Promise<any[]> {
+    const key = await this.getToken()
+    const url = new URL(this.baseUrl('/resto/api/v2/cashshifts/list'))
+    url.searchParams.set('key', key)
+    url.searchParams.set('openDateFrom', params.openDateFrom)
+    url.searchParams.set('openDateTo', params.openDateTo)
+    url.searchParams.set('status', params.status || 'ANY')
+    const res = await fetch(url)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`iiko cashshifts failed ${res.status}: ${text?.slice(0, 200)}`)
+    }
+    return (await res.json()) as any[]
+  }
+
   async getRecipePrepared(params: { date: string; productId: string; departmentId?: string }): Promise<any> {
     const key = await this.getToken()
     const url = new URL(this.baseUrl('/resto/api/v2/assemblyCharts/getPrepared'))
