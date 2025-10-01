@@ -29,6 +29,8 @@ import balancesRouter from './modules/balances/router'
 import { createChannelsRouter } from './modules/channels/router'
 import { createTenderTypesRouter } from './modules/tender-types/router'
 import { createShiftsRouter } from './modules/shifts/router'
+import { createExpenseDocsRouter } from './modules/expense-docs/router'
+import { createPaymentsRouter } from './modules/payments/router'
 
 const prisma = new PrismaClient()
 installPrismaAuditMiddleware(prisma)
@@ -87,6 +89,8 @@ app.use('/api/counterparty-types', createCounterpartyTypesRouter(prisma))
 app.use('/api/channels', createChannelsRouter(prisma))
 app.use('/api/tender-types', createTenderTypesRouter(prisma))
 app.use('/api/shifts', createShiftsRouter(prisma))
+app.use('/api/expense-docs', createExpenseDocsRouter(prisma))
+app.use('/api/payments', createPaymentsRouter(prisma))
 app.use('/api/balances', balancesRouter)
 app.use('/api/auth/otp', createOtpRouter(prisma))
 app.use('/api/admin/users', createAdminUsersRouter(prisma))
