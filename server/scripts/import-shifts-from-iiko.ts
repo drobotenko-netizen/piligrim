@@ -190,21 +190,7 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
     for (const [dateKey, dayShifts] of shiftsByDay.entries()) {
       console.log(`\n📅 Обработка ${dateKey}: ${dayShifts.length} смен(ы) iiko`)
 
-      // Проверяем, есть ли уже смена на этот день
-      const existingShift = await prisma.shift.findFirst({
-        where: {
-          tenantId: tenant.id,
-          openAt: {
-            gte: new Date(dateKey + 'T00:00:00.000Z'),
-            lt: new Date(dateKey + 'T23:59:59.999Z')
-          }
-        }
-      })
-
-      if (existingShift) {
-        console.log(`  ⏭️  Смена уже существует, пропускаем`)
-        continue
-      }
+      // API уже удалил старые смены за период, создаём новую
 
       // Берём самую раннюю дату открытия и самую позднюю дату закрытия
       const openAt = new Date(Math.min(...dayShifts.map((s: any) => new Date(s.openDate).getTime())))
