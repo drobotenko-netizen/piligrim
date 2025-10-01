@@ -59,13 +59,39 @@ export function createShiftsRouter(prisma: PrismaClient) {
           })
         }
         
-        // Для удалённых чеков - берём все за день (у них часто нет sessionNumber)
-        const deletedReceipts = await prisma.iikoReceipt.findMany({
+        // Удаления относим к смене с максимальной выручкой за день
+        let deletedReceipts: any[] = []
+        
+        // Находим все смены этого дня
+        const dayShifts = await prisma.shift.findMany({
           where: {
-            date: { gte: dayStart, lt: dayEnd },
-            isDeleted: true
+            tenantId: shift.tenantId,
+            openAt: { gte: dayStart, lt: dayEnd }
+          },
+          include: {
+            sales: true
           }
         })
+        
+        // Вычисляем выручку каждой смены
+        const shiftsRevenue = dayShifts.map(s => ({
+          id: s.id,
+          sessionNum: s.iikoSessionNum,
+          revenue: s.sales.reduce((sum, sale) => sum + (sale.grossAmount - sale.discounts - sale.refunds), 0)
+        }))
+        
+        // Смена с максимальной выручкой
+        const maxRevenueShift = shiftsRevenue.sort((a, b) => b.revenue - a.revenue)[0]
+        
+        // Только для смены с макс выручкой показываем удаления
+        if (maxRevenueShift && maxRevenueShift.id === shift.id) {
+          deletedReceipts = await prisma.iikoReceipt.findMany({
+            where: {
+              date: { gte: dayStart, lt: dayEnd },
+              isDeleted: true
+            }
+          })
+        }
 
         // Статистика по чекам
         const receiptsTotal = receipts.filter(r => !r.isDeleted).length
