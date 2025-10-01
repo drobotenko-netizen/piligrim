@@ -768,6 +768,8 @@ export function createIikoRouter() {
         payTypes: safeParseArray(r.payTypesJson),
         waiter: r.waiter,
         register: r.register,
+        sessionNumber: r.sessionNumber,
+        cashRegNumber: r.cashRegNumber,
         customerName: r.customerName,
         customerPhone: r.customerPhone,
         orderType: r.orderType || null,
