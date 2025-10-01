@@ -58,7 +58,9 @@ export default function ShiftsClient() {
         mergeByDay: importMode === 'merge'
       }
       
-      console.log('📤 Sending import request:', payload)
+      console.log('📤 Import mode state:', importMode)
+      console.log('📤 mergeByDay value:', importMode === 'merge')
+      console.log('📤 Full payload:', JSON.stringify(payload, null, 2))
       
       const res = await fetch(`${API_BASE}/api/iiko/import/shifts`, {
         method: 'POST',
@@ -88,7 +90,10 @@ export default function ShiftsClient() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Смены (импорт из iiko)</h1>
         <div className="flex items-center gap-4">
-          <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'merge' | 'separate')}>
+          <Tabs value={importMode} onValueChange={(v) => {
+            console.log('🔄 Tab changed to:', v)
+            setImportMode(v as 'merge' | 'separate')
+          }}>
             <TabsList>
               <TabsTrigger value="merge">Объединять за день</TabsTrigger>
               <TabsTrigger value="separate">Раздельно (кассы)</TabsTrigger>
