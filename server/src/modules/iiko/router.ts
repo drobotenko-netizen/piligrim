@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import { IikoClient, buildDayRangeIso } from './client'
 import { importReceiptsForDate, importReceiptsRange } from './etl/receipts'
-import { prisma } from '../../utils/prisma-audit-mw'
 
 export function createIikoRouter() {
   const router = Router()
@@ -1601,6 +1600,9 @@ export function createIikoRouter() {
   // POST /iiko/import/shifts - импорт смен из чеков iiko
   router.post('/import/shifts', async (req, res) => {
     try {
+      const prisma = (req as any).prisma || req.app.get('prisma')
+      if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+
       const { fromDate, toDate, mergeByDay = true } = req.body
       console.log('📥 Import shifts request:', { fromDate, toDate, mergeByDay })
       
