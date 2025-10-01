@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { IikoClient, buildDayRangeIso } from './client'
 import { importReceiptsForDate, importReceiptsRange } from './etl/receipts'
+import { prisma } from '../../utils/prisma-audit-mw'
 
 export function createIikoRouter() {
   const router = Router()
