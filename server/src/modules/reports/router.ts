@@ -358,7 +358,9 @@ export function createReportsRouter(prisma: PrismaClient) {
         const day = r.date.toISOString().slice(0, 10)
         const current = receiptsMap.get(day) || { count: 0, total: 0 }
         current.count++
-        current.total += r.net || 0
+        // Вычитаем возвраты (returnSum) из суммы чеков
+        const netAmount = (r.net || 0) - (r.isReturn ? Math.abs(r.returnSum || 0) : 0)
+        current.total += netAmount
         receiptsMap.set(day, current)
       }
 
