@@ -13,6 +13,7 @@ export default function ShiftsClient() {
   const [importing, setImporting] = useState(false)
   const [reconciliation, setReconciliation] = useState<any[]>([])
   const [viewMode, setViewMode] = useState<'merge' | 'separate'>('merge')
+  const [importDays, setImportDays] = useState(30)
 
   useEffect(() => {
     loadShifts()
@@ -45,12 +46,12 @@ export default function ShiftsClient() {
   }
 
   async function importFromIiko() {
-    if (!confirm('Импортировать смены из iiko за последние 30 дней?')) return
+    if (!confirm(`Импортировать смены из iiko за последние ${importDays} дней?`)) return
     
     setImporting(true)
     try {
       const to = new Date()
-      const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const from = new Date(to.getTime() - importDays * 24 * 60 * 60 * 1000)
       
       const payload = {
         fromDate: from.toISOString().slice(0, 10),
@@ -130,14 +131,29 @@ export default function ShiftsClient() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Смены (импорт из iiko)</h1>
-        <div className="flex items-center gap-4">
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'merge' | 'separate')}>
-            <TabsList>
-              <TabsTrigger value="merge">По дням</TabsTrigger>
-              <TabsTrigger value="separate">По кассам</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'merge' | 'separate')}>
+          <TabsList>
+            <TabsTrigger value="merge">По дням</TabsTrigger>
+            <TabsTrigger value="separate">По кассам</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Период:</span>
+            <select 
+              value={importDays} 
+              onChange={(e) => setImportDays(Number(e.target.value))}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              <option value={7}>7 дней</option>
+              <option value={14}>14 дней</option>
+              <option value={30}>30 дней</option>
+              <option value={60}>60 дней</option>
+              <option value={90}>90 дней</option>
+            </select>
+          </div>
+          
           <Button 
             onClick={importFromIiko} 
             disabled={importing}
