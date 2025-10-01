@@ -37,16 +37,27 @@ export function createShiftsRouter(prisma: PrismaClient) {
       
       // Обогащаем данные статистикой из iiko чеков
       const items = await Promise.all(shifts.map(async (shift) => {
-        const shiftDate = shift.openAt
-        const dayStart = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate())
-        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+        let receipts = []
+        
+        if (shift.iikoSessionNum) {
+          // Фильтруем чеки по номеру смены
+          receipts = await prisma.iikoReceipt.findMany({
+            where: {
+              sessionNumber: shift.iikoSessionNum
+            }
+          })
+        } else {
+          // Fallback: фильтруем по дате (для старых смен без номера)
+          const shiftDate = shift.openAt
+          const dayStart = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate())
+          const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
 
-        // Получаем чеки за этот день
-        const receipts = await prisma.iikoReceipt.findMany({
-          where: {
-            date: { gte: dayStart, lt: dayEnd }
-          }
-        })
+          receipts = await prisma.iikoReceipt.findMany({
+            where: {
+              date: { gte: dayStart, lt: dayEnd }
+            }
+          })
+        }
 
         // Статистика по чекам
         const receiptsTotal = receipts.filter(r => !r.isDeleted).length
