@@ -100,7 +100,17 @@ export function createReportsRouter(prisma: PrismaClient) {
       const start = new Date(Date.UTC(yFrom, mFrom - 1, 1))
       const end = new Date(Date.UTC(yTo, mTo, 1))
 
-      // 1. Выручка из смен (по posting_period = месяц закрытия)
+      // Генерируем список месяцев
+      const months: Array<{ year: number; month: number; key: string; label: string }> = []
+      const cur = new Date(start)
+      while (cur < end) {
+        const yy = cur.getUTCFullYear()
+        const mm = cur.getUTCMonth() + 1
+        months.push({ year: yy, month: mm, key: `${yy}-${String(mm).padStart(2,'0')}`, label: `${String(mm).padStart(2,'0')}.${yy}` })
+        cur.setUTCMonth(cur.getUTCMonth() + 1)
+      }
+
+      // 1. Выручка из смен (по месяцам закрытия)
       const shifts = await prisma.shift.findMany({
         where: {
           closeAt: {
@@ -118,19 +128,28 @@ export function createReportsRouter(prisma: PrismaClient) {
         }
       })
 
-      let totalRevenue = 0
-      const revenueByChannel: Record<string, number> = {}
+      const revenueByChannelByMonth: Record<string, Map<string, number>> = {}
+      const revenueByMonth = new Map<string, number>()
 
       shifts.forEach(shift => {
+        if (!shift.closeAt) return
+        const yy = shift.closeAt.getUTCFullYear()
+        const mm = shift.closeAt.getUTCMonth() + 1
+        const monthKey = `${yy}-${String(mm).padStart(2,'0')}`
+
         shift.sales.forEach(sale => {
           const netto = sale.grossAmount - sale.discounts - sale.refunds
-          totalRevenue += netto
           const channelName = sale.channel.name
-          revenueByChannel[channelName] = (revenueByChannel[channelName] || 0) + netto
+
+          if (!revenueByChannelByMonth[channelName]) {
+            revenueByChannelByMonth[channelName] = new Map()
+          }
+          revenueByChannelByMonth[channelName].set(monthKey, (revenueByChannelByMonth[channelName].get(monthKey) || 0) + netto)
+          revenueByMonth.set(monthKey, (revenueByMonth.get(monthKey) || 0) + netto)
         })
       })
 
-      // 2. Расходы из ExpenseDoc по posting_period
+      // 2. Расходы из ExpenseDoc по posting_period (по месяцам)
       const expenses = await prisma.expenseDoc.findMany({
         where: {
           postingPeriod: {
@@ -145,72 +164,73 @@ export function createReportsRouter(prisma: PrismaClient) {
         }
       })
 
-      let cogs = 0
-      let opex = 0
-      let capex = 0
-      let tax = 0
-      let fee = 0
-      let other = 0
-
-      const expensesByKind: Record<string, any[]> = {
-        COGS: [],
-        OPEX: [],
-        CAPEX: [],
-        TAX: [],
-        FEE: [],
-        OTHER: []
+      const expensesByKindByMonth: Record<string, Map<string, Map<string, number>>> = {
+        COGS: new Map(),
+        OPEX: new Map(),
+        CAPEX: new Map(),
+        TAX: new Map(),
+        FEE: new Map(),
+        OTHER: new Map()
       }
 
       expenses.forEach(exp => {
         const kind = exp.category.kind || 'OTHER'
-        const amount = exp.amount
+        const yy = exp.postingPeriod.getUTCFullYear()
+        const mm = exp.postingPeriod.getUTCMonth() + 1
+        const monthKey = `${yy}-${String(mm).padStart(2,'0')}`
+        const itemKey = `${exp.category.name}${exp.vendor ? ` (${exp.vendor.name})` : ''}`
 
-        expensesByKind[kind] = expensesByKind[kind] || []
-        expensesByKind[kind].push({
-          categoryName: exp.category.name,
-          vendorName: exp.vendor?.name,
-          amount
-        })
-
-        if (kind === 'COGS') cogs += amount
-        else if (kind === 'OPEX') opex += amount
-        else if (kind === 'CAPEX') capex += amount
-        else if (kind === 'TAX') tax += amount
-        else if (kind === 'FEE') fee += amount
-        else other += amount
+        if (!expensesByKindByMonth[kind].has(itemKey)) {
+          expensesByKindByMonth[kind].set(itemKey, new Map())
+        }
+        const itemMap = expensesByKindByMonth[kind].get(itemKey)!
+        itemMap.set(monthKey, (itemMap.get(monthKey) || 0) + exp.amount)
       })
 
-      const grossProfit = totalRevenue - cogs
-      const operatingProfit = grossProfit - opex
-      const netProfit = operatingProfit - tax - fee - other
+      // 3. Подсчёт итогов
+      const cogsByMonth = new Map<string, number>()
+      const opexByMonth = new Map<string, number>()
+      const capexByMonth = new Map<string, number>()
+      const taxByMonth = new Map<string, number>()
+      const feeByMonth = new Map<string, number>()
+      const otherByMonth = new Map<string, number>()
+
+      months.forEach(mo => {
+        for (const [_, itemMap] of expensesByKindByMonth.COGS.entries()) {
+          cogsByMonth.set(mo.key, (cogsByMonth.get(mo.key) || 0) + (itemMap.get(mo.key) || 0))
+        }
+        for (const [_, itemMap] of expensesByKindByMonth.OPEX.entries()) {
+          opexByMonth.set(mo.key, (opexByMonth.get(mo.key) || 0) + (itemMap.get(mo.key) || 0))
+        }
+        for (const [_, itemMap] of expensesByKindByMonth.CAPEX.entries()) {
+          capexByMonth.set(mo.key, (capexByMonth.get(mo.key) || 0) + (itemMap.get(mo.key) || 0))
+        }
+        for (const [_, itemMap] of expensesByKindByMonth.TAX.entries()) {
+          taxByMonth.set(mo.key, (taxByMonth.get(mo.key) || 0) + (itemMap.get(mo.key) || 0))
+        }
+        for (const [_, itemMap] of expensesByKindByMonth.FEE.entries()) {
+          feeByMonth.set(mo.key, (feeByMonth.get(mo.key) || 0) + (itemMap.get(mo.key) || 0))
+        }
+        for (const [_, itemMap] of expensesByKindByMonth.OTHER.entries()) {
+          otherByMonth.set(mo.key, (otherByMonth.get(mo.key) || 0) + (itemMap.get(mo.key) || 0))
+        }
+      })
 
       res.json({
-        period: { 
-          from: { year: yFrom, month: mFrom },
-          to: { year: yTo, month: mTo }
-        },
+        months,
         revenue: {
-          total: totalRevenue,
-          byChannel: revenueByChannel
+          byMonth: Object.fromEntries(revenueByMonth),
+          byChannelByMonth: Object.fromEntries(
+            Object.entries(revenueByChannelByMonth).map(([ch, map]) => [ch, Object.fromEntries(map)])
+          )
         },
         expenses: {
-          cogs: { total: cogs, items: expensesByKind.COGS },
-          opex: { total: opex, items: expensesByKind.OPEX },
-          capex: { total: capex, items: expensesByKind.CAPEX },
-          tax: { total: tax, items: expensesByKind.TAX },
-          fee: { total: fee, items: expensesByKind.FEE },
-          other: { total: other, items: expensesByKind.OTHER }
-        },
-        totals: {
-          revenue: totalRevenue,
-          cogs,
-          grossProfit,
-          opex,
-          operatingProfit,
-          tax,
-          fee,
-          other,
-          netProfit
+          cogs: { byMonth: Object.fromEntries(cogsByMonth), items: Object.fromEntries(expensesByKindByMonth.COGS.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
+          opex: { byMonth: Object.fromEntries(opexByMonth), items: Object.fromEntries(expensesByKindByMonth.OPEX.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
+          capex: { byMonth: Object.fromEntries(capexByMonth), items: Object.fromEntries(expensesByKindByMonth.CAPEX.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
+          tax: { byMonth: Object.fromEntries(taxByMonth), items: Object.fromEntries(expensesByKindByMonth.TAX.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
+          fee: { byMonth: Object.fromEntries(feeByMonth), items: Object.fromEntries(expensesByKindByMonth.FEE.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
+          other: { byMonth: Object.fromEntries(otherByMonth), items: Object.fromEntries(expensesByKindByMonth.OTHER.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) }
         }
       })
     } catch (e: any) {

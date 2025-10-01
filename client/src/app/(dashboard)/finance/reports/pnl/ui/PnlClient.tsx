@@ -32,7 +32,37 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
 
   if (!data) return <div>Загрузка...</div>
 
-  const { revenue, expenses, totals } = data
+  const { months, revenue, expenses } = data
+
+  // Подсчёт итогов
+  const calcTotal = (byMonth: Record<string, number>) => {
+    return months.reduce((sum: number, mo: any) => sum + (byMonth[mo.key] || 0), 0)
+  }
+
+  const revenueTotal = calcTotal(revenue.byMonth)
+  const cogsTotal = calcTotal(expenses.cogs.byMonth)
+  const grossProfitByMonth: Record<string, number> = {}
+  months.forEach((mo: any) => {
+    grossProfitByMonth[mo.key] = (revenue.byMonth[mo.key] || 0) - (expenses.cogs.byMonth[mo.key] || 0)
+  })
+  const grossProfitTotal = calcTotal(grossProfitByMonth)
+  
+  const opexTotal = calcTotal(expenses.opex.byMonth)
+  const operatingProfitByMonth: Record<string, number> = {}
+  months.forEach((mo: any) => {
+    operatingProfitByMonth[mo.key] = grossProfitByMonth[mo.key] - (expenses.opex.byMonth[mo.key] || 0)
+  })
+  const operatingProfitTotal = calcTotal(operatingProfitByMonth)
+  
+  const taxTotal = calcTotal(expenses.tax.byMonth)
+  const feeTotal = calcTotal(expenses.fee.byMonth)
+  const otherTotal = calcTotal(expenses.other.byMonth)
+  const capexTotal = calcTotal(expenses.capex.byMonth)
+  const netProfitByMonth: Record<string, number> = {}
+  months.forEach((mo: any) => {
+    netProfitByMonth[mo.key] = operatingProfitByMonth[mo.key] - (expenses.tax.byMonth[mo.key] || 0) - (expenses.fee.byMonth[mo.key] || 0) - (expenses.other.byMonth[mo.key] || 0)
+  })
+  const netProfitTotal = calcTotal(netProfitByMonth)
 
   return (
     <Card>
@@ -74,105 +104,150 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
         </div>
 
         <div className="flex-1 overflow-auto">
-          <Table className="w-full">
+          <Table className="w-full table-fixed">
+            <THead className="sticky top-0 bg-card z-10">
+              <TR>
+                <TH className="h-8 px-2 w-[300px] sticky left-0 bg-card z-20">Показатель</TH>
+                {months.map((mo: any) => (
+                  <TH key={mo.key} className="h-8 px-2 text-right w-[140px]">{mo.label}</TH>
+                ))}
+                <TH className="h-8 px-2 text-right w-[160px]">Итого</TH>
+              </TR>
+            </THead>
             <TBody>
               {/* Выручка */}
               <TR className="hover:bg-muted/30 transition-colors">
-                <TD className="font-bold py-1.5" colSpan={2}>ВЫРУЧКА (нетто)</TD>
-                <TD className="text-right font-bold py-1.5">{rubFmt(totals.revenue)}</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-card">ВЫРУЧКА (нетто)</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-1.5 font-bold">{rubFmt(revenue.byMonth[mo.key] || 0)}</TD>
+                ))}
+                <TD className="text-right py-1.5 font-bold">{rubFmt(revenueTotal)}</TD>
               </TR>
-              {Object.entries(revenue.byChannel || {}).map(([channel, amount]: any) => (
+              {Object.entries(revenue.byChannelByMonth || {}).map(([channel, byMonth]: any) => (
                 <TR key={channel} className="hover:bg-muted/20 transition-colors">
-                  <TD className="pl-8 py-1.5"></TD>
-                  <TD className="py-1.5">{channel}</TD>
-                  <TD className="text-right py-1.5">{rubFmt(amount)}</TD>
+                  <TD className="pl-8 py-1.5 sticky left-0 bg-card">{channel}</TD>
+                  {months.map((mo: any) => (
+                    <TD key={mo.key} className="text-right py-1.5">{rubFmt(byMonth[mo.key] || 0)}</TD>
+                  ))}
+                  <TD className="text-right py-1.5">{rubFmt(calcTotal(byMonth))}</TD>
                 </TR>
               ))}
 
               {/* COGS */}
               <TR className="hover:bg-muted/30 transition-colors">
-                <TD className="font-bold py-1.5" colSpan={2}>Себестоимость (COGS)</TD>
-                <TD className="text-right font-bold py-1.5">−{rubFmt(totals.cogs)}</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-card">Себестоимость (COGS)</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-1.5 font-bold">−{rubFmt(expenses.cogs.byMonth[mo.key] || 0)}</TD>
+                ))}
+                <TD className="text-right py-1.5 font-bold">−{rubFmt(cogsTotal)}</TD>
               </TR>
               {expenses.cogs?.items?.map((item: any, idx: number) => (
                 <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                  <TD className="pl-8 py-1.5"></TD>
-                  <TD className="py-1.5">{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                  <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
+                  <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
+                  {months.map((mo: any) => (
+                    <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
+                  ))}
+                  <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
                 </TR>
               ))}
 
               {/* Валовая прибыль */}
               <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t">
-                <TD className="font-bold py-1.5" colSpan={2}>ВАЛОВАЯ ПРИБЫЛЬ</TD>
-                <TD className="text-right font-bold py-1.5">{rubFmt(totals.grossProfit)}</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-muted/50">ВАЛОВАЯ ПРИБЫЛЬ</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-1.5 font-bold bg-muted/50">{rubFmt(grossProfitByMonth[mo.key] || 0)}</TD>
+                ))}
+                <TD className="text-right py-1.5 font-bold bg-muted/50">{rubFmt(grossProfitTotal)}</TD>
               </TR>
 
               {/* OPEX */}
               <TR className="hover:bg-muted/30 transition-colors">
-                <TD className="font-bold py-1.5" colSpan={2}>Операционные расходы (OPEX)</TD>
-                <TD className="text-right font-bold py-1.5">−{rubFmt(totals.opex)}</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-card">Операционные расходы (OPEX)</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-1.5 font-bold">−{rubFmt(expenses.opex.byMonth[mo.key] || 0)}</TD>
+                ))}
+                <TD className="text-right py-1.5 font-bold">−{rubFmt(opexTotal)}</TD>
               </TR>
               {expenses.opex?.items?.map((item: any, idx: number) => (
                 <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                  <TD className="pl-8 py-1.5"></TD>
-                  <TD className="py-1.5">{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                  <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
+                  <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
+                  {months.map((mo: any) => (
+                    <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
+                  ))}
+                  <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
                 </TR>
               ))}
 
               {/* Операционная прибыль */}
               <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t">
-                <TD className="font-bold py-1.5" colSpan={2}>ОПЕРАЦИОННАЯ ПРИБЫЛЬ</TD>
-                <TD className="text-right font-bold py-1.5">{rubFmt(totals.operatingProfit)}</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-muted/50">ОПЕРАЦИОННАЯ ПРИБЫЛЬ</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-1.5 font-bold bg-muted/50">{rubFmt(operatingProfitByMonth[mo.key] || 0)}</TD>
+                ))}
+                <TD className="text-right py-1.5 font-bold bg-muted/50">{rubFmt(operatingProfitTotal)}</TD>
               </TR>
 
               {/* Прочие расходы */}
-              {(totals.fee > 0 || totals.tax > 0 || totals.other > 0) && (
+              {(feeTotal > 0 || taxTotal > 0 || otherTotal > 0) && (
                 <>
-                  {totals.fee > 0 && (
+                  {feeTotal > 0 && (
                     <>
                       <TR className="hover:bg-muted/30 transition-colors">
-                        <TD className="font-semibold py-1.5" colSpan={2}>Комиссии и сборы</TD>
-                        <TD className="text-right font-semibold py-1.5">−{rubFmt(totals.fee)}</TD>
+                        <TD className="font-semibold py-1.5 sticky left-0 bg-card">Комиссии и сборы</TD>
+                        {months.map((mo: any) => (
+                          <TD key={mo.key} className="text-right py-1.5 font-semibold">−{rubFmt(expenses.fee.byMonth[mo.key] || 0)}</TD>
+                        ))}
+                        <TD className="text-right py-1.5 font-semibold">−{rubFmt(feeTotal)}</TD>
                       </TR>
                       {expenses.fee?.items?.map((item: any, idx: number) => (
                         <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                          <TD className="pl-8 py-1.5"></TD>
-                          <TD className="py-1.5">{item.categoryName}</TD>
-                          <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
+                          <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
+                          {months.map((mo: any) => (
+                            <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
+                          ))}
+                          <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
                         </TR>
                       ))}
                     </>
                   )}
 
-                  {totals.tax > 0 && (
+                  {taxTotal > 0 && (
                     <>
                       <TR className="hover:bg-muted/30 transition-colors">
-                        <TD className="font-semibold py-1.5" colSpan={2}>Налоги</TD>
-                        <TD className="text-right font-semibold py-1.5">−{rubFmt(totals.tax)}</TD>
+                        <TD className="font-semibold py-1.5 sticky left-0 bg-card">Налоги</TD>
+                        {months.map((mo: any) => (
+                          <TD key={mo.key} className="text-right py-1.5 font-semibold">−{rubFmt(expenses.tax.byMonth[mo.key] || 0)}</TD>
+                        ))}
+                        <TD className="text-right py-1.5 font-semibold">−{rubFmt(taxTotal)}</TD>
                       </TR>
                       {expenses.tax?.items?.map((item: any, idx: number) => (
                         <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                          <TD className="pl-8 py-1.5"></TD>
-                          <TD className="py-1.5">{item.categoryName}</TD>
-                          <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
+                          <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
+                          {months.map((mo: any) => (
+                            <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
+                          ))}
+                          <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
                         </TR>
                       ))}
                     </>
                   )}
 
-                  {totals.other > 0 && (
+                  {otherTotal > 0 && (
                     <>
                       <TR className="hover:bg-muted/30 transition-colors">
-                        <TD className="font-semibold py-1.5" colSpan={2}>Прочие расходы</TD>
-                        <TD className="text-right font-semibold py-1.5">−{rubFmt(totals.other)}</TD>
+                        <TD className="font-semibold py-1.5 sticky left-0 bg-card">Прочие расходы</TD>
+                        {months.map((mo: any) => (
+                          <TD key={mo.key} className="text-right py-1.5 font-semibold">−{rubFmt(expenses.other.byMonth[mo.key] || 0)}</TD>
+                        ))}
+                        <TD className="text-right py-1.5 font-semibold">−{rubFmt(otherTotal)}</TD>
                       </TR>
                       {expenses.other?.items?.map((item: any, idx: number) => (
                         <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                          <TD className="pl-8 py-1.5"></TD>
-                          <TD className="py-1.5">{item.categoryName}</TD>
-                          <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
+                          <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
+                          {months.map((mo: any) => (
+                            <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
+                          ))}
+                          <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
                         </TR>
                       ))}
                     </>
@@ -182,27 +257,45 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
 
               {/* Чистая прибыль */}
               <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t-2">
-                <TD className="font-bold py-2" colSpan={2}>ЧИСТАЯ ПРИБЫЛЬ</TD>
-                <TD className="text-right font-bold py-2">{rubFmt(totals.netProfit)}</TD>
+                <TD className="font-bold py-2 sticky left-0 bg-muted/50">ЧИСТАЯ ПРИБЫЛЬ</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-2 font-bold bg-muted/50">{rubFmt(netProfitByMonth[mo.key] || 0)}</TD>
+                ))}
+                <TD className="text-right py-2 font-bold bg-muted/50">{rubFmt(netProfitTotal)}</TD>
               </TR>
             </TBody>
           </Table>
 
           {/* CAPEX отдельно (не влияет на прибыль, но показываем для информации) */}
-          {totals.capex > 0 && (
+          {capexTotal > 0 && (
             <div className="mt-6 pt-6 border-t">
               <h3 className="font-bold mb-3 text-muted-foreground">Капитальные расходы (не влияют на P&L):</h3>
-              <Table>
+              <Table className="w-full table-fixed">
+                <THead className="sticky top-0 bg-card z-10">
+                  <TR>
+                    <TH className="h-8 px-2 w-[300px] sticky left-0 bg-card z-20">Категория</TH>
+                    {months.map((mo: any) => (
+                      <TH key={mo.key} className="h-8 px-2 text-right w-[140px]">{mo.label}</TH>
+                    ))}
+                    <TH className="h-8 px-2 text-right w-[160px]">Итого</TH>
+                  </TR>
+                </THead>
                 <TBody>
                   {expenses.capex?.items?.map((item: any, idx: number) => (
                     <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TD className="py-1.5">{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                      <TD className="text-right py-1.5">{rubFmt(item.amount)}</TD>
+                      <TD className="py-1.5 sticky left-0 bg-card">{item.name}</TD>
+                      {months.map((mo: any) => (
+                        <TD key={mo.key} className="text-right py-1.5">{rubFmt(item.byMonth[mo.key] || 0)}</TD>
+                      ))}
+                      <TD className="text-right py-1.5">{rubFmt(calcTotal(item.byMonth))}</TD>
                     </TR>
                   ))}
                   <TR className="border-t hover:bg-muted/30 transition-colors">
-                    <TD className="font-bold py-1.5">Итого CAPEX</TD>
-                    <TD className="text-right font-bold py-1.5">{rubFmt(totals.capex)}</TD>
+                    <TD className="font-bold py-1.5 sticky left-0 bg-card">Итого CAPEX</TD>
+                    {months.map((mo: any) => (
+                      <TD key={mo.key} className="text-right py-1.5 font-bold">{rubFmt(expenses.capex.byMonth[mo.key] || 0)}</TD>
+                    ))}
+                    <TD className="text-right py-1.5 font-bold">{rubFmt(capexTotal)}</TD>
                   </TR>
                 </TBody>
               </Table>
