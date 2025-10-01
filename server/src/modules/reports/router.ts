@@ -123,5 +123,137 @@ export function createReportsRouter(prisma: PrismaClient) {
     res.json({ items: Array.from(map.values()), totals: { income: totalIncome, expense: totalExpense, net: totalIncome - totalExpense } })
   })
 
+  // Отчёт Aging: долги по поставщикам с bucket'ами по срокам
+  router.get('/aging', async (req, res) => {
+    try {
+      const asOfDate = req.query.asOfDate 
+        ? new Date(String(req.query.asOfDate)) 
+        : new Date()
+      const vendorId = req.query.vendorId ? String(req.query.vendorId) : undefined
+      const categoryId = req.query.categoryId ? String(req.query.categoryId) : undefined
+
+      const where: any = {
+        status: { in: ['unpaid', 'partial'] }
+      }
+      if (vendorId) where.vendorId = vendorId
+      if (categoryId) where.categoryId = categoryId
+
+      const docs = await prisma.expenseDoc.findMany({
+        where,
+        include: {
+          vendor: true,
+          category: true
+        },
+        orderBy: [
+          { vendor: { name: 'asc' } },
+          { operationDate: 'asc' }
+        ]
+      })
+
+      // Группируем по bucket'ам
+      const items = docs.map(doc => {
+        const balance = doc.amount - doc.paidAmount
+        const ageDays = Math.floor(
+          (asOfDate.getTime() - new Date(doc.operationDate).getTime()) / (1000 * 60 * 60 * 24)
+        )
+        
+        let bucket = '90+'
+        if (ageDays <= 30) bucket = '0-30'
+        else if (ageDays <= 60) bucket = '31-60'
+        else if (ageDays <= 90) bucket = '61-90'
+
+        return {
+          id: doc.id,
+          vendorName: doc.vendor?.name || 'Без поставщика',
+          vendorId: doc.vendorId,
+          operationDate: doc.operationDate,
+          postingPeriod: doc.postingPeriod,
+          categoryName: doc.category.name,
+          amount: doc.amount,
+          paidAmount: doc.paidAmount,
+          balance,
+          ageDays,
+          bucket
+        }
+      })
+
+      // Сводка по bucket'ам
+      const summary = {
+        '0-30': 0,
+        '31-60': 0,
+        '61-90': 0,
+        '90+': 0,
+        total: 0
+      }
+
+      items.forEach(item => {
+        summary[item.bucket as keyof typeof summary] += item.balance
+        summary.total += item.balance
+      })
+
+      res.json({ items, summary })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
+  // Дневная сводка по сменам
+  router.get('/shift-summary', async (req, res) => {
+    try {
+      const from = req.query.from ? new Date(String(req.query.from)) : null
+      const to = req.query.to ? new Date(String(req.query.to)) : null
+
+      if (!from || !to) {
+        return res.status(400).json({ error: 'from and to dates required' })
+      }
+
+      const shifts = await prisma.shift.findMany({
+        where: {
+          closeAt: { gte: from, lt: to }
+        },
+        include: {
+          sales: {
+            include: {
+              channel: true,
+              tenderType: true
+            }
+          }
+        },
+        orderBy: { closeAt: 'desc' }
+      })
+
+      const items = []
+      for (const shift of shifts) {
+        for (const sale of shift.sales) {
+          const nettoAmount = sale.grossAmount - sale.discounts - sale.refunds
+          items.push({
+            shiftId: shift.id,
+            date: shift.closeAt,
+            channel: sale.channel.name,
+            tenderType: sale.tenderType.name,
+            grossAmount: sale.grossAmount,
+            discounts: sale.discounts,
+            refunds: sale.refunds,
+            nettoAmount,
+            cashToCollect: sale.tenderType.name === 'Наличные' ? nettoAmount : 0
+          })
+        }
+      }
+
+      // Итоги
+      const totals = {
+        grossAmount: items.reduce((sum, i) => sum + i.grossAmount, 0),
+        discounts: items.reduce((sum, i) => sum + i.discounts, 0),
+        refunds: items.reduce((sum, i) => sum + i.refunds, 0),
+        nettoAmount: items.reduce((sum, i) => sum + i.nettoAmount, 0),
+        cashToCollect: items.reduce((sum, i) => sum + i.cashToCollect, 0)
+      }
+
+      res.json({ items, totals })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   return router
 }
