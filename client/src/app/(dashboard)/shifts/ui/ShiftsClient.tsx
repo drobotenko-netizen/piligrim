@@ -149,12 +149,12 @@ export default function ShiftsClient() {
                   <TH>Дата смены</TH>
                   <TH>№ смены</TH>
                   <TH>Закрыл</TH>
-                  <TH>Кол-во чеков</TH>
-                  <TH>Выручка</TH>
-                  <TH>Возвраты (шт)</TH>
-                  <TH>Возвраты (₽)</TH>
-                  <TH>Удаления (шт)</TH>
-                  <TH>Удаления (₽)</TH>
+                  <TH className="text-right">Кол-во чеков</TH>
+                  <TH className="text-right w-32">Выручка</TH>
+                  <TH className="text-right">Возвраты (шт)</TH>
+                  <TH className="text-right">Возвраты (₽)</TH>
+                  <TH className="text-right">Удаления (шт)</TH>
+                  <TH className="text-right">Удаления (₽)</TH>
                 </TR>
               </THead>
               <TBody>
@@ -187,18 +187,18 @@ export default function ShiftsClient() {
                       </TD>
                       <TD className="text-gray-600">#{sessionNumber}</TD>
                       <TD>{shift.closedBy || '—'}</TD>
-                      <TD className="text-center">{shift.stats?.receiptsTotal || 0}</TD>
-                      <TD className="font-semibold text-green-700">{rubFmt(totalNetto)}</TD>
-                      <TD className="text-center text-orange-600">
+                      <TD className="text-right">{shift.stats?.receiptsTotal || 0}</TD>
+                      <TD className="text-right font-semibold text-green-700">{rubFmt(totalNetto)}</TD>
+                      <TD className="text-right text-orange-600">
                         {shift.stats?.receiptsReturns || 0}
                       </TD>
-                      <TD className="text-orange-600">
+                      <TD className="text-right text-orange-600">
                         {shift.stats?.sumReturns ? rubFmt(shift.stats.sumReturns) : '—'}
                       </TD>
-                      <TD className="text-center text-red-600">
+                      <TD className="text-right text-red-600">
                         {shift.stats?.receiptsDeleted || 0}
                       </TD>
-                      <TD className="text-red-600">
+                      <TD className="text-right text-red-600">
                         {shift.stats?.sumDeleted ? rubFmt(shift.stats.sumDeleted) : '—'}
                       </TD>
                     </TR>
