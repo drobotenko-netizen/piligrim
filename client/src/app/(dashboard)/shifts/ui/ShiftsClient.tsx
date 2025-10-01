@@ -52,15 +52,19 @@ export default function ShiftsClient() {
       const to = new Date()
       const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000)
       
+      const payload = {
+        fromDate: from.toISOString().slice(0, 10),
+        toDate: to.toISOString().slice(0, 10),
+        mergeByDay: importMode === 'merge'
+      }
+      
+      console.log('📤 Sending import request:', payload)
+      
       const res = await fetch(`${API_BASE}/api/iiko/import/shifts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          fromDate: from.toISOString().slice(0, 10),
-          toDate: to.toISOString().slice(0, 10),
-          mergeByDay: importMode === 'merge'
-        })
+        body: JSON.stringify(payload)
       })
       
       const data = await res.json()

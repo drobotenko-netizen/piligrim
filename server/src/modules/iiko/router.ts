@@ -1599,6 +1599,8 @@ export function createIikoRouter() {
   router.post('/import/shifts', async (req, res) => {
     try {
       const { fromDate, toDate, mergeByDay = true } = req.body
+      console.log('📥 Import shifts request:', { fromDate, toDate, mergeByDay })
+      
       if (!fromDate || !toDate) {
         return res.status(400).json({ error: 'fromDate and toDate required (YYYY-MM-DD)' })
       }
@@ -1610,6 +1612,8 @@ export function createIikoRouter() {
 
       const mode = mergeByDay ? 'merge' : 'separate'
       const cmd = `npx tsx scripts/import-shifts-from-iiko.ts "${fromDate}" "${toDate}" "${mode}"`
+      console.log('🔧 Running command:', cmd)
+      
       const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() })
 
       res.json({ 
