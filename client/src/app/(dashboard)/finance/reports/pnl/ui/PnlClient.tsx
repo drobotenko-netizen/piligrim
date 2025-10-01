@@ -166,31 +166,29 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
               </TR>
             </TBody>
           </Table>
-        </CardContent>
-      </Card>
 
-      {/* CAPEX отдельно (не влияет на прибыль, но показываем для информации) */}
-      {totals.capex > 0 && (
-        <Card className="mt-6">
-          <CardContent className="p-6">
-            <h3 className="font-bold mb-3 text-gray-600">Капитальные расходы (не влияют на P&L):</h3>
-            <Table>
-              <TBody>
-                {expenses.capex?.items?.map((item: any, idx: number) => (
-                  <TR key={idx}>
-                    <TD>{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                    <TD className="text-right text-gray-600">{rubFmt(item.amount)}</TD>
+          {/* CAPEX отдельно (не влияет на прибыль, но показываем для информации) */}
+          {totals.capex > 0 && (
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="font-bold mb-3 text-gray-600">Капитальные расходы (не влияют на P&L):</h3>
+              <Table>
+                <TBody>
+                  {expenses.capex?.items?.map((item: any, idx: number) => (
+                    <TR key={idx}>
+                      <TD>{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
+                      <TD className="text-right text-gray-600">{rubFmt(item.amount)}</TD>
+                    </TR>
+                  ))}
+                  <TR className="border-t">
+                    <TD className="font-bold">Итого CAPEX</TD>
+                    <TD className="text-right font-bold text-gray-700">{rubFmt(totals.capex)}</TD>
                   </TR>
-                ))}
-                <TR className="border-t">
-                  <TD className="font-bold">Итого CAPEX</TD>
-                  <TD className="text-right font-bold text-gray-700">{rubFmt(totals.capex)}</TD>
-                </TR>
-              </TBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+                </TBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
