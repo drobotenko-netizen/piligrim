@@ -159,15 +159,52 @@ export default function ShiftsClient() {
     return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2 }).format(n) + ' ₽'
   }
 
+  async function importFromIiko() {
+    if (!confirm('Импортировать смены из iiko за последние 7 дней?')) return
+    
+    try {
+      const to = new Date()
+      const from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000)
+      
+      const res = await fetch(`${API_BASE}/api/iiko/import/shifts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          fromDate: from.toISOString().slice(0, 10),
+          toDate: to.toISOString().slice(0, 10)
+        })
+      })
+      
+      const data = await res.json()
+      if (data.ok) {
+        alert('Импорт завершён!\n\n' + data.output)
+        loadShifts()
+      } else {
+        alert('Ошибка импорта: ' + data.error)
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Ошибка: ' + e)
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Смены</h1>
-        {!currentShift && (
-          <Button onClick={openShift} className="bg-orange-500 hover:bg-orange-600 text-white">
-            Открыть смену
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {!currentShift && (
+            <>
+              <Button onClick={importFromIiko} variant="outline">
+                Импорт из iiko
+              </Button>
+              <Button onClick={openShift} className="bg-orange-500 hover:bg-orange-600 text-white">
+                Открыть смену вручную
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
@@ -187,21 +224,42 @@ export default function ShiftsClient() {
                   <TH>Дата закрытия</TH>
                   <TH>Открыл</TH>
                   <TH>Закрыл</TH>
+                  <TH>Нетто выручка</TH>
                   <TH>Продаж</TH>
                   <TH>Примечание</TH>
                 </TR>
               </THead>
               <TBody>
-                {shifts.map(shift => (
-                  <TR key={shift.id}>
-                    <TD>{new Date(shift.openAt).toLocaleString('ru')}</TD>
-                    <TD>{shift.closeAt ? new Date(shift.closeAt).toLocaleString('ru') : '—'}</TD>
-                    <TD>{shift.openedBy || '—'}</TD>
-                    <TD>{shift.closedBy || '—'}</TD>
-                    <TD>{shift.sales?.length || 0}</TD>
-                    <TD>{shift.note || '—'}</TD>
-                  </TR>
-                ))}
+                {shifts.map(shift => {
+                  const totalNetto = shift.sales?.reduce((sum: number, s: any) => 
+                    sum + (s.grossAmount - s.discounts - s.refunds), 0
+                  ) || 0
+                  
+                  return (
+                    <TR key={shift.id}>
+                      <TD>{new Date(shift.openAt).toLocaleString('ru')}</TD>
+                      <TD>{shift.closeAt ? new Date(shift.closeAt).toLocaleString('ru') : '—'}</TD>
+                      <TD>{shift.openedBy || '—'}</TD>
+                      <TD>{shift.closedBy || '—'}</TD>
+                      <TD className="font-semibold">{rubFmt(totalNetto / 100)}</TD>
+                      <TD>
+                        <details className="cursor-pointer">
+                          <summary className="text-blue-600 hover:underline">
+                            {shift.sales?.length || 0} позиций
+                          </summary>
+                          <div className="mt-2 text-sm space-y-1">
+                            {shift.sales?.map((s: any, idx: number) => (
+                              <div key={idx}>
+                                {s.channel?.name} × {s.tenderType?.name}: {rubFmt((s.grossAmount - s.discounts - s.refunds) / 100)}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </TD>
+                      <TD>{shift.note || '—'}</TD>
+                    </TR>
+                  )
+                })}
                 {shifts.length === 0 && (
                   <TR>
                     <TD colSpan={6} className="text-center text-gray-500">

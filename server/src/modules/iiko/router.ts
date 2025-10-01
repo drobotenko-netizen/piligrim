@@ -1548,6 +1548,32 @@ export function createIikoRouter() {
     }
   })
 
+  // POST /iiko/import/shifts - импорт смен из чеков iiko
+  router.post('/import/shifts', async (req, res) => {
+    try {
+      const { fromDate, toDate } = req.body
+      if (!fromDate || !toDate) {
+        return res.status(400).json({ error: 'fromDate and toDate required (YYYY-MM-DD)' })
+      }
+
+      // Импортируем через динамический import чтобы не тянуть Prisma в роутер
+      const { exec } = await import('child_process')
+      const { promisify } = await import('util')
+      const execAsync = promisify(exec)
+
+      const cmd = `npx tsx scripts/import-shifts-from-iiko.ts "${fromDate}" "${toDate}"`
+      const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() })
+
+      res.json({ 
+        ok: true, 
+        output: stdout,
+        errors: stderr || undefined
+      })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   return router
 }
 
