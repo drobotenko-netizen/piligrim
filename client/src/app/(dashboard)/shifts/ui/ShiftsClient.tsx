@@ -107,10 +107,18 @@ export default function ShiftsClient() {
             sumDeleted: dayShifts.reduce((sum, s) => sum + (s.stats?.sumDeleted || 0), 0),
           }
           
+          // Номера всех смен дня
+          const sessionNumbers = dayShifts
+            .map(s => s.iikoSessionNum)
+            .filter(n => n)
+            .join(', ')
+          
           return {
             ...firstShift,
             id: day,
             note: `${dayShifts.length} смен(ы)`,
+            iikoSessionNum: null, // Группа, нет одного номера
+            groupedSessions: sessionNumbers, // Все номера смен
             totalNetto,
             stats: totalStats,
             isGrouped: true
@@ -165,8 +173,10 @@ export default function ShiftsClient() {
                   
                   const shiftDate = new Date(shift.openAt).toISOString().slice(0, 10)
                   
-                  // Номер смены из базы или из note
-                  const sessionNumber = shift.iikoSessionNum || shift.note?.match(/#(\d+)/)?.[1] || '—'
+                  // Номер смены: для группы - все номера, для одной - один
+                  const sessionNumber = shift.isGrouped 
+                    ? (shift.groupedSessions || '—')
+                    : (shift.iikoSessionNum || shift.note?.match(/#(\d+)/)?.[1] || '—')
                   
                   // Ссылка с датой и номером смены
                   const receiptsLink = shift.iikoSessionNum 
@@ -189,7 +199,9 @@ export default function ShiftsClient() {
                           })}
                         </a>
                       </TD>
-                      <TD className="text-gray-600">#{sessionNumber}</TD>
+                      <TD className="text-gray-600">
+                        {shift.isGrouped ? `#${sessionNumber}` : `#${sessionNumber}`}
+                      </TD>
                       <TD>{shift.closedBy || '—'}</TD>
                       <TD className="text-right">{shift.stats?.receiptsTotal || 0}</TD>
                       <TD className="text-right font-semibold text-green-700">{rubFmt(totalNetto)}</TD>
