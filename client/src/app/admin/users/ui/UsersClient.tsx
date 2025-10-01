@@ -1,0 +1,156 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+
+export default function UsersClient({ initialItems }: { initialItems: any[] }) {
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const [items, setItems] = useState<any[]>(initialItems)
+  const [roleTab, setRoleTab] = useState<string>('ALL')
+  const [activeTab, setActiveTab] = useState<'ACTIVE'|'INACTIVE'>('ACTIVE')
+  const [form, setForm] = useState<{ fullName: string; phone: string; role: string }>({ fullName: '', phone: '', role: 'EMPLOYEE' })
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  async function reload() {
+    const res = await fetch(`${API_BASE}/api/admin/users`, { credentials: 'include' })
+    const json = await res.json()
+    setItems(json.items || [])
+  }
+
+  async function save() {
+    if (!form.fullName.trim() || !form.phone.trim()) return
+    if (!editingId) {
+      const res = await fetch(`${API_BASE}/api/admin/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ fullName: form.fullName, phone: form.phone }) })
+      const json = await res.json()
+      if (json?.data?.id) {
+        await fetch(`${API_BASE}/api/admin/users/${json.data.id}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ roles: [form.role] }) })
+      }
+    } else {
+      await fetch(`${API_BASE}/api/admin/users/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ fullName: form.fullName, phone: form.phone }) })
+      await fetch(`${API_BASE}/api/admin/users/${editingId}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ roles: [form.role] }) })
+    }
+    setEditingId(null)
+    setForm({ fullName: '', phone: '', role: 'EMPLOYEE' })
+    await reload()
+  }
+
+  function startEdit(u: any) {
+    setEditingId(u.id)
+    const firstRole = Array.isArray(u.roles) && u.roles.length > 0 ? String(u.roles[0]) : 'EMPLOYEE'
+    setForm({ fullName: u.fullName || '', phone: u.phone || '', role: firstRole })
+  }
+
+  function resetForm() {
+    setEditingId(null)
+    setForm({ fullName: '', phone: '', role: 'EMPLOYEE' })
+  }
+
+  const filtered = useMemo(() => {
+    return items.filter(u => {
+      const hasRole = roleTab === 'ALL' || (Array.isArray(u.roles) && u.roles.includes(roleTab))
+      const isActive = activeTab === 'ACTIVE' ? u.active : !u.active
+      return hasRole && isActive
+    })
+  }, [items, roleTab, activeTab])
+
+  async function setActive(id: string, active: boolean) {
+    // примитивно: пробросим в PATCH users (реализация на сервере может быть добавлена позже)
+    await fetch(`${API_BASE}/api/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ active }) })
+    await reload()
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Card className="lg:col-span-2">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <Tabs value={roleTab} onValueChange={v => setRoleTab(v)}>
+              <TabsList>
+                <TabsTrigger value="ALL">Все</TabsTrigger>
+                <TabsTrigger value="ADMIN">ADMIN</TabsTrigger>
+                <TabsTrigger value="ACCOUNTANT">ACCOUNTANT</TabsTrigger>
+                <TabsTrigger value="MANAGER">MANAGER</TabsTrigger>
+                <TabsTrigger value="CASHIER">CASHIER</TabsTrigger>
+                <TabsTrigger value="EMPLOYEE">EMPLOYEE</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)}>
+              <TabsList>
+                <TabsTrigger value="ACTIVE">Активные</TabsTrigger>
+                <TabsTrigger value="INACTIVE">Не активные</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <div className="overflow-auto">
+            <Table className="w-full">
+              <THead className="sticky top-0 bg-card z-10">
+                <TR>
+                  <TH>Имя</TH>
+                  <TH>Телефон</TH>
+                  <TH>Тип</TH>
+                  <TH>Активен</TH>
+                  <TH className="w-10"></TH>
+                </TR>
+              </THead>
+              <TBody>
+                {filtered.map((u: any) => (
+                  <TR key={u.id} onClick={() => startEdit(u)} className={editingId === u.id ? 'bg-accent' : 'cursor-pointer'}>
+                    <TD>{u.fullName}</TD>
+                    <TD>{u.phone}</TD>
+                    <TD>{Array.isArray(u.roles) && u.roles.length > 0 ? u.roles.join(', ') : '—'}</TD>
+                    <TD>{u.active ? 'Да' : 'Нет'}</TD>
+                    <TD className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost" aria-label="Операции">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {u.active ? (
+                            <DropdownMenuItem onClick={() => setActive(u.id, false)}>Деактивировать</DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => setActive(u.id, true)}>Активировать</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="self-start">
+        <CardContent className="p-4 space-y-3">
+          <Select value={form.role} onValueChange={v => setForm(s => ({ ...s, role: v }))}>
+            <SelectTrigger><SelectValue placeholder="Тип пользователя" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ADMIN">ADMIN</SelectItem>
+              <SelectItem value="ACCOUNTANT">ACCOUNTANT</SelectItem>
+              <SelectItem value="MANAGER">MANAGER</SelectItem>
+              <SelectItem value="CASHIER">CASHIER</SelectItem>
+              <SelectItem value="EMPLOYEE">EMPLOYEE</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input placeholder="Имя" value={form.fullName} onChange={e => setForm(s => ({ ...s, fullName: e.target.value }))} />
+          <Input placeholder="Телефон (+7...)" value={form.phone} onChange={e => setForm(s => ({ ...s, phone: e.target.value }))} />
+          <div className="flex gap-2">
+            <Button onClick={save}>{editingId ? 'Сохранить' : 'Создать'}</Button>
+            {editingId && <Button variant="outline" onClick={resetForm}>Новый</Button>}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+

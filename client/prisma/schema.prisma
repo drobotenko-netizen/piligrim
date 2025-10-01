@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Tenant {
+  id        String     @id @default(cuid())
+  name      String
+  positions Position[]
+  employees Employee[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Position {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  name         String
+  baseHourRate Int?      // копейки
+  employees    Employee[]
+}
+
+model Employee {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  positionId       String?
+  position         Position? @relation(fields: [positionId], references: [id])
+  fullName         String
+  active           Boolean  @default(true)
+  hiredAt          DateTime @default(now())
+  firedAt          DateTime?
+  personalHourRate Int?     // копейки
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+

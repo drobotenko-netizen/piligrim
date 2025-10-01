@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+
+# production
+.next
+out
+
+# misc
+.DS_Store
+
+# env
+.env
+.env.*
+
+# prisma sqlite db
+prisma/*.db
+prisma/*.db-journal
+
+# local storage
+storage/
+

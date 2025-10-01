@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS IikoReceiptItem;
+DROP TABLE IF EXISTS IikoReceipt;

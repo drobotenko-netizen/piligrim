@@ -1,0 +1,421 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Note: SQLite не поддерживает enum — используем String + валидацию на уровне API
+
+model Tenant {
+  id        String     @id @default(cuid())
+  name      String
+  positions Position[]
+  employees Employee[]
+  timesheets Timesheet[]
+  adjustments Adjustment[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  payouts    Payout[]
+  positionRates PositionRate[]
+  accounts   Account[]
+  categories Category[]
+  transactions Transaction[]
+  counterparties Counterparty[]
+  statements Statement[]
+  users      User[]
+  userRoles  UserRole[]
+  auditLogs  AuditLog[]
+}
+
+model Position {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  name         String
+  baseHourRate Int?      // копейки, опционально
+  kind         String    // 'SHIFTS_PLUS_REVENUE' | 'SALARY' | 'SALARY_PLUS_TASKS'
+  revenuePercentBps Int? // базисные пункты % выручки (0-10000)
+  salaryAmount  Int?     // оклад в копейках
+  department   String?   // 'KITCHEN' | 'HALL' | 'OFFICE'
+  employees    Employee[]
+  rates        PositionRate[]
+}
+
+model Employee {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  positionId       String?
+  position         Position? @relation(fields: [positionId], references: [id])
+  fullName         String
+  active           Boolean  @default(true)
+  hiredAt          DateTime @default(now())
+  firedAt          DateTime?
+  personalHourRate Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  timesheets       Timesheet[]
+  adjustments      Adjustment[]
+  payouts          Payout[]
+  transactions    Transaction[]
+}
+
+model Timesheet {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  workDate   DateTime  // date (00:00)
+  minutes    Int       // количество минут за день
+  status     String   @default("draft") // 'draft' | 'approved'
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([employeeId, workDate])
+}
+
+model Adjustment {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  kind       String   // 'bonus' | 'fine' | 'deduction'
+  amount     Int      // копейки, положительное
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Account {
+  id       String   @id @default(cuid())
+  tenantId String
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  name     String
+  kind     String   // 'cash' | 'bank' | 'card' | 'safe'
+  active   Boolean  @default(true)
+  payouts  Payout[]
+  transactions Transaction[] @relation("AccountTransactions")
+  statements Statement[]
+  createdBy String?
+  updatedBy String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Payout {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  // период начисления, за который платим
+  year       Int
+  month      Int
+  amount     Int      // копейки, положительное
+  method     String   // 'cash' | 'card'
+  accountId  String?
+  account    Account? @relation(fields: [accountId], references: [id])
+  note       String?
+  createdBy  String?
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PositionRate {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id])
+  year       Int
+  month      Int
+  baseHourRate Int?
+  revenuePercentBps Int?
+  salaryAmount Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([positionId, year, month])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  type      String   // 'expense' | 'income'
+  activity  String   // 'OPERATING' | 'INVESTING' | 'FINANCING'
+  parentId  String?
+  parent    Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+  fund      String?  // Связь с фондом из Google Sheets
+  active    Boolean  @default(true)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  transactions Transaction[]
+}
+
+model Statement {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  periodYear  Int
+  periodMonth Int
+  opening     Int
+  closing     Int
+  source      String?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lines       StatementLine[]
+
+  @@unique([accountId, periodYear, periodMonth])
+}
+
+model StatementLine {
+  id           String   @id @default(cuid())
+  statementId  String
+  statement    Statement @relation(fields: [statementId], references: [id])
+  paymentDate  DateTime
+  amount       Int
+  description  String?
+  externalId   String?
+  matchedTransactionId String?
+  status       String?
+  createdBy    String?
+  createdAt    DateTime @default(now())
+}
+
+// ===== RBAC & Users =====
+
+model User {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  fullName   String
+  phone      String   @unique
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  roles      UserRole[]
+  auditLogs  AuditLog[]
+}
+
+model Role {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  users      UserRole[]
+  rolePerms  RolePermission[]
+}
+
+model Permission {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  description String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  rolePerms  RolePermission[]
+}
+
+model UserRole {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  roleId    String
+  role      Role   @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, userId, roleId])
+}
+
+model RolePermission {
+  id            String @id @default(cuid())
+  roleId        String
+  role          Role   @relation(fields: [roleId], references: [id])
+  permissionId  String
+  permission    Permission @relation(fields: [permissionId], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  diff      String?  // JSON
+  ip        String?
+  ua        String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, entity])
+}
+
+model Counterparty {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  kind      String?
+  active    Boolean  @default(true)
+  transactions Transaction[]
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  kind          String   // 'expense' | 'income' | 'transfer' | 'adjustment'
+  paymentDate   DateTime
+  accrualYear   Int?
+  accrualMonth  Int?
+  accountId     String?
+  account       Account? @relation("AccountTransactions", fields: [accountId], references: [id])
+  fromAccountId String?
+  toAccountId   String?
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  employeeId    String?
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+  counterpartyId String?
+  counterparty   Counterparty? @relation(fields: [counterpartyId], references: [id])
+  method        String?
+  amount        Int
+  note          String?
+  source        String?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([paymentDate])
+  @@index([accrualYear, accrualMonth])
+  @@index([kind])
+  @@index([accountId])
+  @@index([categoryId])
+}
+
+// ===== iiko Receipts staging (для локального хранения чеков) =====
+
+model IikoReceipt {
+  id             String   @id @default(cuid())
+  orderNum       String
+  date           DateTime
+  waiter         String?
+  register       String?
+  customerName   String?
+  customerPhone  String?
+  orderType      String?
+  deliveryServiceType String?
+  isReturn       Boolean?
+  returnSum      Int?      // сумма возврата по чеку (целая)
+  isDeleted      Boolean?  // флаг удаленного чека
+  deletedWithWriteoff Boolean? // удален с/без списания
+  orderDeleted   String?   // статус удаления чека (DELETED/NOT_DELETED)
+  openTime       DateTime? // время открытия чека
+  closeTime      DateTime? // время закрытия чека
+  rawJson        String?   // полный OLAP-ряд по чеку
+  payTypesJson   String?   // JSON-массив типов оплат
+  guests         Int?
+  net            Int?      // сумма по чеку (целое)
+  cost           Int?      // себестоимость (целое)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  items          IikoReceiptItem[]
+
+  @@index([date])
+  @@index([isDeleted])
+  @@unique([orderNum, date])
+  @@index([orderNum, date])
+}
+
+model IikoReceiptItem {
+  receiptId    String
+  lineNo       Int
+  dishId       String?
+  dishName     String?
+  size         String?
+  qty          Int?
+  net          Int?
+  cost         Int?
+  measureUnit  String?
+  returnSum    Int?
+  rawJson      String?   // полный OLAP-ряд по позиции
+
+  receipt      IikoReceipt @relation(fields: [receiptId], references: [id])
+
+  @@id([receiptId, lineNo])
+}
+
+// Нормализованное хранилище всех колонок OLAP SALES (чек/позиция) в формате ключ-значение
+model IikoOlapRowKV {
+  id        String   @id @default(cuid())
+  date      DateTime
+  orderNum  String
+  level     String   // 'RECEIPT' | 'ITEM'
+  itemKey   String?  // идентификатор позиции (например, DishId)
+  col       String   // имя колонки из OLAP (как в API)
+  valStr    String?
+  valNum    Float?
+  createdAt DateTime @default(now())
+
+  @@index([date, orderNum])
+  @@index([col])
+}
+
+model IikoImportCheckpoint {
+  jobName   String  @id
+  cursor    String?
+  updatedAt DateTime @updatedAt
+}
+
+// ===== GSheets staging for cashflow =====
+model GsCashflowRow {
+  id          String   @id @default(cuid())
+  spreadsheet String
+  sheet       String
+  rowNum      Int
+  monthName   String?
+  monthNum    Int?
+  date        DateTime?
+  dateText    String?
+  amount      Int?     // в копейках
+  wallet      String?
+  supplier    String?
+  comment     String?
+  fund        String?
+  flowType    String?  // Поступление | Выбытие
+  activity    String?  // Операционная и т.п.
+  raw         String?  // JSON исходной строки
+  createdAt   DateTime @default(now())
+
+  @@unique([spreadsheet, sheet, rowNum])
+  @@index([spreadsheet, sheet])
+}
+

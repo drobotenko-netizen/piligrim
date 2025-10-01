@@ -1,0 +1,320 @@
+"use client"
+import { useEffect, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Paperclip } from 'lucide-react'
+
+function ymd(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+export default function CashflowClient() {
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const spreadsheetId = '1vEuHUs31i9DVxLebJ9AxHiOYXCJxQR094NhY8u3IPi8'
+  const sheet = 'ДДС месяц'
+
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [wallet, setWallet] = useState('')
+  const [fund, setFund] = useState('')
+  const [flowType, setFlowType] = useState('')
+  const [search, setSearch] = useState('')
+  const [incompleteTransfer, setIncompleteTransfer] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(50)
+  const [rows, setRows] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
+  const [meta, setMeta] = useState<{ minDate: string|null; maxDate: string|null; wallets: string[]; funds: string[]; flowTypes: string[] } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<string | null>(null)
+  const [loadingToTransactions, setLoadingToTransactions] = useState(false)
+
+  async function loadMeta() {
+    const u = new URL(`${API_BASE}/api/gsheets/cashflow/meta`)
+    u.searchParams.set('spreadsheetId', spreadsheetId)
+    u.searchParams.set('sheet', sheet)
+    const r = await fetch(u.toString(), { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+    const j = await r.json()
+    setMeta(j)
+    if (!dateFrom && j?.minDate) setDateFrom(j.minDate.slice(0,10))
+    if (!dateTo && j?.maxDate) setDateTo(j.maxDate.slice(0,10))
+  }
+
+  async function load() {
+    setLoading(true)
+    try {
+      const u = new URL(`${API_BASE}/api/gsheets/cashflow`)
+      u.searchParams.set('spreadsheetId', spreadsheetId)
+      u.searchParams.set('sheet', sheet)
+      if (dateFrom) u.searchParams.set('dateFrom', dateFrom)
+      if (dateTo) u.searchParams.set('dateTo', dateTo)
+      if (wallet) u.searchParams.set('wallet', wallet)
+      if (fund) u.searchParams.set('fund', fund)
+      if (flowType) u.searchParams.set('flowType', flowType)
+      if (search) u.searchParams.set('search', search)
+      if (incompleteTransfer) u.searchParams.set('incompleteTransfer', incompleteTransfer)
+      u.searchParams.set('page', String(page))
+      u.searchParams.set('limit', String(limit))
+      const r = await fetch(u.toString(), { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const j = await r.json()
+      setRows(Array.isArray(j?.rows) ? j.rows : [])
+      setTotal(Number(j?.total || 0))
+    } catch {
+      setRows([]); setTotal(0)
+    }
+    setLoading(false)
+  }
+
+  async function refreshData() {
+    setImporting(true)
+    setImportResult(null)
+    try {
+      // Сначала очищаем старые данные
+      setImportResult('🗑️ Очистка старых данных...')
+      const clearResponse = await fetch(`${API_BASE}/api/gsheets/cashflow/clear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-role': 'ADMIN'
+        },
+        body: JSON.stringify({
+          spreadsheetId,
+          gid: '0' // Используем gid=0
+        })
+      })
+      
+      if (!clearResponse.ok) {
+        throw new Error('Ошибка при очистке данных')
+      }
+      
+      // Затем импортируем новые данные
+      setImportResult('🔄 Импорт новых данных...')
+      const importResponse = await fetch(`${API_BASE}/api/gsheets/cashflow/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-role': 'ADMIN'
+        },
+        body: JSON.stringify({
+          spreadsheetId,
+          gid: '0', // Используем gid=0 (лист с 7071 строками)
+          from: 5, // Начинаем с 5 строки (данные начинаются здесь)
+          to: 15000 // Импортируем все 7000+ строк
+        })
+      })
+      
+      const result = await importResponse.json()
+      
+      if (importResponse.ok) {
+        setImportResult(`✅ Обновление завершено! Обработано строк: ${result.processed || 'неизвестно'}`)
+        // Перезагружаем данные после импорта
+        await loadMeta()
+        await load()
+      } else {
+        setImportResult(`❌ Ошибка импорта: ${result.error || 'неизвестная ошибка'}`)
+      }
+    } catch (error) {
+      setImportResult(`❌ Ошибка обновления: ${error}`)
+    }
+    setImporting(false)
+  }
+
+  async function loadToTransactions() {
+    setLoadingToTransactions(true)
+    setImportResult(null)
+    try {
+      // Сначала удаляем все транзакции
+      setImportResult('🗑️ Удаление старых транзакций...')
+      const clearResponse = await fetch(`${API_BASE}/api/transactions/clear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-role': 'ADMIN'
+        }
+      })
+      
+      if (!clearResponse.ok) {
+        throw new Error('Ошибка при удалении транзакций')
+      }
+      
+      // Затем загружаем данные из Google Sheets в транзакции
+      setImportResult('📊 Загрузка данных в транзакции...')
+      const loadResponse = await fetch(`${API_BASE}/api/transactions/load-from-gsheets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-role': 'ADMIN'
+        },
+        body: JSON.stringify({
+          spreadsheetId,
+          gid: '0'
+        })
+      })
+      
+      const result = await loadResponse.json()
+      
+      if (loadResponse.ok) {
+        const transferInfo = result.fullPairs ? `, обработано переводов: ${result.fullPairs}` : ''
+        const incompleteInfo = result.incompletePairs ? `, неполных переводов: ${result.incompletePairs}` : ''
+        setImportResult(`✅ Загрузка завершена! Создано транзакций: ${result.created || 'неизвестно'}${transferInfo}${incompleteInfo}`)
+      } else {
+        setImportResult(`❌ Ошибка загрузки: ${result.error || 'неизвестная ошибка'}`)
+      }
+    } catch (error) {
+      setImportResult(`❌ Ошибка загрузки в транзакции: ${error}`)
+    }
+    setLoadingToTransactions(false)
+  }
+
+  useEffect(() => { loadMeta() }, [])
+  useEffect(() => { load() }, [dateFrom, dateTo, wallet, fund, flowType, search, incompleteTransfer, page, limit])
+
+  const pages = useMemo(() => Math.max(1, Math.ceil(total / Math.max(1, limit))), [total, limit])
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">ДДС (Google)</h1>
+          <a 
+            href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=0`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+            title="Открыть таблицу в Google Sheets"
+          >
+            <Paperclip size={18} />
+          </a>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={refreshData}
+            disabled={importing || loadingToTransactions}
+          >
+            {importing ? 'Обновление...' : 'Обновить из Google Sheets'}
+          </Button>
+          <Button 
+            onClick={loadToTransactions}
+            disabled={importing || loadingToTransactions}
+            variant="secondary"
+          >
+            {loadingToTransactions ? 'Загрузка...' : 'Загрузить в транзакции'}
+          </Button>
+        </div>
+      </div>
+      
+      {importResult && (
+        <div className={`p-3 rounded ${importResult.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {importResult}
+        </div>
+      )}
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+        <div>
+          <label className="block text-xs text-muted-foreground">С даты</label>
+          <input type="date" value={dateFrom} onChange={e => { setPage(1); setDateFrom(e.target.value) }} className="border rounded px-2 py-1 w-full" />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">По дату</label>
+          <input type="date" value={dateTo} onChange={e => { setPage(1); setDateTo(e.target.value) }} className="border rounded px-2 py-1 w-full" />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">Кошелёк</label>
+          <select value={wallet} onChange={e => { setPage(1); setWallet(e.target.value) }} className="border rounded px-2 py-1 w-full">
+            <option value="">—</option>
+            {(meta?.wallets || []).map(w => <option key={w} value={w}>{w}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">Фонд</label>
+          <select value={fund} onChange={e => { setPage(1); setFund(e.target.value) }} className="border rounded px-2 py-1 w-full">
+            <option value="">—</option>
+            {(meta?.funds || []).map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">Тип потока</label>
+          <select value={flowType} onChange={e => { setPage(1); setFlowType(e.target.value) }} className="border rounded px-2 py-1 w-full">
+            <option value="">—</option>
+            {(meta?.flowTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">Поиск</label>
+          <input type="text" value={search} onChange={e => { setPage(1); setSearch(e.target.value) }} placeholder="Поставщик/комментарий" className="border rounded px-2 py-1 w-full" />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">Неполные переводы</label>
+          <select value={incompleteTransfer} onChange={e => { setPage(1); setIncompleteTransfer(e.target.value) }} className="border rounded px-2 py-1 w-full">
+            <option value="">—</option>
+            <option value="true">Только неполные</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Всего: {total}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <label className="text-sm">На странице:</label>
+          <select value={limit} onChange={e => { setPage(1); setLimit(Number(e.target.value) || 50) }} className="border rounded px-2 py-1">
+            {[25,50,100,200].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="border rounded px-2 py-1">←</button>
+          <span className="text-sm">{page}/{pages}</span>
+          <button disabled={page>=pages} onClick={() => setPage(p => Math.min(pages, p+1))} className="border rounded px-2 py-1">→</button>
+        </div>
+      </div>
+
+      <div className="overflow-auto border rounded">
+        <table className="min-w-full text-sm">
+          <thead className="bg-muted">
+            <tr>
+              <th className="text-left px-2 py-1">Дата</th>
+              <th className="text-left px-2 py-1">Сумма</th>
+              <th className="text-left px-2 py-1">Кошелёк</th>
+              <th className="text-left px-2 py-1">Поставщик</th>
+              <th className="text-left px-2 py-1">Комментарий</th>
+              <th className="text-left px-2 py-1">Фонд</th>
+              <th className="text-left px-2 py-1">Тип</th>
+              <th className="text-left px-2 py-1">Активность</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => {
+              const amt = typeof r.amount === 'number' ? (r.amount/100).toFixed(2) : ''
+              const d = r.date ? String(r.date).slice(0,10) : r.dateText || ''
+              const isIncomplete = r.raw && JSON.parse(r.raw || '{}').incompleteTransfer
+              const transferType = r.raw && JSON.parse(r.raw || '{}').transferType
+              return (
+                <tr key={r.id || idx} className={`border-t ${isIncomplete ? 'bg-yellow-50' : ''}`}>
+                  <td className="px-2 py-1 whitespace-nowrap">{d}</td>
+                  <td className="px-2 py-1 whitespace-nowrap">{amt}</td>
+                  <td className="px-2 py-1">{r.wallet || ''}</td>
+                  <td className="px-2 py-1">{r.supplier || ''}</td>
+                  <td className="px-2 py-1">{r.comment || ''}</td>
+                  <td className="px-2 py-1">{r.fund || ''}</td>
+                  <td className="px-2 py-1">
+                    {r.flowType || ''}
+                    {isIncomplete && (
+                      <span className="ml-1 text-xs text-orange-600" title={`Неполный перевод: ${transferType === 'outgoing_only' ? 'только выбытие' : 'только поступление'}`}>
+                        ⚠️
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1">{r.activity || ''}</td>
+                </tr>
+              )
+            })}
+            {rows.length === 0 && (
+              <tr><td className="px-2 py-4 text-muted-foreground" colSpan={8}>{loading ? 'Загрузка…' : 'Нет данных'}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+

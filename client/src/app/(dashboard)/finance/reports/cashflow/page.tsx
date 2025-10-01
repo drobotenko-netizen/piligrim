@@ -1,0 +1,38 @@
+import CashflowClient from './ui/CashflowClient'
+import { fetchWithRole } from '@/lib/utils'
+
+export const dynamic = 'force-dynamic'
+
+export default async function CashflowReportPage() {
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const now = new Date()
+  const currentYear = now.getUTCFullYear()
+  const currentMonth = now.getUTCMonth() + 1
+  
+  // По умолчанию: с января по текущий месяц
+  const yFrom = currentYear
+  const mFrom = 1 // январь
+  const yTo = currentYear
+  const mTo = currentMonth
+  
+  let initial: any = { items: [], total: 0, months: [] }
+  try {
+    const res = await fetchWithRole(`${API_BASE}/api/reports/cashflow?yFrom=${yFrom}&mFrom=${mFrom}&yTo=${yTo}&mTo=${mTo}`, { cache: 'no-store' })
+    initial = await res.json()
+  } catch (e) {
+    console.error('Failed to fetch cashflow report', e)
+  }
+  return (
+    <div className="p-6">
+      <CashflowClient 
+        initialYFrom={yFrom} 
+        initialMFrom={mFrom} 
+        initialYTo={yTo} 
+        initialMTo={mTo} 
+        initialItems={initial.items || []} 
+        initialTotal={initial.total || 0} 
+        initialMonths={initial.months || []}
+      />
+    </div>
+  )
+}
