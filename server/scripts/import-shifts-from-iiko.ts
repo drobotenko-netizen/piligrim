@@ -234,49 +234,37 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
       
       console.log(`  📄 Чеков в сменах #${sessionNumbers}: ${shiftReceipts.length}`)
 
-    // Агрегируем продажи по channel × tenderType
-    type SaleKey = string // `${channelName}__${tenderTypeName}`
+    // Используем ОФИЦИАЛЬНЫЕ данные из iiko API смен
+    type SaleKey = string
     const salesAgg = new Map<SaleKey, { channel: string; tender: string; gross: number; discounts: number; refunds: number }>()
 
-    for (const receipt of shiftReceipts) {
-      // Определяем канал
-      const channelName = mapToChannel(receipt.orderType, receipt.deliveryServiceType)
+    // Суммируем по всем сменам дня
+    for (const dayShift of dayShifts) {
+      if (dayShift.salesCash && dayShift.salesCash > 0) {
+        const key = 'Dine-in__Наличные'
+        const sale = salesAgg.get(key) || { channel: 'Dine-in', tender: 'Наличные', gross: 0, discounts: 0, refunds: 0 }
+        sale.gross += Math.round(dayShift.salesCash * 100)
+        salesAgg.set(key, sale)
+      }
       
-      // Парсим способы оплаты
-      let payTypes: string[] = []
-      try {
-        if (receipt.payTypesJson) {
-          payTypes = JSON.parse(receipt.payTypesJson)
-        }
-      } catch {
-        payTypes = ['Прочее']
+      if (dayShift.salesCard && dayShift.salesCard > 0) {
+        const key = 'Dine-in__Карта'
+        const sale = salesAgg.get(key) || { channel: 'Dine-in', tender: 'Карта', gross: 0, discounts: 0, refunds: 0 }
+        sale.gross += Math.round(dayShift.salesCard * 100)
+        salesAgg.set(key, sale)
       }
-
-      if (payTypes.length === 0) payTypes = ['Прочее']
-
-      // Берём ПЕРВЫЙ (основной) способ оплаты, НЕ делим сумму!
-      // ВАЖНО: receipt.net в целых рублях, нужно умножить на 100 для копеек!
-      const netAmountCents = (receipt.net || 0) * 100
-      const mainPayType = payTypes[0] // Только первый способ
-      const tenderName = mapToTenderType(mainPayType)
-      const key: SaleKey = `${channelName}__${tenderName}`
-
-      const sale = salesAgg.get(key) || { 
-        channel: channelName, 
-        tender: tenderName, 
-        gross: 0, 
-        discounts: 0, 
-        refunds: 0 
+      
+      if (dayShift.salesCredit && dayShift.salesCredit > 0) {
+        const key = 'Dine-in__Прочее'
+        const sale = salesAgg.get(key) || { channel: 'Dine-in', tender: 'Прочее', gross: 0, discounts: 0, refunds: 0 }
+        sale.gross += Math.round(dayShift.salesCredit * 100)
+        salesAgg.set(key, sale)
       }
-
-      sale.gross += netAmountCents // Вся сумма, НЕ делим!
-      // discounts и refunds тоже в целых рублях
-      if (receipt.isReturn) {
-        sale.refunds += Math.abs(receipt.returnSum || 0) * 100
-      }
-
-      salesAgg.set(key, sale)
     }
+    
+    const totalCash = dayShifts.reduce((sum, s) => sum + (s.salesCash || 0), 0)
+    const totalCard = dayShifts.reduce((sum, s) => sum + (s.salesCard || 0), 0)
+    console.log(`  💰 Из iiko API: наличные=${totalCash}, карта=${totalCard}`)
 
       // Создаём смену
       const shift = await prisma.shift.create({
@@ -359,46 +347,33 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
       
       console.log(`  📄 Чеков в смене #${iikoShift.sessionNumber}: ${shiftReceipts.length}`)
 
-      // Агрегируем продажи
+      // Используем ОФИЦИАЛЬНЫЕ данные из iiko API смен (не из чеков!)
       type SaleKey = string
       const salesAgg = new Map<SaleKey, { channel: string; tender: string; gross: number; discounts: number; refunds: number }>()
 
-      for (const receipt of shiftReceipts) {
-        const channelName = mapToChannel(receipt.orderType, receipt.deliveryServiceType)
-        
-        let payTypes: string[] = []
-        try {
-          if (receipt.payTypesJson) {
-            const parsed = JSON.parse(receipt.payTypesJson)
-            if (Array.isArray(parsed)) {
-              payTypes = parsed
-            }
-          }
-        } catch {}
-
-        if (payTypes.length === 0) payTypes = ['Прочее']
-
-        // Берём ПЕРВЫЙ (основной) способ оплаты, НЕ делим сумму!
-        const netAmountCents = (receipt.net || 0) * 100
-        const mainPayType = payTypes[0] // Только первый способ
-        const tenderName = mapToTenderType(mainPayType)
-        const key: SaleKey = `${channelName}__${tenderName}`
-
-        const sale = salesAgg.get(key) || { 
-          channel: channelName, 
-          tender: tenderName, 
-          gross: 0, 
-          discounts: 0, 
-          refunds: 0 
-        }
-
-        sale.gross += netAmountCents // Вся сумма, НЕ делим!
-        if (receipt.isReturn) {
-          sale.refunds += Math.abs(receipt.returnSum || 0) * 100
-        }
-
+      // Данные из iiko Cash Shifts API (в рублях, нужно *100 для копеек)
+      if (iikoShift.salesCash && iikoShift.salesCash > 0) {
+        const key = 'Dine-in__Наличные' // По умолчанию Dine-in
+        const sale = salesAgg.get(key) || { channel: 'Dine-in', tender: 'Наличные', gross: 0, discounts: 0, refunds: 0 }
+        sale.gross += Math.round(iikoShift.salesCash * 100)
         salesAgg.set(key, sale)
       }
+      
+      if (iikoShift.salesCard && iikoShift.salesCard > 0) {
+        const key = 'Dine-in__Карта'
+        const sale = salesAgg.get(key) || { channel: 'Dine-in', tender: 'Карта', gross: 0, discounts: 0, refunds: 0 }
+        sale.gross += Math.round(iikoShift.salesCard * 100)
+        salesAgg.set(key, sale)
+      }
+      
+      if (iikoShift.salesCredit && iikoShift.salesCredit > 0) {
+        const key = 'Dine-in__Прочее'
+        const sale = salesAgg.get(key) || { channel: 'Dine-in', tender: 'Прочее', gross: 0, discounts: 0, refunds: 0 }
+        sale.gross += Math.round(iikoShift.salesCredit * 100)
+        salesAgg.set(key, sale)
+      }
+      
+      console.log(`  💰 Из iiko API: наличные=${iikoShift.salesCash}, карта=${iikoShift.salesCard}, кредит=${iikoShift.salesCredit || 0}`)
 
       // Создаём смену
       const shift = await prisma.shift.create({
