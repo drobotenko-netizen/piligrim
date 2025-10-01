@@ -1607,7 +1607,30 @@ export function createIikoRouter() {
         return res.status(400).json({ error: 'fromDate and toDate required (YYYY-MM-DD)' })
       }
 
-      // Импортируем через динамический import чтобы не тянуть Prisma в роутер
+      // 1. УДАЛЯЕМ старые смены за период
+      const from = new Date(fromDate)
+      const to = new Date(toDate)
+      to.setDate(to.getDate() + 1) // Включаем toDate
+      
+      console.log('🗑️  Удаляем старые смены за период:', fromDate, '-', toDate)
+      const shiftsToDelete = await prisma.shift.findMany({
+        where: {
+          OR: [
+            { openAt: { gte: from, lt: to } },
+            { closeAt: { gte: from, lt: to } }
+          ]
+        },
+        select: { id: true }
+      })
+      
+      const shiftIds = shiftsToDelete.map(s => s.id)
+      if (shiftIds.length > 0) {
+        await prisma.shiftSale.deleteMany({ where: { shiftId: { in: shiftIds } } })
+        await prisma.shift.deleteMany({ where: { id: { in: shiftIds } } })
+        console.log(`✅ Удалено ${shiftIds.length} смен`)
+      }
+
+      // 2. ИМПОРТИРУЕМ заново
       const { exec } = await import('child_process')
       const { promisify } = await import('util')
       const execAsync = promisify(exec)
