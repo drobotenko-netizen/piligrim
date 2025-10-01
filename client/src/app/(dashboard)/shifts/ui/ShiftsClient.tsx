@@ -164,10 +164,14 @@ export default function ShiftsClient() {
                   ) || 0)
                   
                   const shiftDate = new Date(shift.openAt).toISOString().slice(0, 10)
-                  const receiptsLink = `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
                   
                   // Номер смены из базы или из note
                   const sessionNumber = shift.iikoSessionNum || shift.note?.match(/#(\d+)/)?.[1] || '—'
+                  
+                  // Ссылка с датой и номером смены
+                  const receiptsLink = shift.iikoSessionNum 
+                    ? `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}&session=${shift.iikoSessionNum}`
+                    : `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
                   
                   return (
                     <TR key={shift.id}>
