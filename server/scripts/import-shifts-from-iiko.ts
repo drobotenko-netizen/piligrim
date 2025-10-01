@@ -45,20 +45,6 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
     console.log(`   Используем группировку по чекам`)
   }
 
-  // Получаем сотрудников из iiko для маппинга UUID → имя
-  let employeesMap = new Map<string, string>()
-  try {
-    const employees = await iikoClient.getEmployees()
-    employees.forEach((emp: any) => {
-      if (emp.id && emp.name) {
-        employeesMap.set(emp.id, emp.name)
-      }
-    })
-    console.log(`👥 Получено сотрудников из iiko: ${employeesMap.size}`)
-  } catch (e) {
-    console.warn(`⚠️  Не удалось получить сотрудников из iiko API: ${e}`)
-  }
-
   // Получаем или создаём каналы и способы оплаты
   const channelMap = new Map<string, string>()
   const tenderTypeMap = new Map<string, string>()
@@ -118,6 +104,68 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
         iikoShiftsMap.set(dateKey, iikoShift)
       }
     }
+  }
+
+  // Сопоставляем UUID смен из iiko с именами официантов из чеков
+  const uuidToNameMap = new Map<string, Map<string, number>>()
+  
+  // Для каждой смены из iiko собираем статистику официантов в этот день
+  for (const [dateKey, shift] of iikoShiftsMap.entries()) {
+    const receiptsForDay = await prisma.iikoReceipt.findMany({
+      where: {
+        date: {
+          gte: new Date(dateKey + 'T00:00:00.000Z'),
+          lt: new Date(dateKey + 'T23:59:59.999Z')
+        },
+        waiter: { not: null }
+      },
+      select: { waiter: true }
+    })
+    
+    const waiterCounts = new Map<string, number>()
+    receiptsForDay.forEach(r => {
+      if (r.waiter) {
+        waiterCounts.set(r.waiter, (waiterCounts.get(r.waiter) || 0) + 1)
+      }
+    })
+    
+    // Берём самого частого официанта как ответственного за смену
+    let maxName = ''
+    let maxCount = 0
+    for (const [name, count] of waiterCounts.entries()) {
+      if (count > maxCount) {
+        maxCount = count
+        maxName = name
+      }
+    }
+    
+    if (maxName && shift.responsibleUserId) {
+      if (!uuidToNameMap.has(shift.responsibleUserId)) {
+        uuidToNameMap.set(shift.responsibleUserId, new Map())
+      }
+      uuidToNameMap.get(shift.responsibleUserId)!.set(maxName, maxCount)
+    }
+  }
+  
+  // Создаём финальный маппинг UUID → имя (выбираем самый частый вариант)
+  const employeesMap = new Map<string, string>()
+  for (const [uuid, names] of uuidToNameMap.entries()) {
+    let bestName = ''
+    let bestCount = 0
+    for (const [name, count] of names.entries()) {
+      if (count > bestCount) {
+        bestCount = count
+        bestName = name
+      }
+    }
+    if (bestName) {
+      employeesMap.set(uuid, bestName)
+    }
+  }
+  
+  console.log(`👥 Сопоставлено UUID → имена: ${employeesMap.size}`)
+  for (const [uuid, name] of employeesMap.entries()) {
+    console.log(`   ${uuid.slice(0, 8)}... → ${name}`)
   }
 
   // Группируем чеки по дням
