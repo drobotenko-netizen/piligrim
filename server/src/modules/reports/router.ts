@@ -225,12 +225,12 @@ export function createReportsRouter(prisma: PrismaClient) {
           )
         },
         expenses: {
-          cogs: { byMonth: Object.fromEntries(cogsByMonth), items: Object.fromEntries(expensesByKindByMonth.COGS.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
-          opex: { byMonth: Object.fromEntries(opexByMonth), items: Object.fromEntries(expensesByKindByMonth.OPEX.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
-          capex: { byMonth: Object.fromEntries(capexByMonth), items: Object.fromEntries(expensesByKindByMonth.CAPEX.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
-          tax: { byMonth: Object.fromEntries(taxByMonth), items: Object.fromEntries(expensesByKindByMonth.TAX.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
-          fee: { byMonth: Object.fromEntries(feeByMonth), items: Object.fromEntries(expensesByKindByMonth.FEE.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) },
-          other: { byMonth: Object.fromEntries(otherByMonth), items: Object.fromEntries(expensesByKindByMonth.OTHER.entries()).map(([name, map]: any) => ({ name, byMonth: Object.fromEntries(map) })) }
+          cogs: { byMonth: Object.fromEntries(cogsByMonth), items: Array.from(expensesByKindByMonth.COGS.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
+          opex: { byMonth: Object.fromEntries(opexByMonth), items: Array.from(expensesByKindByMonth.OPEX.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
+          capex: { byMonth: Object.fromEntries(capexByMonth), items: Array.from(expensesByKindByMonth.CAPEX.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
+          tax: { byMonth: Object.fromEntries(taxByMonth), items: Array.from(expensesByKindByMonth.TAX.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
+          fee: { byMonth: Object.fromEntries(feeByMonth), items: Array.from(expensesByKindByMonth.FEE.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
+          other: { byMonth: Object.fromEntries(otherByMonth), items: Array.from(expensesByKindByMonth.OTHER.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) }
         }
       })
     } catch (e: any) {
