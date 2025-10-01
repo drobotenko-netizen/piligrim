@@ -119,17 +119,16 @@
   - При получении выплаты → cash_tx(in) ⏳
   - Триггеры или сервисные функции (в API) ✅
 
-#### 1.6 Разделение дат
-- [ ] **Обновить Transaction для поддержки двух дат**
-  - Переименовать paymentDate → operation_date
-  - Добавить posting_period (DATE, всегда 1-е число месяца)
-  - Миграция данных: posting_period = первое число месяца operation_date
-  - Обновить все API
-  - Обновить UI
-
-- [ ] **Обновить ShiftSale**
-  - operation_date = shift.close_at::date
-  - posting_period = первое число месяца close_at
+#### 1.6 Интеграция с iiko
+- [x] **Автоматический импорт смен из чеков**
+  - Скрипт импорта из IikoReceipt ✅
+  - Маппинг orderType/deliveryServiceType → Channel ✅
+  - Маппинг payTypes → TenderType ✅
+  - Группировка по датам ✅
+  - Агрегация по channel × tender ✅
+  - API endpoint POST /api/iiko/import/shifts ✅
+  - UI кнопка импорта ✅
+  - Таблица сверки чеков vs смен ✅
 
 #### 1.7 Сверка банка
 - [ ] **Расширить BankStatementLine**
