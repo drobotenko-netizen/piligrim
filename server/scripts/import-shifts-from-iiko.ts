@@ -284,17 +284,19 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
       }
     }
 
-    // Создаём смену
-    const shift = await prisma.shift.create({
-      data: {
-        tenantId: tenant.id,
-        openAt,
-        closeAt,
-        openedBy: closedBy,
-        closedBy: closedBy,
-        note: `Смены iiko #${sessionNumbers}: ${shiftReceipts.length} чеков`
-      }
-    })
+      // Создаём смену
+      const shift = await prisma.shift.create({
+        data: {
+          tenantId: tenant.id,
+          openAt,
+          closeAt,
+          openedBy: closedBy,
+          closedBy: closedBy,
+          note: `Смены iiko #${sessionNumbers}: ${shiftReceipts.length} чеков`,
+          iikoSessionNum: dayShifts.length > 1 ? null : dayShifts[0].sessionNumber,
+          iikoCashRegNum: dayShifts.length > 1 ? null : dayShifts[0].cashRegNumber
+        }
+      })
 
     shiftsCreated++
     console.log(`  ✅ Смена создана: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
@@ -356,16 +358,12 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
       console.log(`     Даты: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
       console.log(`     Закрыл: ${closedBy}`)
       
-      // Чеки за ДЕНЬ (т.к. у чеков нет точного времени)
-      const dayStart = new Date(dateKey + 'T00:00:00.000Z')
-      const dayEnd = new Date(dateKey + 'T23:59:59.999Z')
-      
+      // Чеки КОНКРЕТНО ЭТОЙ СМЕНЫ по sessionNumber
       const shiftReceipts = receipts.filter(r => {
-        const rDate = r.date
-        return rDate >= dayStart && rDate <= dayEnd
+        return r.sessionNumber === iikoShift.sessionNumber
       })
       
-      console.log(`  📄 Чеков за день: ${shiftReceipts.length}`)
+      console.log(`  📄 Чеков в смене #${iikoShift.sessionNumber}: ${shiftReceipts.length}`)
 
       // Агрегируем продажи
       type SaleKey = string
@@ -418,7 +416,9 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
           closeAt,
           openedBy: closedBy,
           closedBy: closedBy,
-          note: `Смена iiko #${iikoShift.sessionNumber}: ${shiftReceipts.length} чеков`
+          note: `Смена iiko #${iikoShift.sessionNumber}: ${shiftReceipts.length} чеков`,
+          iikoSessionNum: iikoShift.sessionNumber,
+          iikoCashRegNum: iikoShift.cashRegNumber
         }
       })
 

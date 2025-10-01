@@ -360,20 +360,23 @@ model TenderType {
 
 // Смены
 model Shift {
-  id        String      @id @default(cuid())
-  tenantId  String
-  tenant    Tenant      @relation(fields: [tenantId], references: [id])
-  openAt    DateTime
-  closeAt   DateTime?
-  openedBy  String?
-  closedBy  String?
-  note      String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  sales     ShiftSale[]
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id])
+  openAt         DateTime
+  closeAt        DateTime?
+  openedBy       String?
+  closedBy       String?
+  note           String?
+  iikoSessionNum Int? // номер смены из iiko API
+  iikoCashRegNum Int? // номер кассы из iiko API
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  sales          ShiftSale[]
 
   @@index([openAt])
   @@index([closeAt])
+  @@index([iikoSessionNum])
 }
 
 // Продажи по сменам (канал × способ оплаты)
@@ -493,6 +496,8 @@ model IikoReceipt {
   date                DateTime
   waiter              String?
   register            String?
+  sessionNumber       Int? // номер кассовой смены из iiko
+  cashRegNumber       Int? // номер кассы (ФРа) из iiko
   customerName        String?
   customerPhone       String?
   orderType           String?
@@ -517,6 +522,8 @@ model IikoReceipt {
   @@index([date])
   @@index([isDeleted])
   @@index([orderNum, date])
+  @@index([sessionNumber])
+  @@index([cashRegNumber])
 }
 
 model IikoReceiptItem {

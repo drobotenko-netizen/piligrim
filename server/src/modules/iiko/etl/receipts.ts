@@ -24,7 +24,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
   const bodyHeader = {
     reportType: 'SALES',
     buildSummary: true,
-    groupByRowFields: ['OrderNum','PayTypes','WaiterName','CashRegisterName','Delivery.CustomerName','Delivery.CustomerPhone','OrderType','Storned','Delivery.ServiceType','OrderDeleted','DeletedWithWriteoff','OpenTime','CloseTime'],
+    groupByRowFields: ['OrderNum','PayTypes','WaiterName','CashRegisterName','SessionNum','Delivery.CustomerName','Delivery.CustomerPhone','OrderType','Storned','Delivery.ServiceType','OrderDeleted','DeletedWithWriteoff','OpenTime','CloseTime'],
     groupByColFields: [],
     aggregateFields: ['DishSumInt','DishDiscountSumInt','ProductCostBase.ProductCost','GuestNum','DishAmountInt','DishReturnSum'],
     filters: {
@@ -37,7 +37,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
   const bodyDeleted = {
     reportType: 'SALES',
     buildSummary: true,
-    groupByRowFields: ['OrderNum','OpenTime','CloseTime','OrderDeleted','DeletedWithWriteoff','PayTypes','WaiterName','CashRegisterName','Delivery.CustomerName','Delivery.CustomerPhone','OrderType','Storned','Delivery.ServiceType'],
+    groupByRowFields: ['OrderNum','SessionNum','OpenTime','CloseTime','OrderDeleted','DeletedWithWriteoff','PayTypes','WaiterName','CashRegisterName','Delivery.CustomerName','Delivery.CustomerPhone','OrderType','Storned','Delivery.ServiceType'],
     groupByColFields: [],
     aggregateFields: ['DishSumInt','DishDiscountSumInt','ProductCostBase.ProductCost','GuestNum','DishAmountInt','DishReturnSum'],
     filters: {
@@ -115,6 +115,8 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
       payTypes: new Set<string>(),
       waiter: r?.WaiterName || null,
       register: r?.CashRegisterName || null,
+      sessionNumber: r?.SessionNum ? Number(r.SessionNum) : null,
+      cashRegNumber: null, // Нет в OLAP, будет null
       customerName: r?.['Delivery.CustomerName'] || null,
       customerPhone: r?.['Delivery.CustomerPhone'] || null,
       orderType: r?.OrderType || null,
@@ -594,6 +596,8 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
         date: dayStart,
         waiter: e.waiter,
         register: e.register,
+        sessionNumber: e.sessionNumber,
+        cashRegNumber: e.cashRegNumber,
         customerName: e.customerName,
         customerPhone: e.customerPhone,
         orderType: e.orderType,
@@ -613,6 +617,8 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
         date: dayStart,
         waiter: e.waiter,
         register: e.register,
+        sessionNumber: e.sessionNumber,
+        cashRegNumber: e.cashRegNumber,
         customerName: e.customerName,
         customerPhone: e.customerPhone,
         orderType: e.orderType,

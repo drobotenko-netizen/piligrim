@@ -166,8 +166,8 @@ export default function ShiftsClient() {
                   const shiftDate = new Date(shift.openAt).toISOString().slice(0, 10)
                   const receiptsLink = `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
                   
-                  // Вытаскиваем номер смены из note (формат: "Смена iiko #123: ...")
-                  const sessionNumber = shift.note?.match(/#(\d+)/)?.[1] || shift.note || '—'
+                  // Номер смены из базы или из note
+                  const sessionNumber = shift.iikoSessionNum || shift.note?.match(/#(\d+)/)?.[1] || '—'
                   
                   return (
                     <TR key={shift.id}>
