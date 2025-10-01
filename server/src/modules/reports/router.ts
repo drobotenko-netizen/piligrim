@@ -338,5 +338,73 @@ export function createReportsRouter(prisma: PrismaClient) {
     }
   })
 
+  // Сверка смен с чеками iiko
+  router.get('/shifts-reconciliation', async (req, res) => {
+    try {
+      // Получаем последние 30 дней
+      const to = new Date()
+      const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      // Группируем чеки iiko по датам
+      const receipts = await prisma.iikoReceipt.findMany({
+        where: {
+          date: { gte: from, lt: to },
+          OR: [{ isDeleted: false }, { isDeleted: null }]
+        }
+      })
+
+      const receiptsMap = new Map<string, { count: number; total: number }>()
+      for (const r of receipts) {
+        const day = r.date.toISOString().slice(0, 10)
+        const current = receiptsMap.get(day) || { count: 0, total: 0 }
+        current.count++
+        current.total += r.net || 0
+        receiptsMap.set(day, current)
+      }
+
+      // Группируем смены по датам
+      const shifts = await prisma.shift.findMany({
+        where: {
+          openAt: { gte: from, lt: to }
+        },
+        include: {
+          sales: true
+        }
+      })
+
+      const shiftsMap = new Map<string, { count: number; total: number }>()
+      for (const s of shifts) {
+        const day = s.openAt.toISOString().slice(0, 10)
+        const current = shiftsMap.get(day) || { count: 0, total: 0 }
+        current.count++
+        const shiftTotal = s.sales.reduce((sum, sale) => 
+          sum + (sale.grossAmount - sale.discounts - sale.refunds), 0
+        )
+        current.total += shiftTotal
+        shiftsMap.set(day, current)
+      }
+
+      // Объединяем для сверки
+      const allDays = new Set([...receiptsMap.keys(), ...shiftsMap.keys()])
+      const items = Array.from(allDays).map(day => {
+        const receiptsData = receiptsMap.get(day) || { count: 0, total: 0 }
+        const shiftsData = shiftsMap.get(day) || { count: 0, total: 0 }
+        
+        return {
+          date: day,
+          receiptsCount: receiptsData.count,
+          receiptsTotal: receiptsData.total,
+          shiftsCount: shiftsData.count,
+          shiftsTotal: shiftsData.total,
+          diff: shiftsData.total - receiptsData.total
+        }
+      }).sort((a, b) => b.date.localeCompare(a.date))
+
+      res.json({ items })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   return router
 }
