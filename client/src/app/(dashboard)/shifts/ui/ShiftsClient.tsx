@@ -41,7 +41,7 @@ export default function ShiftsClient() {
   }
 
   function rubFmt(cents: number) {
-    return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2 }).format(cents / 100) + ' ₽'
+    return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(cents / 100) + ' ₽'
   }
 
   async function importFromIiko() {
