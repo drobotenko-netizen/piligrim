@@ -37,12 +37,26 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
     iikoShifts = await iikoClient.getCashShifts({
       openDateFrom: fromDate,
       openDateTo: toDate,
-      status: 'CLOSED'
+      status: 'ANY'
     })
     console.log(`📡 Получено смен из iiko API: ${iikoShifts.length}`)
   } catch (e) {
     console.warn(`⚠️  Не удалось получить смены из iiko API: ${e}`)
     console.log(`   Используем группировку по чекам`)
+  }
+
+  // Получаем сотрудников из iiko для маппинга UUID → имя
+  let employeesMap = new Map<string, string>()
+  try {
+    const employees = await iikoClient.getEmployees()
+    employees.forEach((emp: any) => {
+      if (emp.id && emp.name) {
+        employeesMap.set(emp.id, emp.name)
+      }
+    })
+    console.log(`👥 Получено сотрудников из iiko: ${employeesMap.size}`)
+  } catch (e) {
+    console.warn(`⚠️  Не удалось получить сотрудников из iiko API: ${e}`)
   }
 
   // Получаем или создаём каналы и способы оплаты
@@ -152,8 +166,9 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
       openAt = iikoShift.openDate ? new Date(iikoShift.openDate) : new Date(dateKey + 'T09:00:00.000Z')
       closeAt = iikoShift.closeDate ? new Date(iikoShift.closeDate) : new Date(dateKey + 'T23:00:00.000Z')
       
-      // responsibleUserId - UUID кассира из iiko
-      closedBy = iikoShift.responsibleUserId || iikoShift.managerId || 'unknown'
+      // Получаем имя сотрудника по UUID
+      const userId = iikoShift.responsibleUserId || iikoShift.managerId
+      closedBy = userId ? (employeesMap.get(userId) || userId) : 'unknown'
       
       console.log(`  📡 Из iiko API: смена #${iikoShift.sessionNumber}`)
       console.log(`     Даты: ${openAt.toISOString()} - ${closeAt.toISOString()}`)
