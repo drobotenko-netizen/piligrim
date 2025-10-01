@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
@@ -11,7 +12,7 @@ export default function ShiftsClient() {
   const [shifts, setShifts] = useState<any[]>([])
   const [importing, setImporting] = useState(false)
   const [reconciliation, setReconciliation] = useState<any[]>([])
-  const [mergeMode, setMergeMode] = useState(true) // true = объединять, false = раздельно
+  const [importMode, setImportMode] = useState<'merge' | 'separate'>('merge')
 
   useEffect(() => {
     loadShifts()
@@ -43,7 +44,7 @@ export default function ShiftsClient() {
   }
 
   async function importFromIiko() {
-    const mode = mergeMode ? 'объединять смены в одну за день' : 'создавать отдельную смену для каждой кассы'
+    const mode = importMode === 'merge' ? 'объединять смены в одну за день' : 'создавать отдельную смену для каждой кассы'
     if (!confirm(`Импортировать смены из iiko за последние 30 дней?\n\nРежим: ${mode}`)) return
     
     setImporting(true)
@@ -58,7 +59,7 @@ export default function ShiftsClient() {
         body: JSON.stringify({
           fromDate: from.toISOString().slice(0, 10),
           toDate: to.toISOString().slice(0, 10),
-          mergeByDay: mergeMode
+          mergeByDay: importMode === 'merge'
         })
       })
       
@@ -83,15 +84,12 @@ export default function ShiftsClient() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Смены (импорт из iiko)</h1>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input 
-              type="checkbox" 
-              checked={mergeMode}
-              onChange={(e) => setMergeMode(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span>Объединять смены за день</span>
-          </label>
+          <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'merge' | 'separate')}>
+            <TabsList>
+              <TabsTrigger value="merge">Объединять за день</TabsTrigger>
+              <TabsTrigger value="separate">Раздельно (кассы)</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Button 
             onClick={importFromIiko} 
             disabled={importing}
