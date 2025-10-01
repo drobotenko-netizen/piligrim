@@ -37,6 +37,10 @@ export function createShiftsRouter(prisma: PrismaClient) {
       
       // Обогащаем данные статистикой из iiko чеков
       const items = await Promise.all(shifts.map(async (shift) => {
+        const shiftDate = shift.openAt
+        const dayStart = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate())
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+        
         let receipts = []
         
         if (shift.iikoSessionNum) {
@@ -48,28 +52,31 @@ export function createShiftsRouter(prisma: PrismaClient) {
           })
         } else {
           // Fallback: фильтруем по дате (для старых смен без номера)
-          const shiftDate = shift.openAt
-          const dayStart = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate())
-          const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
-
           receipts = await prisma.iikoReceipt.findMany({
             where: {
               date: { gte: dayStart, lt: dayEnd }
             }
           })
         }
+        
+        // Для удалённых чеков - берём все за день (у них часто нет sessionNumber)
+        const deletedReceipts = await prisma.iikoReceipt.findMany({
+          where: {
+            date: { gte: dayStart, lt: dayEnd },
+            isDeleted: true
+          }
+        })
 
         // Статистика по чекам
         const receiptsTotal = receipts.filter(r => !r.isDeleted).length
         const receiptsReturns = receipts.filter(r => r.isReturn && !r.isDeleted).length
-        const receiptsDeleted = receipts.filter(r => r.isDeleted).length
+        const receiptsDeleted = deletedReceipts.length
         
         const sumReturns = receipts
           .filter(r => r.isReturn && !r.isDeleted)
           .reduce((sum, r) => sum + Math.abs(r.returnSum || 0) * 100, 0)
         
-        const sumDeleted = receipts
-          .filter(r => r.isDeleted)
+        const sumDeleted = deletedReceipts
           .reduce((sum, r) => sum + Math.abs(r.net || 0) * 100, 0)
 
         return {
