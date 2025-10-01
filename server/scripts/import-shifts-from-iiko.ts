@@ -94,23 +94,39 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
 
   console.log(`📄 Найдено чеков: ${receipts.length}`)
 
-  // Сопоставляем UUID с именами из всех чеков
+  // Сопоставляем UUID с именами - группируем по дням и берём самого частого waiter
   const uuidToNameMap = new Map<string, Map<string, number>>()
   
+  // Группируем смены по дням для сопоставления
+  const shiftsByDayTemp = new Map<string, any[]>()
   for (const iikoShift of iikoShifts) {
-    if (!iikoShift.responsibleUserId || !iikoShift.openDate) continue
+    if (!iikoShift.openDate) continue
+    const dateKey = new Date(iikoShift.openDate).toISOString().slice(0, 10)
+    if (!shiftsByDayTemp.has(dateKey)) {
+      shiftsByDayTemp.set(dateKey, [])
+    }
+    shiftsByDayTemp.get(dateKey)!.push(iikoShift)
+  }
+  
+  for (const [dateKey, dayShifts] of shiftsByDayTemp.entries()) {
+    // Берём последнюю закрытую смену для UUID
+    const lastShift = dayShifts.sort((a: any, b: any) => 
+      (b.closeDate ? new Date(b.closeDate).getTime() : 0) - 
+      (a.closeDate ? new Date(a.closeDate).getTime() : 0)
+    )[0]
     
-    const openAt = new Date(iikoShift.openDate)
-    const closeAt = iikoShift.closeDate ? new Date(iikoShift.closeDate) : new Date()
+    if (!lastShift.responsibleUserId) continue
     
-    // Чеки за время смены
-    const shiftsReceipts = receipts.filter(r => {
+    // Чеки за день
+    const dayReceipts = receipts.filter(r => {
       const rDate = r.date
-      return rDate >= openAt && rDate <= closeAt && r.waiter
+      const dayStart = new Date(dateKey + 'T00:00:00.000Z')
+      const dayEnd = new Date(dateKey + 'T23:59:59.999Z')
+      return rDate >= dayStart && rDate <= dayEnd && r.waiter
     })
     
     const waiterCounts = new Map<string, number>()
-    shiftsReceipts.forEach(r => {
+    dayReceipts.forEach(r => {
       if (r.waiter) {
         waiterCounts.set(r.waiter, (waiterCounts.get(r.waiter) || 0) + 1)
       }
@@ -126,10 +142,10 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
     }
     
     if (maxName) {
-      if (!uuidToNameMap.has(iikoShift.responsibleUserId)) {
-        uuidToNameMap.set(iikoShift.responsibleUserId, new Map())
+      if (!uuidToNameMap.has(lastShift.responsibleUserId)) {
+        uuidToNameMap.set(lastShift.responsibleUserId, new Map())
       }
-      uuidToNameMap.get(iikoShift.responsibleUserId)!.set(maxName, maxCount)
+      uuidToNameMap.get(lastShift.responsibleUserId)!.set(maxName, maxCount)
     }
   }
   
