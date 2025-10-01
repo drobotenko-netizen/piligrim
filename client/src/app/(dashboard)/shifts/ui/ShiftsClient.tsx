@@ -12,7 +12,7 @@ export default function ShiftsClient() {
   const [shifts, setShifts] = useState<any[]>([])
   const [importing, setImporting] = useState(false)
   const [reconciliation, setReconciliation] = useState<any[]>([])
-  const [importMode, setImportMode] = useState<'merge' | 'separate'>('merge')
+  const [viewMode, setViewMode] = useState<'merge' | 'separate'>('merge')
 
   useEffect(() => {
     loadShifts()
@@ -44,8 +44,7 @@ export default function ShiftsClient() {
   }
 
   async function importFromIiko() {
-    const mode = importMode === 'merge' ? 'объединять смены в одну за день' : 'создавать отдельную смену для каждой кассы'
-    if (!confirm(`Импортировать смены из iiko за последние 30 дней?\n\nРежим: ${mode}`)) return
+    if (!confirm('Импортировать смены из iiko за последние 30 дней?')) return
     
     setImporting(true)
     try {
@@ -55,12 +54,8 @@ export default function ShiftsClient() {
       const payload = {
         fromDate: from.toISOString().slice(0, 10),
         toDate: to.toISOString().slice(0, 10),
-        mergeByDay: importMode === 'merge'
+        mergeByDay: false // Всегда импортируем раздельно
       }
-      
-      console.log('📤 Import mode state:', importMode)
-      console.log('📤 mergeByDay value:', importMode === 'merge')
-      console.log('📤 Full payload:', JSON.stringify(payload, null, 2))
       
       const res = await fetch(`${API_BASE}/api/iiko/import/shifts`, {
         method: 'POST',
@@ -85,18 +80,53 @@ export default function ShiftsClient() {
     }
   }
 
+  // Группируем смены по дням если режим "По дням"
+  const displayShifts = viewMode === 'merge' 
+    ? (() => {
+        const grouped = new Map<string, any[]>()
+        shifts.forEach(shift => {
+          const day = new Date(shift.openAt).toISOString().slice(0, 10)
+          if (!grouped.has(day)) grouped.set(day, [])
+          grouped.get(day)!.push(shift)
+        })
+        
+        return Array.from(grouped.entries()).map(([day, dayShifts]) => {
+          const firstShift = dayShifts[0]
+          const totalNetto = dayShifts.reduce((sum, s) => 
+            sum + (s.sales?.reduce((sSum: number, sale: any) => 
+              sSum + (sale.grossAmount - sale.discounts - sale.refunds), 0
+            ) || 0), 0
+          )
+          
+          const totalStats = {
+            receiptsTotal: dayShifts.reduce((sum, s) => sum + (s.stats?.receiptsTotal || 0), 0),
+            receiptsReturns: dayShifts.reduce((sum, s) => sum + (s.stats?.receiptsReturns || 0), 0),
+            receiptsDeleted: dayShifts.reduce((sum, s) => sum + (s.stats?.receiptsDeleted || 0), 0),
+            sumReturns: dayShifts.reduce((sum, s) => sum + (s.stats?.sumReturns || 0), 0),
+            sumDeleted: dayShifts.reduce((sum, s) => sum + (s.stats?.sumDeleted || 0), 0),
+          }
+          
+          return {
+            ...firstShift,
+            id: day,
+            note: `${dayShifts.length} смен(ы)`,
+            totalNetto,
+            stats: totalStats,
+            isGrouped: true
+          }
+        })
+      })()
+    : shifts
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Смены (импорт из iiko)</h1>
         <div className="flex items-center gap-4">
-          <Tabs value={importMode} onValueChange={(v) => {
-            console.log('🔄 Tab changed to:', v)
-            setImportMode(v as 'merge' | 'separate')
-          }}>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'merge' | 'separate')}>
             <TabsList>
-              <TabsTrigger value="merge">Объединять за день</TabsTrigger>
-              <TabsTrigger value="separate">Раздельно (кассы)</TabsTrigger>
+              <TabsTrigger value="merge">По дням</TabsTrigger>
+              <TabsTrigger value="separate">По кассам</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button 
@@ -126,10 +156,10 @@ export default function ShiftsClient() {
                 </TR>
               </THead>
               <TBody>
-                {shifts.map(shift => {
-                  const totalNetto = shift.sales?.reduce((sum: number, s: any) => 
+                {displayShifts.map(shift => {
+                  const totalNetto = shift.totalNetto ?? (shift.sales?.reduce((sum: number, s: any) => 
                     sum + (s.grossAmount - s.discounts - s.refunds), 0
-                  ) || 0
+                  ) || 0)
                   
                   const shiftDate = new Date(shift.openAt).toISOString().slice(0, 10)
                   const receiptsLink = `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
