@@ -328,19 +328,7 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
       
       console.log(`\n📅 Обработка смены #${iikoShift.sessionNumber} (${dateKey})`)
 
-      // Проверяем, есть ли уже такая смена
-      const existingShift = await prisma.shift.findFirst({
-        where: {
-          tenantId: tenant.id,
-          openAt,
-          closeAt
-        }
-      })
-
-      if (existingShift) {
-        console.log(`  ⏭️  Смена уже существует, пропускаем`)
-        continue
-      }
+      // API уже удалил старые смены за период, создаём новую
 
       const userId = iikoShift.responsibleUserId || iikoShift.managerId
       const closedBy = userId ? (employeesMap.get(userId) || userId) : 'unknown'
