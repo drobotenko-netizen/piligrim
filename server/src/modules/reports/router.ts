@@ -88,18 +88,24 @@ export function createReportsRouter(prisma: PrismaClient) {
   // ОПиУ (P&L): начисленный результат по posting_period с разбивкой на COGS/Валовую/OPEX
   router.get('/pnl', async (req, res) => {
     try {
-      const y = Number(req.query.y)
-      const m = Number(req.query.m)
-      if (!y || !m) return res.status(400).json({ error: 'y/m required' })
+      const yFrom = Number(req.query.yFrom)
+      const mFrom = Number(req.query.mFrom)
+      const yTo = Number(req.query.yTo)
+      const mTo = Number(req.query.mTo)
       
-      const postingPeriod = new Date(Date.UTC(y, m - 1, 1))
+      if (!yFrom || !mFrom || !yTo || !mTo) {
+        return res.status(400).json({ error: 'yFrom/mFrom/yTo/mTo required' })
+      }
+
+      const start = new Date(Date.UTC(yFrom, mFrom - 1, 1))
+      const end = new Date(Date.UTC(yTo, mTo, 1))
 
       // 1. Выручка из смен (по posting_period = месяц закрытия)
       const shifts = await prisma.shift.findMany({
         where: {
           closeAt: {
-            gte: new Date(Date.UTC(y, m - 1, 1)),
-            lt: new Date(Date.UTC(y, m, 1))
+            gte: start,
+            lt: end
           }
         },
         include: {
@@ -127,7 +133,10 @@ export function createReportsRouter(prisma: PrismaClient) {
       // 2. Расходы из ExpenseDoc по posting_period
       const expenses = await prisma.expenseDoc.findMany({
         where: {
-          postingPeriod,
+          postingPeriod: {
+            gte: start,
+            lt: end
+          },
           status: { not: 'void' }
         },
         include: {
@@ -176,7 +185,10 @@ export function createReportsRouter(prisma: PrismaClient) {
       const netProfit = operatingProfit - tax - fee - other
 
       res.json({
-        period: { year: y, month: m },
+        period: { 
+          from: { year: yFrom, month: mFrom },
+          to: { year: yTo, month: mTo }
+        },
         revenue: {
           total: totalRevenue,
           byChannel: revenueByChannel

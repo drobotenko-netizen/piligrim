@@ -7,21 +7,28 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-export default function PnlClient({ initialY, initialM }: { initialY: number; initialM: number }) {
-  const [y, setY] = useState(initialY)
-  const [m, setM] = useState(initialM)
+export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, initialMTo }: { 
+  initialYFrom: number
+  initialMFrom: number
+  initialYTo: number
+  initialMTo: number
+}) {
+  const [yFrom, setYFrom] = useState(initialYFrom)
+  const [mFrom, setMFrom] = useState(initialMFrom)
+  const [yTo, setYTo] = useState(initialYTo)
+  const [mTo, setMTo] = useState(initialMTo)
   const [data, setData] = useState<any>(null)
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
 
   async function reload() {
-    const res = await fetch(`${API_BASE}/api/reports/pnl?y=${y}&m=${m}`, { credentials: 'include' })
+    const res = await fetch(`${API_BASE}/api/reports/pnl?yFrom=${yFrom}&mFrom=${mFrom}&yTo=${yTo}&mTo=${mTo}`, { credentials: 'include' })
     const json = await res.json()
     setData(json)
   }
 
-  useEffect(() => { reload() }, [y, m])
+  useEffect(() => { reload() }, [yFrom, mFrom, yTo, mTo])
 
   if (!data) return <div>Загрузка...</div>
 
@@ -31,16 +38,32 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
     <Card>
       <CardContent className="p-4 space-y-3 flex flex-col h-[calc(100vh-4rem)] min-h-0">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-bold">P&L - Отчёт о прибылях и убытках</h2>
+          <div></div>
           <div className="flex items-center gap-2">
-            <Select value={String(y)} onValueChange={v => setY(Number(v))}>
-              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <Select value={String(yFrom)} onValueChange={v => setYFrom(Number(v))}>
+              <SelectTrigger className="w-28"><SelectValue placeholder="Год от" /></SelectTrigger>
               <SelectContent>
-                {[y-1, y, y+1].map(yy => (<SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>))}
+                {[yFrom-1, yFrom, yFrom+1].map(yy => (<SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>))}
               </SelectContent>
             </Select>
-            <Select value={String(m)} onValueChange={v => setM(Number(v))}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <Select value={String(mFrom)} onValueChange={v => setMFrom(Number(v))}>
+              <SelectTrigger className="w-36"><SelectValue placeholder="Месяц от" /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(mm => (
+                  <SelectItem key={mm} value={String(mm)}>{MONTHS[mm-1]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={String(yTo)} onValueChange={v => setYTo(Number(v))}>
+              <SelectTrigger className="w-28"><SelectValue placeholder="Год до" /></SelectTrigger>
+              <SelectContent>
+                {[yTo-1, yTo, yTo+1].map(yy => (<SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>))}
+              </SelectContent>
+            </Select>
+            <Select value={String(mTo)} onValueChange={v => setMTo(Number(v))}>
+              <SelectTrigger className="w-36"><SelectValue placeholder="Месяц до" /></SelectTrigger>
               <SelectContent>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map(mm => (
                   <SelectItem key={mm} value={String(mm)}>{MONTHS[mm-1]}</SelectItem>
@@ -54,54 +77,54 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
           <Table className="w-full">
             <TBody>
               {/* Выручка */}
-              <TR className="bg-blue-50">
-                <TD className="font-bold py-3" colSpan={2}>ВЫРУЧКА (нетто)</TD>
-                <TD className="text-right font-bold py-3">{rubFmt(totals.revenue)}</TD>
+              <TR className="hover:bg-muted/30 transition-colors">
+                <TD className="font-bold py-1.5" colSpan={2}>ВЫРУЧКА (нетто)</TD>
+                <TD className="text-right font-bold py-1.5">{rubFmt(totals.revenue)}</TD>
               </TR>
               {Object.entries(revenue.byChannel || {}).map(([channel, amount]: any) => (
-                <TR key={channel}>
-                  <TD className="pl-8"></TD>
-                  <TD>{channel}</TD>
-                  <TD className="text-right">{rubFmt(amount)}</TD>
+                <TR key={channel} className="hover:bg-muted/20 transition-colors">
+                  <TD className="pl-8 py-1.5"></TD>
+                  <TD className="py-1.5">{channel}</TD>
+                  <TD className="text-right py-1.5">{rubFmt(amount)}</TD>
                 </TR>
               ))}
 
               {/* COGS */}
-              <TR className="bg-orange-50">
-                <TD className="font-bold py-3" colSpan={2}>Себестоимость (COGS)</TD>
-                <TD className="text-right font-bold py-3 text-red-600">−{rubFmt(totals.cogs)}</TD>
+              <TR className="hover:bg-muted/30 transition-colors">
+                <TD className="font-bold py-1.5" colSpan={2}>Себестоимость (COGS)</TD>
+                <TD className="text-right font-bold py-1.5">−{rubFmt(totals.cogs)}</TD>
               </TR>
               {expenses.cogs?.items?.map((item: any, idx: number) => (
-                <TR key={idx}>
-                  <TD className="pl-8"></TD>
-                  <TD>{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                  <TD className="text-right text-red-600">−{rubFmt(item.amount)}</TD>
+                <TR key={idx} className="hover:bg-muted/20 transition-colors">
+                  <TD className="pl-8 py-1.5"></TD>
+                  <TD className="py-1.5">{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
+                  <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
                 </TR>
               ))}
 
               {/* Валовая прибыль */}
-              <TR className="bg-green-100 border-t-2 border-gray-400">
-                <TD className="font-bold py-3" colSpan={2}>ВАЛОВАЯ ПРИБЫЛЬ</TD>
-                <TD className="text-right font-bold py-3 text-green-700">{rubFmt(totals.grossProfit)}</TD>
+              <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t">
+                <TD className="font-bold py-1.5" colSpan={2}>ВАЛОВАЯ ПРИБЫЛЬ</TD>
+                <TD className="text-right font-bold py-1.5">{rubFmt(totals.grossProfit)}</TD>
               </TR>
 
               {/* OPEX */}
-              <TR className="bg-yellow-50">
-                <TD className="font-bold py-3" colSpan={2}>Операционные расходы (OPEX)</TD>
-                <TD className="text-right font-bold py-3 text-red-600">−{rubFmt(totals.opex)}</TD>
+              <TR className="hover:bg-muted/30 transition-colors">
+                <TD className="font-bold py-1.5" colSpan={2}>Операционные расходы (OPEX)</TD>
+                <TD className="text-right font-bold py-1.5">−{rubFmt(totals.opex)}</TD>
               </TR>
               {expenses.opex?.items?.map((item: any, idx: number) => (
-                <TR key={idx}>
-                  <TD className="pl-8"></TD>
-                  <TD>{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                  <TD className="text-right text-red-600">−{rubFmt(item.amount)}</TD>
+                <TR key={idx} className="hover:bg-muted/20 transition-colors">
+                  <TD className="pl-8 py-1.5"></TD>
+                  <TD className="py-1.5">{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
+                  <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
                 </TR>
               ))}
 
               {/* Операционная прибыль */}
-              <TR className="bg-green-200 border-t-2 border-gray-400">
-                <TD className="font-bold py-3" colSpan={2}>ОПЕРАЦИОННАЯ ПРИБЫЛЬ</TD>
-                <TD className="text-right font-bold py-3 text-green-800">{rubFmt(totals.operatingProfit)}</TD>
+              <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t">
+                <TD className="font-bold py-1.5" colSpan={2}>ОПЕРАЦИОННАЯ ПРИБЫЛЬ</TD>
+                <TD className="text-right font-bold py-1.5">{rubFmt(totals.operatingProfit)}</TD>
               </TR>
 
               {/* Прочие расходы */}
@@ -109,15 +132,15 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
                 <>
                   {totals.fee > 0 && (
                     <>
-                      <TR className="bg-gray-50">
-                        <TD className="font-semibold py-2" colSpan={2}>Комиссии и сборы</TD>
-                        <TD className="text-right font-semibold py-2 text-red-600">−{rubFmt(totals.fee)}</TD>
+                      <TR className="hover:bg-muted/30 transition-colors">
+                        <TD className="font-semibold py-1.5" colSpan={2}>Комиссии и сборы</TD>
+                        <TD className="text-right font-semibold py-1.5">−{rubFmt(totals.fee)}</TD>
                       </TR>
                       {expenses.fee?.items?.map((item: any, idx: number) => (
-                        <TR key={idx}>
-                          <TD className="pl-8"></TD>
-                          <TD>{item.categoryName}</TD>
-                          <TD className="text-right text-red-600">−{rubFmt(item.amount)}</TD>
+                        <TR key={idx} className="hover:bg-muted/20 transition-colors">
+                          <TD className="pl-8 py-1.5"></TD>
+                          <TD className="py-1.5">{item.categoryName}</TD>
+                          <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
                         </TR>
                       ))}
                     </>
@@ -125,15 +148,15 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
 
                   {totals.tax > 0 && (
                     <>
-                      <TR className="bg-gray-50">
-                        <TD className="font-semibold py-2" colSpan={2}>Налоги</TD>
-                        <TD className="text-right font-semibold py-2 text-red-600">−{rubFmt(totals.tax)}</TD>
+                      <TR className="hover:bg-muted/30 transition-colors">
+                        <TD className="font-semibold py-1.5" colSpan={2}>Налоги</TD>
+                        <TD className="text-right font-semibold py-1.5">−{rubFmt(totals.tax)}</TD>
                       </TR>
                       {expenses.tax?.items?.map((item: any, idx: number) => (
-                        <TR key={idx}>
-                          <TD className="pl-8"></TD>
-                          <TD>{item.categoryName}</TD>
-                          <TD className="text-right text-red-600">−{rubFmt(item.amount)}</TD>
+                        <TR key={idx} className="hover:bg-muted/20 transition-colors">
+                          <TD className="pl-8 py-1.5"></TD>
+                          <TD className="py-1.5">{item.categoryName}</TD>
+                          <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
                         </TR>
                       ))}
                     </>
@@ -141,15 +164,15 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
 
                   {totals.other > 0 && (
                     <>
-                      <TR className="bg-gray-50">
-                        <TD className="font-semibold py-2" colSpan={2}>Прочие расходы</TD>
-                        <TD className="text-right font-semibold py-2 text-red-600">−{rubFmt(totals.other)}</TD>
+                      <TR className="hover:bg-muted/30 transition-colors">
+                        <TD className="font-semibold py-1.5" colSpan={2}>Прочие расходы</TD>
+                        <TD className="text-right font-semibold py-1.5">−{rubFmt(totals.other)}</TD>
                       </TR>
                       {expenses.other?.items?.map((item: any, idx: number) => (
-                        <TR key={idx}>
-                          <TD className="pl-8"></TD>
-                          <TD>{item.categoryName}</TD>
-                          <TD className="text-right text-red-600">−{rubFmt(item.amount)}</TD>
+                        <TR key={idx} className="hover:bg-muted/20 transition-colors">
+                          <TD className="pl-8 py-1.5"></TD>
+                          <TD className="py-1.5">{item.categoryName}</TD>
+                          <TD className="text-right py-1.5">−{rubFmt(item.amount)}</TD>
                         </TR>
                       ))}
                     </>
@@ -158,11 +181,9 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
               )}
 
               {/* Чистая прибыль */}
-              <TR className="bg-blue-100 border-t-4 border-gray-600">
-                <TD className="font-bold py-4 text-lg" colSpan={2}>ЧИСТАЯ ПРИБЫЛЬ</TD>
-                <TD className={`text-right font-bold py-4 text-lg ${totals.netProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  {rubFmt(totals.netProfit)}
-                </TD>
+              <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t-2">
+                <TD className="font-bold py-2" colSpan={2}>ЧИСТАЯ ПРИБЫЛЬ</TD>
+                <TD className="text-right font-bold py-2">{rubFmt(totals.netProfit)}</TD>
               </TR>
             </TBody>
           </Table>
@@ -170,18 +191,18 @@ export default function PnlClient({ initialY, initialM }: { initialY: number; in
           {/* CAPEX отдельно (не влияет на прибыль, но показываем для информации) */}
           {totals.capex > 0 && (
             <div className="mt-6 pt-6 border-t">
-              <h3 className="font-bold mb-3 text-gray-600">Капитальные расходы (не влияют на P&L):</h3>
+              <h3 className="font-bold mb-3 text-muted-foreground">Капитальные расходы (не влияют на P&L):</h3>
               <Table>
                 <TBody>
                   {expenses.capex?.items?.map((item: any, idx: number) => (
-                    <TR key={idx}>
-                      <TD>{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
-                      <TD className="text-right text-gray-600">{rubFmt(item.amount)}</TD>
+                    <TR key={idx} className="hover:bg-muted/20 transition-colors">
+                      <TD className="py-1.5">{item.categoryName} {item.vendorName && `(${item.vendorName})`}</TD>
+                      <TD className="text-right py-1.5">{rubFmt(item.amount)}</TD>
                     </TR>
                   ))}
-                  <TR className="border-t">
-                    <TD className="font-bold">Итого CAPEX</TD>
-                    <TD className="text-right font-bold text-gray-700">{rubFmt(totals.capex)}</TD>
+                  <TR className="border-t hover:bg-muted/30 transition-colors">
+                    <TD className="font-bold py-1.5">Итого CAPEX</TD>
+                    <TD className="text-right font-bold py-1.5">{rubFmt(totals.capex)}</TD>
                   </TR>
                 </TBody>
               </Table>
