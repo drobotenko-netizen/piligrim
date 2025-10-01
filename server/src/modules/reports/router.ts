@@ -358,8 +358,9 @@ export function createReportsRouter(prisma: PrismaClient) {
         const day = r.date.toISOString().slice(0, 10)
         const current = receiptsMap.get(day) || { count: 0, total: 0 }
         current.count++
-        // Вычитаем возвраты (returnSum) из суммы чеков
-        const netAmount = (r.net || 0) - (r.isReturn ? Math.abs(r.returnSum || 0) : 0)
+        // ВАЖНО: iiko.net в целых рублях, умножаем на 100 для копеек!
+        const netRub = (r.net || 0) - (r.isReturn ? Math.abs(r.returnSum || 0) : 0)
+        const netAmount = netRub * 100 // в копейки
         current.total += netAmount
         receiptsMap.set(day, current)
       }

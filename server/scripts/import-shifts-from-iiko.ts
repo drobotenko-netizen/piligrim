@@ -141,8 +141,9 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
       if (payTypes.length === 0) payTypes = ['Прочее']
 
       // Распределяем сумму чека пропорционально между способами оплаты
-      const netAmount = receipt.net || 0
-      const amountPerType = Math.floor(netAmount / payTypes.length)
+      // ВАЖНО: receipt.net в целых рублях, нужно умножить на 100 для копеек!
+      const netAmountCents = (receipt.net || 0) * 100
+      const amountPerType = Math.floor(netAmountCents / payTypes.length)
 
       for (const payType of payTypes) {
         const tenderName = mapToTenderType(payType)
@@ -157,10 +158,9 @@ async function importShiftsFromIiko(fromDate: string, toDate: string) {
         }
 
         sale.gross += amountPerType
-        // discounts и refunds можно вытащить из receipt.DishDiscountSumInt и returnSum
-        // но пока упростим
+        // discounts и refunds тоже в целых рублях
         if (receipt.isReturn) {
-          sale.refunds += Math.abs(receipt.returnSum || 0)
+          sale.refunds += Math.abs(receipt.returnSum || 0) * 100
         }
 
         salesAgg.set(key, sale)
