@@ -12,7 +12,24 @@ function dtToYMD(d: Date) {
 
 export default function ReceiptsClient() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-  const [date, setDate] = useState(dtToYMD(new Date()))
+  
+  // Получаем параметры из URL
+  const [date, setDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('date') || dtToYMD(new Date())
+    }
+    return dtToYMD(new Date())
+  })
+  
+  const [selectedSession, setSelectedSession] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('session') || 'all'
+    }
+    return 'all'
+  })
+  
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<'all' | 'actual' | 'returns' | 'deleted'>('all')
@@ -47,6 +64,21 @@ export default function ReceiptsClient() {
   useEffect(() => { 
     load()
   }, [date])
+  
+  // Список уникальных номеров смен
+  const sessionNumbers = useMemo(() => {
+    const sessions = new Set<number>()
+    rows.forEach(r => {
+      if (r.sessionNumber) sessions.add(r.sessionNumber)
+    })
+    return Array.from(sessions).sort((a, b) => a - b)
+  }, [rows])
+  
+  // Фильтрация по выбранной смене
+  const filteredRows = useMemo(() => {
+    if (selectedSession === 'all') return rows
+    return rows.filter(r => r.sessionNumber === Number(selectedSession))
+  }, [rows, selectedSession])
 
   return (
     <div className="space-y-3">
@@ -55,14 +87,27 @@ export default function ReceiptsClient() {
           <div className="text-xs text-muted-foreground">Дата</div>
           <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
         </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Смена</div>
+          <select 
+            value={selectedSession} 
+            onChange={e => setSelectedSession(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          >
+            <option value="all">Все смены</option>
+            {sessionNumbers.map(num => (
+              <option key={num} value={num}>#{num}</option>
+            ))}
+          </select>
+        </div>
         <button onClick={() => { load(); }} className="border rounded px-3 py-1 text-sm">Показать</button>
         <div className="ml-auto flex items-center gap-3">
           <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
             <TabsList>
-              <TabsTrigger value="all">Все: {rows.length}</TabsTrigger>
-              <TabsTrigger value="actual">Актуальные: {actualCount}</TabsTrigger>
-              <TabsTrigger value="returns">Возвраты: {returnsCount}</TabsTrigger>
-              <TabsTrigger value="deleted">Удалённые: {deletedCount}</TabsTrigger>
+              <TabsTrigger value="all">Все: {filteredRows.length}</TabsTrigger>
+              <TabsTrigger value="actual">Актуальные: {filteredRows.filter((r: any) => (r.isDeleted !== true) && !((!!r.isReturn) || ((Number(r.returnSum) || 0) > 0))).length}</TabsTrigger>
+              <TabsTrigger value="returns">Возвраты: {filteredRows.filter((r: any) => (!!r.isReturn) || ((Number(r.returnSum) || 0) > 0)).length}</TabsTrigger>
+              <TabsTrigger value="deleted">Удалённые: {filteredRows.filter((r: any) => r.isDeleted === true).length}</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -73,6 +118,7 @@ export default function ReceiptsClient() {
             <thead>
               <tr className="text-left text-muted-foreground">
                 <th className="px-2 py-1 w-8"></th>
+                <th className="px-2 py-1 w-16">Смена</th>
                 <th className="px-2 py-1">Время</th>
                 <th className="px-2 py-1 w-[20%]">Чек</th>
                 <th className="px-2 py-1">Клиент</th>
@@ -86,7 +132,7 @@ export default function ReceiptsClient() {
               </tr>
             </thead>
             <tbody>
-              {rows
+              {filteredRows
                 .filter((r: any) => {
                   const isReturn = (!!r.isReturn) || ((Number(r.returnSum) || 0) > 0)
                   const isDeleted = r.isDeleted === true
@@ -114,6 +160,9 @@ export default function ReceiptsClient() {
                             {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                           </button>
                         )}
+                      </td>
+                      <td className="px-2 py-1 text-gray-600">
+                        {r.sessionNumber ? `#${r.sessionNumber}` : '—'}
                       </td>
                       <td className="px-2 py-1">
                         {(r.openTime || r.closeTime || '').toString().slice(11,16)}
