@@ -180,5 +180,50 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     }
   })
 
+  // Покрытие фондов по плану (проверяем, на все ли фонды есть маппинг)
+  router.get('/funds/plan-coverage', async (req, res) => {
+    function normalizeFund(input: string): string {
+      const replaced = String(input || '')
+        .replace(/\u00A0|\u200B|\uFEFF/g, ' ')
+        .replace(/[–—−]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim()
+      return replaced
+    }
+    // План: фонд -> { activity, categoryName, type }
+    const plan: Record<string, { activity: 'OPERATING'|'FINANCING'|'INVESTING'; category: string; type: 'income'|'expense' }> = {
+      'ВЫРУЧКА': { activity: 'OPERATING', category: 'Выручка', type: 'income' },
+      'Эквайринг (процент)': { activity: 'OPERATING', category: 'Банковские комиссии', type: 'expense' },
+      'Комиссия банка': { activity: 'OPERATING', category: 'Банковские комиссии', type: 'expense' },
+      'Расходы на такси': { activity: 'OPERATING', category: 'Транспорт', type: 'expense' },
+      'Вебсайт': { activity: 'OPERATING', category: 'IT и сервисы', type: 'expense' },
+      'Консалтинг / обучение': { activity: 'OPERATING', category: 'IT и сервисы', type: 'expense' },
+      'Подарки персоналу / дни рождения': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'Еда под ЗП': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'ЗП курьеры': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'ЗП кухня': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'ЗП посуда': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'ЗП гардеробщик': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'ЗП офис': { activity: 'OPERATING', category: 'Персонал', type: 'expense' },
+      'Поступление - Перевод между счетами': { activity: 'FINANCING', category: 'Переводы между счетами', type: 'income' },
+      'Выбытие - Перевод между счетами': { activity: 'FINANCING', category: 'Переводы между счетами', type: 'expense' },
+    }
+    try {
+      const funds = await prisma.gsCashflowRow.findMany({
+        where: { fund: { not: null } },
+        select: { fund: true },
+        distinct: ['fund'],
+        orderBy: { fund: 'asc' }
+      })
+      const rawFunds = (funds.map(f => f.fund).filter(Boolean) as string[])
+      const uniqNormalized = Array.from(new Set(rawFunds.map(normalizeFund)))
+      const covered = uniqNormalized.filter(f => !!plan[f])
+      const uncovered = uniqNormalized.filter(f => !plan[f])
+      res.json({ total: uniqNormalized.length, covered: covered.length, uncovered, planKeys: Object.keys(plan) })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   return router
 }
