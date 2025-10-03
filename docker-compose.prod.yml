@@ -13,6 +13,8 @@ services:
       context: ./server
       dockerfile: Dockerfile
     image: ${IMAGE_API:-piligrim-api:latest}
+    env_file:
+      - ./server/.env
     environment:
       - PORT=4000
       - NODE_ENV=production
