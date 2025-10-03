@@ -751,7 +751,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                   <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Выручка</div>
                   {revenueRoot ? (
                     <Tree
-                      nodes={revenueRoot.children || []}
+                      nodes={[revenueRoot]}
                       onSelect={onSelectNode}
                       selectedId={selected?.id}
                       expanded={expanded}
