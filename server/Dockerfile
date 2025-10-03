@@ -2,7 +2,7 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install ALL deps for build (prisma etc.)
+# Install ALL deps for build (prisma, typescript, etc.)
 COPY package*.json ./
 RUN npm ci
 
@@ -11,8 +11,8 @@ COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
 
-# Generate Prisma client and transpile TS to JS without type-checking (SWC)
-RUN npx prisma generate && npx -y @swc/cli@0.1.62 -p @swc/core@1.7.26 swc src -d dist -D --config '{"jsc":{"target":"es2021"},"module":{"type":"es6"}}'
+# Generate Prisma client and build with tsc (tsconfig has noEmitOnError=false)
+RUN npx prisma generate && npm run build
 
 # Production-only dependencies
 FROM node:20-alpine AS proddeps
