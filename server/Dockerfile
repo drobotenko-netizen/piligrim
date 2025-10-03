@@ -1,5 +1,5 @@
 # Runtime image that runs TypeScript directly with tsx (avoids typecheck during build)
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 WORKDIR /app
 
 # Install app dependencies (include dev to have tooling)
