@@ -19,7 +19,7 @@ RUN npx prisma generate
 COPY src ./src
 
 # Install tsx runner
-RUN npm i -g tsx@4.19.2
+RUN npm i -g tsx@4.19.2 prisma@5.19.1
 
 # SQLite data volume by default
 RUN mkdir -p /data
