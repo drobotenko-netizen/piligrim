@@ -237,6 +237,13 @@ export function createAdminCategoriesTools(prisma: PrismaClient) {
     res.json({ deactivated: r.count })
   })
 
+  // Нормализация: убрать fund у всех корневых категорий (parentId=null)
+  router.post('/normalize-roots', requireRole(['ADMIN']), async (req, res) => {
+    const tenant = await getTenant(prisma, req as any)
+    const r = await prisma.category.updateMany({ where: { tenantId: tenant.id, parentId: null, NOT: { fund: null } }, data: { fund: null } })
+    res.json({ rootsFundCleared: r.count })
+  })
+
   // Seed план: создать категории и статьи, привязать фонды (двухуровневая структура)
   router.post('/seed-plan', requireRole(['ADMIN']), async (req, res) => {
     const tenant = await getTenant(prisma, req as any)
