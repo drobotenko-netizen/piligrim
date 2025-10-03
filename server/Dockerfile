@@ -1,43 +1,29 @@
-# Build and run the Express API (TypeScript) with Prisma
-FROM node:20-alpine AS deps
-WORKDIR /app
-
-# Install ALL deps for build (prisma, typescript, etc.)
-COPY package*.json ./
-RUN npm ci
-
-# Copy sources
-COPY tsconfig.json ./
-COPY prisma ./prisma
-COPY src ./src
-
-# Generate Prisma client and build with tsc (tsconfig has noEmitOnError=false)
-RUN npx prisma generate && npm run build
-
-# Production-only dependencies
-FROM node:20-alpine AS proddeps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Final runtime image
+# Runtime image that runs TypeScript directly with tsx (avoids typecheck during build)
 FROM node:20-alpine
 WORKDIR /app
 
-# Place for SQLite database by default
+# Install app dependencies (include dev to have tooling)
+COPY package*.json ./
+RUN npm ci
+
+# Prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# App sources
+COPY src ./src
+
+# Install tsx runner
+RUN npm i -g tsx@4.19.2
+
+# SQLite data volume by default
 RUN mkdir -p /data
 VOLUME /data
-
 ENV NODE_ENV=production \
     PORT=4000 \
     DATABASE_URL="file:/data/dev.db"
 
-# Copy production deps and built app
-COPY --from=proddeps /app/node_modules ./node_modules
-COPY --from=deps /app/dist ./dist
-COPY --from=deps /app/prisma ./prisma
-
 EXPOSE 4000
-CMD ["node", "dist/index.js"]
+CMD ["tsx", "src/index.ts"]
 
 
