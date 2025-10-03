@@ -240,6 +240,7 @@ export function createAdminCategoriesTools(prisma: PrismaClient) {
   // Seed план: создать категории и статьи, привязать фонды (двухуровневая структура)
   router.post('/seed-plan', requireRole(['ADMIN']), async (req, res) => {
     const tenant = await getTenant(prisma, req as any)
+    const { spreadsheetId, gid } = req.body || {}
 
     function normalizeFund(input: string): string {
       return String(input || '')
@@ -279,14 +280,57 @@ export function createAdminCategoriesTools(prisma: PrismaClient) {
       }
     }
 
-    // 2) Список фондов из GSheets
-    const fundRows = await prisma.gsCashflowRow.findMany({
-      where: { fund: { not: null } },
-      select: { fund: true },
-      distinct: ['fund'],
-      orderBy: { fund: 'asc' }
-    })
-    const funds = (fundRows.map(r => r.fund).filter(Boolean) as string[])
+    // 2) Список фондов: либо из БД (если уже импортировано), либо напрямую из Google Sheets
+    let funds: string[] = []
+    try {
+      const fundRows = await prisma.gsCashflowRow.findMany({
+        where: { fund: { not: null } },
+        select: { fund: true },
+        distinct: ['fund'],
+        orderBy: { fund: 'asc' }
+      })
+      funds = (fundRows.map(r => r.fund).filter(Boolean) as string[])
+    } catch {}
+    if ((!funds || funds.length === 0) && spreadsheetId && (gid || gid === 0)) {
+      // Забираем CSV напрямую и извлекаем колонку фонда (индекс 8)
+      const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(String(spreadsheetId))}/export?format=csv&gid=${encodeURIComponent(String(gid))}`
+      const r = await fetch(url)
+      if (!r.ok) return res.status(500).json({ error: `gsheets export failed ${r.status}` })
+      const csv = await r.text()
+      // Простой CSV-парсер (поддержка кавычек)
+      const rows: string[][] = []
+      {
+        let i = 0, field = '', cur: string[] = [], inQuotes = false
+        const pushField = () => { cur.push(field); field = '' }
+        const pushRow = () => { rows.push(cur); cur = [] }
+        while (i < csv.length) {
+          const ch = csv[i]
+          if (inQuotes) {
+            if (ch === '"') {
+              if (csv[i+1] === '"') { field += '"'; i += 2; continue }
+              inQuotes = false; i++; continue
+            }
+            field += ch; i++; continue
+          } else {
+            if (ch === '"') { inQuotes = true; i++; continue }
+            if (ch === ',') { pushField(); i++; continue }
+            if (ch === '\n') { pushField(); pushRow(); i++; continue }
+            if (ch === '\r') { i++; continue }
+            field += ch; i++; continue
+          }
+        }
+        pushField(); if (cur.length) pushRow()
+      }
+      const uniq = new Set<string>()
+      for (let idx = 0; idx < rows.length; idx++) {
+        const row = rows[idx]
+        if (!row || row.length < 11) continue
+        const f = normalizeFund(row[8] || '')
+        if (!f || /^фонд$/i.test(f)) continue
+        uniq.add(f)
+      }
+      funds = Array.from(uniq)
+    }
 
     // 3) План маппинга фондов -> категория
     const toCategory: Record<string, string> = {
