@@ -100,11 +100,18 @@ export async function importCashflowRange(
     }
   }
   let processed = 0
+  const CHUNK_SIZE = 500
+  let batch: any[] = []
+
+  const flush = async () => {
+    if (batch.length === 0) return
+    await prisma.gsCashflowRow.createMany({ data: batch, skipDuplicates: true })
+    batch = []
+  }
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i] || []
     const rowNum = fromRow + i
-    // columns mapping based on header example
     const monthName = r[0] ? normalizeSpaces(String(r[0])) : null
     const monthNum = r[1] ? Number(String(r[1]).replace(/[^0-9-]/g, '')) : null
     const dateText = r[2] ? String(r[2]) : null
@@ -118,46 +125,33 @@ export async function importCashflowRange(
 
     const dt = parseRuDate(dateText || undefined)
 
-    // Skip completely empty lines
     const isEmpty = !monthName && !monthNum && !dateText && amountCents === null && !wallet && !supplier && !comment && !fund && !flowType && !activity
     if (isEmpty) continue
 
-    await prisma.gsCashflowRow.upsert({
-      where: { spreadsheet_sheet_rowNum: { spreadsheet: spreadsheetId, sheet, rowNum } },
-      create: {
-        spreadsheet: spreadsheetId,
-        sheet,
-        rowNum,
-        monthName: monthName || undefined,
-        monthNum: monthNum ?? undefined,
-        date: dt || undefined,
-        dateText: dateText || undefined,
-        amount: amountCents ?? undefined,
-        wallet: wallet || undefined,
-        supplier: supplier || undefined,
-        comment: comment || undefined,
-        fund: fund || undefined,
-        flowType: flowType || undefined,
-        activity: activity || undefined,
-        raw: JSON.stringify(r),
-      },
-      update: {
-        monthName: monthName || undefined,
-        monthNum: monthNum ?? undefined,
-        date: dt || undefined,
-        dateText: dateText || undefined,
-        amount: amountCents ?? undefined,
-        wallet: wallet || undefined,
-        supplier: supplier || undefined,
-        comment: comment || undefined,
-        fund: fund || undefined,
-        flowType: flowType || undefined,
-        activity: activity || undefined,
-        raw: JSON.stringify(r),
-      },
+    batch.push({
+      spreadsheet: spreadsheetId,
+      sheet,
+      rowNum,
+      monthName: monthName || undefined,
+      monthNum: monthNum ?? undefined,
+      date: dt || undefined,
+      dateText: dateText || undefined,
+      amount: amountCents ?? undefined,
+      wallet: wallet || undefined,
+      supplier: supplier || undefined,
+      comment: comment || undefined,
+      fund: fund || undefined,
+      flowType: flowType || undefined,
+      activity: activity || undefined,
+      raw: JSON.stringify(r),
     })
     processed++
+
+    if (batch.length >= CHUNK_SIZE) {
+      await flush()
+    }
   }
+  await flush()
   return { processed }
 }
 

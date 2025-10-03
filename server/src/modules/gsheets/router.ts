@@ -40,6 +40,8 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
       const fromRow = Number(from || 1)
       const toRow = Number(to || fromRow + 2000)
       if (!Number.isFinite(fromRow) || !Number.isFinite(toRow) || fromRow < 1 || toRow < fromRow) return res.status(400).json({ error: 'bad range' })
+      // Перед импортом очищаем диапазон по spreadsheetId (+опционально sheet)
+      await prisma.gsCashflowRow.deleteMany({ where: { spreadsheet: spreadsheetId, ...(sheet ? { sheet } : {}) } })
       const r = await importCashflowRange(prisma, { spreadsheetId, sheet, gid, fromRow, toRow })
       res.json(r)
     } catch (e: any) {
