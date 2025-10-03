@@ -29,11 +29,13 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-https://api.piligrim.5-star-roi.ru}
     image: ${IMAGE_WEB:-piligrim-web:latest}
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - NEXT_PUBLIC_API_BASE=https://api.piligrim.5-star-roi.ru
+      - NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE:-https://api.piligrim.5-star-roi.ru}
     depends_on:
       - api
     expose:
