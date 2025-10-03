@@ -17,8 +17,11 @@ services:
     image: piligrim-api:${TAG-latest}
     env_file:
       - /srv/piligrim/app/server/.env
+    environment:
+      - TELEGRAM_POLLING=1
     volumes:
       - api_data:/data
+      - /srv/piligrim/app/server/.env:/app/.env:ro
     restart: unless-stopped
 volumes:
   caddy_data: {}
