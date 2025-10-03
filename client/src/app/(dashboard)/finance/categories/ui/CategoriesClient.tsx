@@ -820,29 +820,27 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
             </SelectContent>
           </Select>
 
-          {/* 2. Kind (COGS/OPEX/etc) - ВТОРОЕ ПОЛЕ */}
-          <Select value={kindChoice} onValueChange={(v) => {
-            setKindChoice(v)
-            // Автоматически устанавливаем operSection для операционной деятельности
-            if (!editingId && activeActivity === 'OPERATING') {
-              if (v === 'COGS') {
-                setOperSection('COGS')
-              } else if (v === 'OPEX' || v === 'TAX' || v === 'FEE' || v === 'OTHER') {
-                setOperSection('OPEX')
+          {/* 2. Kind (COGS/OPEX/etc) — только для категорий (root) или при создании категории */}
+          {((!editingId && catChoice === 'create') || (editingId && selected?.parentId == null)) && (
+            <Select value={kindChoice} onValueChange={(v) => {
+              setKindChoice(v)
+              if (!editingId && activeActivity === 'OPERATING') {
+                if (v === 'COGS') setOperSection('COGS')
+                else if (v === 'OPEX' || v === 'TAX' || v === 'FEE' || v === 'OTHER') setOperSection('OPEX')
               }
-            }
-          }}>
-            <SelectTrigger><SelectValue placeholder="Тип (kind)" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Без типа</SelectItem>
-              <SelectItem value="COGS">COGS (Себестоимость)</SelectItem>
-              <SelectItem value="OPEX">OPEX (Операционные расходы)</SelectItem>
-              <SelectItem value="CAPEX">CAPEX (Капитальные расходы)</SelectItem>
-              <SelectItem value="TAX">TAX (Налоги)</SelectItem>
-              <SelectItem value="FEE">FEE (Комиссии)</SelectItem>
-              <SelectItem value="OTHER">OTHER (Прочее)</SelectItem>
-            </SelectContent>
-          </Select>
+            }}>
+              <SelectTrigger><SelectValue placeholder="Тип (kind)" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Без типа</SelectItem>
+                <SelectItem value="COGS">COGS (Себестоимость)</SelectItem>
+                <SelectItem value="OPEX">OPEX (Операционные расходы)</SelectItem>
+                <SelectItem value="CAPEX">CAPEX (Капитальные расходы)</SelectItem>
+                <SelectItem value="TAX">TAX (Налоги)</SelectItem>
+                <SelectItem value="FEE">FEE (Комиссии)</SelectItem>
+                <SelectItem value="OTHER">OTHER (Прочее)</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
           {/* 3. Раздел (REVENUE/COGS/OPEX) - только для операционной деятельности при создании */}
           {!editingId && activeActivity === 'OPERATING' && (
