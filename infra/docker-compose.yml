@@ -16,7 +16,7 @@ services:
   api:
     image: piligrim-api:${TAG-latest}
     env_file:
-      - ./../server/.env
+      - /srv/piligrim/app/server/.env
     volumes:
       - api_data:/data
     restart: unless-stopped
