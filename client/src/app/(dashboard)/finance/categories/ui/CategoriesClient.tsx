@@ -27,16 +27,12 @@ function Tree({ nodes, onSelect, selectedId, expanded, onToggle, activity, secti
       {nodes.map((n) => {
         const hasChildren = Array.isArray(n.children) && n.children.length > 0
         const isOpen = expanded.has(n.id)
-        const isCategoryLeaf = !hasChildren && (
-          activity === 'OPERATING'
-            ? (n.parentId && sectionRootIds.has(n.parentId))
-            : (n.parentId == null)
-        )
+        const isCategory = n.parentId == null
         const isSystem = payrollId ? (n.id === payrollId || n.parentId === payrollId) : false
         return (
           <li key={n.id}>
             <div className="flex items-center gap-1 group hover:bg-accent/20 rounded px-1 py-0.5">
-              {hasChildren ? (
+              {isCategory ? (
                 <button
                   type="button"
                   className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-accent/40 text-sm"
@@ -45,8 +41,6 @@ function Tree({ nodes, onSelect, selectedId, expanded, onToggle, activity, secti
                 >
                   {isOpen ? '−' : '+'}
                 </button>
-              ) : isCategoryLeaf ? (
-                <span className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50">+</span>
               ) : (
                 <span className="w-5" />
               )}
