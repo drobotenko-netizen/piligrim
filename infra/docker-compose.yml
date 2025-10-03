@@ -15,7 +15,12 @@ services:
     restart: unless-stopped
   api:
     image: piligrim-api:${TAG-latest}
+    env_file:
+      - ./../server/.env
+    volumes:
+      - api_data:/data
     restart: unless-stopped
 volumes:
   caddy_data: {}
   caddy_config: {}
+  api_data: {}
