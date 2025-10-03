@@ -236,5 +236,114 @@ export function createAdminCategoriesTools(prisma: PrismaClient) {
     const r = await prisma.category.updateMany({ where: { tenantId: tenant.id, active: true }, data: { active: false } })
     res.json({ deactivated: r.count })
   })
+
+  // Seed план: создать категории и статьи, привязать фонды (двухуровневая структура)
+  router.post('/seed-plan', requireRole(['ADMIN']), async (req, res) => {
+    const tenant = await getTenant(prisma, req as any)
+
+    function normalizeFund(input: string): string {
+      return String(input || '')
+        .replace(/\u00A0|\u200B|\uFEFF/g, ' ')
+        .replace(/[–—−]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
+
+    // 1) Обеспечиваем базовые категории (двухуровневая схема)
+    const baseCategories: Array<{ name: string; activity: 'OPERATING'|'FINANCING'|'INVESTING'; type: 'income'|'expense'; kind?: 'COGS'|'OPEX'|'CAPEX'|'TAX'|'FEE'|'OTHER' }>
+      = [
+        { name: 'Выручка', activity: 'OPERATING', type: 'income' },
+        { name: 'Себестоимость', activity: 'OPERATING', type: 'expense', kind: 'COGS' },
+        { name: 'Банковские комиссии', activity: 'OPERATING', type: 'expense', kind: 'FEE' },
+        { name: 'Транспорт', activity: 'OPERATING', type: 'expense', kind: 'OPEX' },
+        { name: 'IT и сервисы', activity: 'OPERATING', type: 'expense', kind: 'OPEX' },
+        { name: 'Персонал', activity: 'OPERATING', type: 'expense', kind: 'OPEX' },
+        { name: 'Прочее (OPEX)', activity: 'OPERATING', type: 'expense', kind: 'OPEX' },
+        { name: 'Переводы — Поступления', activity: 'FINANCING', type: 'income' },
+        { name: 'Переводы — Выбытия', activity: 'FINANCING', type: 'expense' },
+      ]
+
+    const nameToCategoryId = new Map<string, string>()
+    for (const c of baseCategories) {
+      const existing = await prisma.category.findFirst({ where: { tenantId: tenant.id, name: c.name, parentId: null } })
+      if (existing) {
+        if (!existing.active || existing.activity !== c.activity || existing.type !== c.type || existing.kind !== (c.kind || null)) {
+          const updated = await prisma.category.update({ where: { id: existing.id }, data: { active: true, activity: c.activity, type: c.type, kind: c.kind || null } })
+          nameToCategoryId.set(c.name, updated.id)
+        } else {
+          nameToCategoryId.set(c.name, existing.id)
+        }
+      } else {
+        const created = await prisma.category.create({ data: { tenantId: tenant.id, name: c.name, activity: c.activity, type: c.type, kind: c.kind || null } })
+        nameToCategoryId.set(c.name, created.id)
+      }
+    }
+
+    // 2) Список фондов из GSheets
+    const fundRows = await prisma.gsCashflowRow.findMany({
+      where: { fund: { not: null } },
+      select: { fund: true },
+      distinct: ['fund'],
+      orderBy: { fund: 'asc' }
+    })
+    const funds = (fundRows.map(r => r.fund).filter(Boolean) as string[])
+
+    // 3) План маппинга фондов -> категория
+    const toCategory: Record<string, string> = {
+      'ВЫРУЧКА': 'Выручка',
+      'Эквайринг (процент)': 'Банковские комиссии',
+      'Комиссия банка': 'Банковские комиссии',
+      'Расходы на такси': 'Транспорт',
+      'Вебсайт': 'IT и сервисы',
+      'Консалтинг / обучение': 'IT и сервисы',
+      'Подарки персоналу / дни рождения': 'Персонал',
+      'Еда под ЗП': 'Персонал',
+      'ЗП курьеры': 'Персонал',
+      'ЗП кухня': 'Персонал',
+      'ЗП посуда': 'Персонал',
+      'ЗП гардеробщик': 'Персонал',
+      'ЗП офис': 'Персонал',
+      'Поступление - Перевод между счетами': 'Переводы — Поступления',
+      'Выбытие - Перевод между счетами': 'Переводы — Выбытия',
+    }
+
+    const payrollSet = new Set([
+      'ЗП курьеры','ЗП кухня','ЗП посуда','ЗП гардеробщик','ЗП офис','Еда под ЗП','Подарки персоналу / дни рождения'
+    ])
+
+    // 4) Создаём статьи под нужными категориями и привязываем фонд
+    let created = 0, reactivated = 0, updated = 0
+    for (const originalFund of funds) {
+      const nf = normalizeFund(originalFund)
+      const categoryName = toCategory[nf] || 'Прочее (OPEX)'
+      const parentId = nameToCategoryId.get(categoryName) as string
+      if (!parentId) continue
+
+      // Имя статьи: для выручки — "Выручка", для переводов — как в фонде, иначе по фонду
+      let articleName = nf
+      if (nf === 'ВЫРУЧКА') articleName = 'Выручка'
+      // Для персонала имена статей = фондам (ЗП ..., Еда под ЗП, Подарки ...)
+
+      // Тип статьи: берём из категории (родителя)
+      const parent = await prisma.category.findUnique({ where: { id: parentId } })
+      const type = parent?.type === 'income' ? 'income' : 'expense'
+      const activity = parent?.activity || 'OPERATING'
+
+      const existing = await prisma.category.findFirst({ where: { tenantId: tenant.id, name: articleName, parentId } })
+      if (existing) {
+        const needUpdate = (!existing.active) || (existing.fund !== originalFund) || (existing.type !== type) || (existing.activity !== activity)
+        if (needUpdate) {
+          await prisma.category.update({ where: { id: existing.id }, data: { active: true, fund: originalFund, type, activity } })
+          if (!existing.active) reactivated++
+          else updated++
+        }
+      } else {
+        await prisma.category.create({ data: { tenantId: tenant.id, name: articleName, parentId, fund: originalFund, type, activity } })
+        created++
+      }
+    }
+
+    res.json({ ok: true, categories: baseCategories.length, created, reactivated, updated })
+  })
   return router
 }
