@@ -248,10 +248,8 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       if (revId && isDescendant(categories, n.id, revId)) setOperSection('REVENUE')
       else if (cogsId && isDescendant(categories, n.id, cogsId)) setOperSection('COGS')
       else setOperSection('OPEX')
-      // catChoice: для статей — родительская категория, для категорий — create
-      const parentId = n.parentId || ''
-      const sectionRoots = new Set<string>([revId, cogsId, opexId].filter(Boolean) as string[])
-      if (parentId && !sectionRoots.has(parentId)) setCatChoice(parentId)
+      // catChoice: для статей — всегда родительская категория (включая корни-разделы), для категорий — create
+      if (n.parentId) setCatChoice(n.parentId)
       else setCatChoice('create')
     } else {
       // FINANCING/INVESTING: catChoice — родитель (если есть), иначе create
