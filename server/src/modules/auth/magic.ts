@@ -68,6 +68,11 @@ export function createMagicRouter(prisma: PrismaClient) {
       if (!dbToken || dbToken.userId !== userId || dbToken.tenantId !== tenantId) {
         return res.status(400).send('Token not found')
       }
+      // Игнорируем преглядыватели (preview) — не помечаем токен использованным
+      const ua = String(req.headers['user-agent'] || '')
+      const isPreview = /(TelegramBot|WhatsApp|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|SkypeUriPreview|Discordbot|Google-InspectionTool|curl|wget|Pingdom|Bingbot)/i.test(ua)
+      if (isPreview) return res.status(204).end()
+
       if (dbToken.usedAt) return res.status(400).send('Token already used')
       if (dbToken.expiresAt.getTime() < Date.now()) return res.status(400).send('Token expired')
 

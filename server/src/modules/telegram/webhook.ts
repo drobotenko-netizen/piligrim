@@ -75,7 +75,8 @@ export function createTelegramWebhook(prisma: PrismaClient) {
           const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
           const issueJson: any = await issueRes.json().catch(() => ({}))
           if (issueRes.ok && issueJson?.url) {
-            await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}`)
+            // Добавим hint про копирование если Telegram может сделать пререндера
+            await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}\n\nЕсли видите Token already used — скопируйте ссылку и откройте в браузере вручную.`)
           } else {
             await sendMessage(chatId, 'Не удалось выдать ссылку, попробуйте позже.')
           }
