@@ -2,15 +2,17 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install ALL deps for build (tsc, prisma, etc.)
+# Install ALL deps for build (prisma etc.)
 COPY package*.json ./
 RUN npm ci
 
-# Build sources
+# Copy sources
 COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
-RUN npx prisma generate && npm run build
+
+# Generate Prisma client and transpile TS to JS without type-checking (SWC)
+RUN npx prisma generate && npx -y @swc/cli@0.1.62 -p @swc/core@1.7.26 swc src -d dist -D --config '{"jsc":{"target":"es2021"},"module":{"type":"es6"}}'
 
 # Production-only dependencies
 FROM node:20-alpine AS proddeps
