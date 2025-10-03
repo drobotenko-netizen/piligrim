@@ -17,6 +17,7 @@ RUN npx prisma generate
 
 # App sources
 COPY src ./src
+COPY scripts ./scripts
 
 # Install tsx runner
 RUN npm i -g tsx@4.19.2 prisma@5.19.1
