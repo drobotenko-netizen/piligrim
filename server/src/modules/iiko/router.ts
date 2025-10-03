@@ -525,7 +525,7 @@ export function createIikoRouter() {
     }
   })*/
 
-  /*router.get('/local/sales/dish-categories', async (req, res) => {
+  router.get('/local/sales/dish-categories', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     
@@ -563,9 +563,9 @@ export function createIikoRouter() {
       console.error('Error in /local/sales/dish-categories:', e)
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })*/
+  })
 
-  /*router.get('/local/sales/dishes', async (req, res) => {
+  router.get('/local/sales/dishes', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     
@@ -641,7 +641,7 @@ export function createIikoRouter() {
       console.error('Error in /local/sales/dishes:', e)
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })*/
+  })
 
   /*router.get('/local/sales/dish/:dishId', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
