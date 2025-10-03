@@ -561,30 +561,18 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
   const sectionRootIds = useMemo(() => new Set<string>([revenueRoot?.id, cogsRoot?.id, opexRoot?.id].filter(Boolean) as string[]), [revenueRoot, cogsRoot, opexRoot])
 
-  // Список категорий для выбора родителя статьи в зависимости от раздела
+  // Список категорий для выбора родителя статьи: показываем ВСЕ корневые категории выбранного вида деятельности
   const categoryOptionsForSection = useMemo(() => {
-    let root: any = null
-    if (activeActivity === 'OPERATING') {
-      if (operSection === 'REVENUE') {
-        root = revenueRoot
-        return root ? root.children || [] : []
-      } else if (operSection === 'COGS') {
-        return cogsCombinedList
-      } else {
-        return opexCombinedList
-      }
-    }
-    // Для финансовой/инвест — показываем все корни
-    return treeForTab
-  }, [activeActivity, operSection, revenueRoot, cogsCombinedList, opexCombinedList, treeForTab])
+    return (treeForTab || []).filter((n: any) => n.parentId == null)
+  }, [treeForTab])
 
   // Для OPERATING/OPEX исключаем системные из списка выбора родителя
   const filteredCategoryOptionsForSection = useMemo(() => {
     if (activeActivity === 'OPERATING' && operSection === 'OPEX') {
-      return opexCombinedList.filter(n => !(payrollCat && (n.id === payrollCat.id || n.parentId === payrollCat.id)))
+      return categoryOptionsForSection.filter(n => !(payrollCat && (n.id === payrollCat.id || n.parentId === payrollCat.id)))
     }
     return categoryOptionsForSection
-  }, [activeActivity, operSection, opexCombinedList, payrollCat, categoryOptionsForSection])
+  }, [activeActivity, operSection, payrollCat, categoryOptionsForSection])
 
   async function ensureOperatingSectionRoot(section: 'REVENUE'|'COGS'|'OPEX'): Promise<string> {
     let existing: any | null = null
