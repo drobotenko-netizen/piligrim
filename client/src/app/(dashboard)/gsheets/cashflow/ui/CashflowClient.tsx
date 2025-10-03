@@ -22,6 +22,7 @@ export default function CashflowClient() {
   const [flowType, setFlowType] = useState('')
   const [search, setSearch] = useState('')
   const [incompleteTransfer, setIncompleteTransfer] = useState('')
+  const [notImported, setNotImported] = useState('')
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(50)
   const [rows, setRows] = useState<any[]>([])
@@ -31,6 +32,7 @@ export default function CashflowClient() {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<string | null>(null)
   const [loadingToTransactions, setLoadingToTransactions] = useState(false)
+  const [loadingToPayments, setLoadingToPayments] = useState(false)
 
   async function loadMeta() {
     const u = new URL(`${API_BASE}/api/gsheets/cashflow/meta`)
@@ -56,6 +58,7 @@ export default function CashflowClient() {
       if (flowType) u.searchParams.set('flowType', flowType)
       if (search) u.searchParams.set('search', search)
       if (incompleteTransfer) u.searchParams.set('incompleteTransfer', incompleteTransfer)
+      if (notImported) u.searchParams.set('notImported', notImported)
       u.searchParams.set('page', String(page))
       u.searchParams.set('limit', String(limit))
       const r = await fetch(u.toString(), { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
@@ -169,8 +172,43 @@ export default function CashflowClient() {
     setLoadingToTransactions(false)
   }
 
+  async function loadToPayments() {
+    setLoadingToPayments(true)
+    setImportResult(null)
+    try {
+      // Загружаем расходы из Google Sheets в ExpenseDoc + Payment
+      setImportResult('📊 Загрузка расходов в платежи...')
+      const loadResponse = await fetch(`${API_BASE}/api/payments/load-from-gsheets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-role': 'ADMIN'
+        },
+        body: JSON.stringify({
+          spreadsheetId,
+          gid: '0'
+        })
+      })
+      
+      const result = await loadResponse.json()
+      
+      if (loadResponse.ok) {
+        const transferInfo = result.fullPairs ? `\nПолных переводов: ${result.fullPairs}` : ''
+        const incompleteInfo = result.incompletePairs ? `\nНеполных переводов: ${result.incompletePairs}` : ''
+        setImportResult(`✅ Загрузка завершена!\nУдалено платежей: ${result.deletedPayments}\nУдалено документов: ${result.deletedDocs}\nСоздано документов расходов: ${result.createdDocs}\nСоздано платежей: ${result.createdPayments}${transferInfo}${incompleteInfo}\nПропущено: ${result.skipped}`)
+        // Перезагружаем данные для обновления отметок
+        await load()
+      } else {
+        setImportResult(`❌ Ошибка загрузки: ${result.error || 'неизвестная ошибка'}`)
+      }
+    } catch (error) {
+      setImportResult(`❌ Ошибка загрузки в платежи: ${error}`)
+    }
+    setLoadingToPayments(false)
+  }
+
   useEffect(() => { loadMeta() }, [])
-  useEffect(() => { load() }, [dateFrom, dateTo, wallet, fund, flowType, search, incompleteTransfer, page, limit])
+  useEffect(() => { load() }, [dateFrom, dateTo, wallet, fund, flowType, search, incompleteTransfer, notImported, page, limit])
 
   const pages = useMemo(() => Math.max(1, Math.ceil(total / Math.max(1, limit))), [total, limit])
 
@@ -198,10 +236,17 @@ export default function CashflowClient() {
           </Button>
           <Button 
             onClick={loadToTransactions}
-            disabled={importing || loadingToTransactions}
+            disabled={importing || loadingToTransactions || loadingToPayments}
             variant="secondary"
           >
             {loadingToTransactions ? 'Загрузка...' : 'Загрузить в транзакции'}
+          </Button>
+          <Button 
+            onClick={loadToPayments}
+            disabled={importing || loadingToTransactions || loadingToPayments}
+            variant="secondary"
+          >
+            {loadingToPayments ? 'Загрузка...' : 'Загрузить в платежи'}
           </Button>
         </div>
       </div>
@@ -252,6 +297,13 @@ export default function CashflowClient() {
             <option value="true">Только неполные</option>
           </select>
         </div>
+        <div>
+          <label className="block text-xs text-muted-foreground">Не импортировано</label>
+          <select value={notImported} onChange={e => { setPage(1); setNotImported(e.target.value) }} className="border rounded px-2 py-1 w-full">
+            <option value="">—</option>
+            <option value="true">Только не импортированные</option>
+          </select>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -271,6 +323,7 @@ export default function CashflowClient() {
         <table className="min-w-full text-sm">
           <thead className="bg-muted">
             <tr>
+              <th className="text-left px-2 py-1">Месяц</th>
               <th className="text-left px-2 py-1">Дата</th>
               <th className="text-left px-2 py-1">Сумма</th>
               <th className="text-left px-2 py-1">Кошелёк</th>
@@ -278,37 +331,49 @@ export default function CashflowClient() {
               <th className="text-left px-2 py-1">Комментарий</th>
               <th className="text-left px-2 py-1">Фонд</th>
               <th className="text-left px-2 py-1">Тип</th>
-              <th className="text-left px-2 py-1">Активность</th>
+              <th className="text-left px-2 py-1">Статус</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, idx) => {
               const amt = typeof r.amount === 'number' ? (r.amount/100).toFixed(2) : ''
               const d = r.date ? String(r.date).slice(0,10) : r.dateText || ''
-              const isIncomplete = r.raw && JSON.parse(r.raw || '{}').incompleteTransfer
-              const transferType = r.raw && JSON.parse(r.raw || '{}').transferType
+              const rawData = r.raw ? JSON.parse(r.raw || '{}') : {}
+              const isIncomplete = rawData.incompleteTransfer
+              const transferType = rawData.transferType
+              const isNotImported = rawData.notImported
+              const notImportedReason = rawData.notImportedReason
               return (
-                <tr key={r.id || idx} className={`border-t ${isIncomplete ? 'bg-yellow-50' : ''}`}>
+                <tr key={r.id || idx} className={`border-t ${isIncomplete ? 'bg-yellow-50' : isNotImported ? 'bg-red-50' : ''}`}>
+                  <td className="px-2 py-1 whitespace-nowrap">{r.monthName || '—'}</td>
                   <td className="px-2 py-1 whitespace-nowrap">{d}</td>
                   <td className="px-2 py-1 whitespace-nowrap">{amt}</td>
                   <td className="px-2 py-1">{r.wallet || ''}</td>
                   <td className="px-2 py-1">{r.supplier || ''}</td>
                   <td className="px-2 py-1">{r.comment || ''}</td>
                   <td className="px-2 py-1">{r.fund || ''}</td>
+                  <td className="px-2 py-1">{r.flowType || ''}</td>
                   <td className="px-2 py-1">
-                    {r.flowType || ''}
                     {isIncomplete && (
-                      <span className="ml-1 text-xs text-orange-600" title={`Неполный перевод: ${transferType === 'outgoing_only' ? 'только выбытие' : 'только поступление'}`}>
-                        ⚠️
+                      <span className="text-xs text-orange-600" title={`Неполный перевод: ${transferType === 'outgoing_only' ? 'только выбытие' : 'только поступление'}`}>
+                        ⚠️ Неполный перевод
+                      </span>
+                    )}
+                    {isNotImported && (
+                      <span className="text-xs text-red-600" title={`Не импортировано: ${notImportedReason}`}>
+                        ❌ {notImportedReason === 'income_not_expense' ? 'Доход' : 
+                            notImportedReason === 'transfer' ? 'Перевод' : 
+                            notImportedReason === 'category_not_found' ? 'Нет категории' : 
+                            notImportedReason === 'duplicate' ? 'Дубликат' : 
+                            'Не импортировано'}
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-1">{r.activity || ''}</td>
                 </tr>
               )
             })}
             {rows.length === 0 && (
-              <tr><td className="px-2 py-4 text-muted-foreground" colSpan={8}>{loading ? 'Загрузка…' : 'Нет данных'}</td></tr>
+              <tr><td className="px-2 py-4 text-muted-foreground" colSpan={9}>{loading ? 'Загрузка…' : 'Нет данных'}</td></tr>
             )}
           </tbody>
         </table>

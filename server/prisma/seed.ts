@@ -137,46 +137,8 @@ async function main() {
     return await (prisma as any).transaction.create({ data })
   }
 
-  // INCOME: hall sales to acquiring
-  await createTxn({ tenantId: tenant.id, kind: 'income', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accSber?.id ?? null, categoryId: catSalesHall?.id ?? null, activity: 'OPERATING', amount: 2_500_000, note: 'Выручка зал', source: 'seed' })
-  // INCOME: bar
-  await createTxn({ tenantId: tenant.id, kind: 'income', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accSber?.id ?? null, categoryId: catBarIncome?.id ?? null, activity: 'OPERATING', amount: 600_000, note: 'Бар', source: 'seed' })
-  // INCOME: delivery
-  await createTxn({ tenantId: tenant.id, kind: 'income', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accSber?.id ?? null, categoryId: catSalesDelivery?.id ?? null, activity: 'OPERATING', amount: 900_000, note: 'Выручка доставка', source: 'seed' })
-
-  // EXPENSE: food purchase
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accCash?.id ?? null, categoryId: catFood?.id ?? null, counterpartyId: cpSupplier?.id ?? null, activity: 'OPERATING', amount: 800_000, note: 'Закупка овощей', source: 'seed' })
-  // EXPENSE: vegetables sub-item
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accCash?.id ?? null, categoryId: catVeg?.id ?? null, counterpartyId: cpSupplier?.id ?? null, activity: 'OPERATING', amount: 350_000, note: 'Овощи и фрукты', source: 'seed' })
-  // EXPENSE: meat sub-item
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accCash?.id ?? null, categoryId: catMeat?.id ?? null, counterpartyId: cpSupplier?.id ?? null, activity: 'OPERATING', amount: 500_000, note: 'Мясо и птица', source: 'seed' })
-  // EXPENSE: dairy sub-item
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accCash?.id ?? null, categoryId: catDairy?.id ?? null, counterpartyId: cpSupplier?.id ?? null, activity: 'OPERATING', amount: 220_000, note: 'Молочная продукция', source: 'seed' })
-
-  // EXPENSE: rent
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accRs?.id ?? null, categoryId: catRent?.id ?? null, counterpartyId: cpLandlord?.id ?? null, activity: 'OPERATING', amount: 2_000_000, note: 'Аренда', source: 'seed' })
-  // EXPENSE: utilities
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accRs?.id ?? null, categoryId: catUtilities?.id ?? null, counterpartyId: cpEnergy?.id ?? null, activity: 'OPERATING', amount: 300_000, note: 'Коммунальные услуги', source: 'seed' })
-  // EXPENSE: cleaning
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accRs?.id ?? null, categoryId: catCleaning?.id ?? null, activity: 'OPERATING', amount: 80_000, note: 'Уборка зала', source: 'seed' })
-
-  // EXPENSE: bank service
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accRs?.id ?? null, categoryId: catAccServ?.id ?? null, counterpartyId: cpSber?.id ?? null, activity: 'FINANCING', amount: 15_000, note: 'Обслуживание счёта', source: 'seed' })
-  // EXPENSE: acquiring commission
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accSber?.id ?? null, categoryId: catAcq?.id ?? null, counterpartyId: cpSber?.id ?? null, activity: 'FINANCING', amount: 30_000, note: 'Комиссия эквайринга', source: 'seed' })
-
-  // EXPENSE: marketing ads
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accRs?.id ?? null, categoryId: catAds?.id ?? null, counterpartyId: cpAdsYandex?.id ?? null, activity: 'OPERATING', amount: 120_000, note: 'Реклама', source: 'seed' })
-  // EXPENSE: aggregator commission
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accSber?.id ?? null, categoryId: catAggregators?.id ?? null, activity: 'OPERATING', amount: 90_000, note: 'Комиссии агрегаторов', source: 'seed' })
-
-  // INVESTING: equipment
-  await createTxn({ tenantId: tenant.id, kind: 'expense', paymentDate: payDate, accrualYear: y, accrualMonth: m, accountId: accRs?.id ?? null, categoryId: catEquip?.id ?? null, activity: 'INVESTING', amount: 3_800_000, note: 'Пароконвектомат', source: 'seed' })
-
-  // TRANSFER: acquiring -> settlement
-  const transferAmount = 500_000
-  await createTxn({ tenantId: tenant.id, kind: 'transfer', paymentDate: payDate, accountId: accSber?.id ?? null, amount: -transferAmount, note: 'Перевод выручки', source: 'seed' })
-  await createTxn({ tenantId: tenant.id, kind: 'transfer', paymentDate: payDate, accountId: accRs?.id ?? null, amount: transferAmount, note: 'Перевод выручки', source: 'seed' })
+  // Skip transactions for now - focus on user creation
+  console.log('Skipping transactions - user creation only')
 
   console.log('Seed completed')
 }

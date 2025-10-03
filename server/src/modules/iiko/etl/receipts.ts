@@ -265,7 +265,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
         const bodyItemsSrc = {
           reportType: 'SALES',
           buildSummary: true,
-          groupByRowFields: ['OrderNum','DishId','DishName','DishSize.ShortName','DishMeasureUnit'],
+          groupByRowFields: ['OrderNum','DishId','DishName','DishCategory','DishSize.ShortName','DishMeasureUnit'],
           groupByColFields: [],
           aggregateFields: ['DishSumInt','DishDiscountSumInt','ProductCostBase.ProductCost','DishAmountInt'],
           filters: filtersHead
@@ -280,6 +280,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
           srcEntry.items.push({
             dishId: r?.DishId || null,
             dishName: r?.DishName || '',
+            dishCategory: r?.DishCategory || null,
             size: r?.['DishSize.ShortName'] || null,
             measureUnit: r?.DishMeasureUnit || null,
             qty: Number(r?.DishAmountInt) || 0,
@@ -316,6 +317,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
             lineNo: idx + 1,
             dishId: it.dishId,
             dishName: it.dishName,
+            dishCategory: it.dishCategory || null,
             size: it.size,
             measureUnit: it.measureUnit || null,
             qty: Number.isFinite(it.qty) ? Math.trunc(it.qty) : null,
@@ -482,7 +484,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
   const bodyItems = {
     reportType: 'SALES',
     buildSummary: true,
-    groupByRowFields: ['OrderNum','DishId','DishName','DishSize.ShortName','DishMeasureUnit','OrderDeleted'],
+    groupByRowFields: ['OrderNum','DishId','DishName','DishCategory','DishSize.ShortName','DishMeasureUnit','OrderDeleted'],
     groupByColFields: [],
     aggregateFields: ['DishSumInt','DishDiscountSumInt','ProductCostBase.ProductCost','DishAmountInt','DishReturnSum'],
     filters: {
@@ -516,6 +518,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
     e.items.push({
       dishId: r?.DishId || null,
       dishName: r?.DishName || '',
+      dishCategory: r?.DishCategory || null,
       size: r?.['DishSize.ShortName'] || null,
       measureUnit: r?.DishMeasureUnit || null,
       qty: Number(r?.DishAmountInt) || 0,
@@ -647,6 +650,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
       lineNo: idx + 1,
       dishId: it.dishId,
       dishName: it.dishName,
+      dishCategory: it.dishCategory || null,
       size: it.size,
       measureUnit: it.measureUnit || null,
       qty: Number.isFinite(it.qty) ? Math.trunc(it.qty) : null,

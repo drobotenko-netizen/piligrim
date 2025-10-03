@@ -31,6 +31,9 @@ import { createTenderTypesRouter } from './modules/tender-types/router'
 import { createShiftsRouter } from './modules/shifts/router'
 import { createExpenseDocsRouter } from './modules/expense-docs/router'
 import { createPaymentsRouter } from './modules/payments/router'
+import { createMagicRouter } from './modules/auth/magic'
+import { createTelegramWebhook } from './modules/telegram/webhook'
+import { startTelegramPolling } from './modules/telegram/polling'
 
 const prisma = new PrismaClient()
 installPrismaAuditMiddleware(prisma)
@@ -93,6 +96,8 @@ app.use('/api/expense-docs', createExpenseDocsRouter(prisma))
 app.use('/api/payments', createPaymentsRouter(prisma))
 app.use('/api/balances', balancesRouter)
 app.use('/api/auth/otp', createOtpRouter(prisma))
+app.use('/api/auth/magic', createMagicRouter(prisma))
+app.use('/api/telegram', createTelegramWebhook(prisma))
 app.use('/api/admin/users', createAdminUsersRouter(prisma))
 app.use('/api/admin', createAdminRolesRouter(prisma))
 app.use('/api/admin/audit', createAdminAuditRouter(prisma))
@@ -100,6 +105,9 @@ app.use('/api/admin/audit', createAdminAuditRouter(prisma))
 const PORT = process.env.PORT || 4000
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`)
+  if (process.env.TELEGRAM_POLLING === '1') {
+    startTelegramPolling(prisma)
+  }
 })
 
 

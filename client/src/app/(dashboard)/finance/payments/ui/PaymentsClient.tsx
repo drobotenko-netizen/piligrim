@@ -265,6 +265,8 @@ export default function PaymentsClient() {
               <TR>
                 <TH>Дата</TH>
                 <TH>Счёт</TH>
+                <TH>Контрагент</TH>
+                <TH>Категория</TH>
                 <TH>Сумма</TH>
                 <TH>Распределено на</TH>
                 <TH>Примечание</TH>
@@ -276,6 +278,16 @@ export default function PaymentsClient() {
                 <TR key={payment.id}>
                   <TD>{new Date(payment.date).toLocaleDateString('ru')}</TD>
                   <TD>{payment.account?.name}</TD>
+                  <TD>
+                    {payment.expenseDoc?.vendor?.name || 
+                     (payment.allocations?.length > 0 && payment.allocations[0]?.expenseDoc?.vendor?.name) || 
+                     '—'}
+                  </TD>
+                  <TD>
+                    {payment.expenseDoc?.category?.name || 
+                     (payment.allocations?.length > 0 && payment.allocations[0]?.expenseDoc?.category?.name) || 
+                     '—'}
+                  </TD>
                   <TD className="font-semibold">{rubFmt(payment.amount)}</TD>
                   <TD>
                     {payment.allocations?.length > 0 ? (
@@ -285,6 +297,10 @@ export default function PaymentsClient() {
                             {alloc.expenseDoc?.vendor?.name || 'Без поставщика'}: {rubFmt(alloc.amount)}
                           </div>
                         ))}
+                      </div>
+                    ) : payment.expenseDoc ? (
+                      <div className="text-sm text-gray-600">
+                        {payment.expenseDoc.vendor?.name || 'Без поставщика'}
                       </div>
                     ) : (
                       '—'
@@ -305,7 +321,7 @@ export default function PaymentsClient() {
               ))}
               {payments.length === 0 && (
                 <TR>
-                  <TD colSpan={6} className="text-center text-gray-500">
+                  <TD colSpan={8} className="text-center text-gray-500">
                     Нет платежей
                   </TD>
                 </TR>

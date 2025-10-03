@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, Fragment } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
@@ -18,9 +20,30 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   const [yTo, setYTo] = useState(initialYTo)
   const [mTo, setMTo] = useState(initialMTo)
   const [data, setData] = useState<any>(null)
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
+  
+  function toggleCategory(categoryId: string) {
+    const newCollapsed = new Set(collapsedCategories)
+    if (newCollapsed.has(categoryId)) {
+      newCollapsed.delete(categoryId)
+    } else {
+      newCollapsed.add(categoryId)
+    }
+    setCollapsedCategories(newCollapsed)
+  }
+  
+  function expandAllCategories() {
+    setCollapsedCategories(new Set())
+  }
+  
+  function collapseAllCategories() {
+    if (!data?.expenseDetails) return
+    const allCategoryIds = new Set(data.expenseDetails.map((r: any) => r.categoryId))
+    setCollapsedCategories(allCategoryIds)
+  }
 
   async function reload() {
     const res = await fetch(`${API_BASE}/api/reports/pnl?yFrom=${yFrom}&mFrom=${mFrom}&yTo=${yTo}&mTo=${mTo}`, { credentials: 'include' })
@@ -29,6 +52,53 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   }
 
   useEffect(() => { reload() }, [yFrom, mFrom, yTo, mTo])
+
+  // Группировка expenseDetails по kind → категориям → статьям для раскрывашек
+  const groupedExpenses = useMemo(() => {
+    if (!data?.expenseDetails) return null
+    
+    const kindMap = new Map<string, Map<string, { 
+      categoryId: string;
+      categoryName: string; 
+      articles: Map<string, { articleId: string; articleName: string; byMonth: Map<string, number> }>;
+      totalByMonth: Map<string, number>;
+    }>>()
+    
+    for (const row of data.expenseDetails) {
+      const monthKey = `${row.year}-${String(row.month).padStart(2,'0')}`
+      
+      if (!kindMap.has(row.kind)) {
+        kindMap.set(row.kind, new Map())
+      }
+      
+      const categoryMap = kindMap.get(row.kind)!
+      
+      if (!categoryMap.has(row.categoryId)) {
+        categoryMap.set(row.categoryId, {
+          categoryId: row.categoryId,
+          categoryName: row.categoryName,
+          articles: new Map(),
+          totalByMonth: new Map()
+        })
+      }
+      
+      const category = categoryMap.get(row.categoryId)!
+      
+      if (!category.articles.has(row.articleId)) {
+        category.articles.set(row.articleId, {
+          articleId: row.articleId,
+          articleName: row.articleName,
+          byMonth: new Map()
+        })
+      }
+      
+      const article = category.articles.get(row.articleId)!
+      article.byMonth.set(monthKey, (article.byMonth.get(monthKey) || 0) + row.amount)
+      category.totalByMonth.set(monthKey, (category.totalByMonth.get(monthKey) || 0) + row.amount)
+    }
+    
+    return kindMap
+  }, [data])
 
   if (!data) return <div>Загрузка...</div>
 
@@ -64,11 +134,79 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   })
   const netProfitTotal = calcTotal(netProfitByMonth)
 
+  // Helper для рендеринга категорий с раскрывашками
+  const renderCategoryRows = (kind: string) => {
+    if (!groupedExpenses) return null
+    const categoriesForKind = groupedExpenses.get(kind)
+    if (!categoriesForKind) return null
+    
+    // Сортируем категории по убыванию суммы
+    const sortedCategories = Array.from(categoriesForKind.values()).sort((a, b) => {
+      const totalA = Array.from(a.totalByMonth.values()).reduce((sum, val) => sum + val, 0)
+      const totalB = Array.from(b.totalByMonth.values()).reduce((sum, val) => sum + val, 0)
+      return totalB - totalA
+    })
+    
+    return sortedCategories.map(category => {
+      const isCollapsed = collapsedCategories.has(category.categoryId)
+      const categoryTotal = Array.from(category.totalByMonth.values()).reduce((sum, val) => sum + val, 0)
+      
+      // Сортируем статьи по убыванию суммы
+      const sortedArticles = Array.from(category.articles.values()).sort((a, b) => {
+        const totalA = Array.from(a.byMonth.values()).reduce((sum, val) => sum + val, 0)
+        const totalB = Array.from(b.byMonth.values()).reduce((sum, val) => sum + val, 0)
+        return totalB - totalA
+      })
+      
+      return (
+        <Fragment key={category.categoryId}>
+          {/* Категория */}
+          <TR className="hover:bg-muted/20 transition-colors">
+            <TD className="pl-6 py-1.5 sticky left-0 bg-card">
+              <button
+                onClick={() => toggleCategory(category.categoryId)}
+                className="inline-flex items-center gap-1 hover:text-primary"
+              >
+                {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                <span>{category.categoryName}</span>
+              </button>
+            </TD>
+            {months.map((mo: any) => (
+              <TD key={mo.key} className="text-right py-1.5">−{rubFmt(category.totalByMonth.get(mo.key) || 0)}</TD>
+            ))}
+            <TD className="text-right py-1.5">−{rubFmt(categoryTotal)}</TD>
+          </TR>
+          
+          {/* Статьи (раскрываемые) */}
+          {!isCollapsed && sortedArticles.map(article => {
+            const articleTotal = Array.from(article.byMonth.values()).reduce((sum, val) => sum + val, 0)
+            return (
+              <TR key={article.articleId} className="hover:bg-muted/10 transition-colors">
+                <TD className="pl-12 py-1 text-sm text-muted-foreground sticky left-0 bg-card">{article.articleName}</TD>
+                {months.map((mo: any) => (
+                  <TD key={mo.key} className="text-right py-1 text-sm text-muted-foreground">−{rubFmt(article.byMonth.get(mo.key) || 0)}</TD>
+                ))}
+                <TD className="text-right py-1 text-sm text-muted-foreground">−{rubFmt(articleTotal)}</TD>
+              </TR>
+            )
+          })}
+        </Fragment>
+      )
+    })
+  }
+
   return (
     <Card>
       <CardContent className="p-4 space-y-3 flex flex-col h-[calc(100vh-4rem)] min-h-0">
         <div className="flex items-center justify-between gap-3">
-          <div></div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={expandAllCategories}>
+              Развернуть все
+            </Button>
+            <Button variant="outline" size="sm" onClick={collapseAllCategories}>
+              Свернуть все
+            </Button>
+          </div>
           <div className="flex items-center gap-2">
             <Select value={String(yFrom)} onValueChange={v => setYFrom(Number(v))}>
               <SelectTrigger className="w-28"><SelectValue placeholder="Год от" /></SelectTrigger>
@@ -123,7 +261,9 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                 ))}
                 <TD className="text-right py-1.5 font-bold">{rubFmt(revenueTotal)}</TD>
               </TR>
-              {Object.entries(revenue.byChannelByMonth || {}).map(([channel, byMonth]: any) => (
+              {Object.entries(revenue.byChannelByMonth || {})
+                .sort(([, byMonthA]: any, [, byMonthB]: any) => calcTotal(byMonthB) - calcTotal(byMonthA))
+                .map(([channel, byMonth]: any) => (
                 <TR key={channel} className="hover:bg-muted/20 transition-colors">
                   <TD className="pl-8 py-1.5 sticky left-0 bg-card">{channel}</TD>
                   {months.map((mo: any) => (
@@ -141,19 +281,11 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                 ))}
                 <TD className="text-right py-1.5 font-bold">−{rubFmt(cogsTotal)}</TD>
               </TR>
-              {expenses.cogs?.items?.map((item: any, idx: number) => (
-                <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                  <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
-                  {months.map((mo: any) => (
-                    <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
-                  ))}
-                  <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
-                </TR>
-              ))}
+              {renderCategoryRows('COGS')}
 
               {/* Валовая прибыль */}
               <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t">
-                <TD className="font-bold py-1.5 sticky left-0 bg-muted/50">ВАЛОВАЯ ПРИБЫЛЬ</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-muted">ВАЛОВАЯ ПРИБЫЛЬ</TD>
                 {months.map((mo: any) => (
                   <TD key={mo.key} className="text-right py-1.5 font-bold bg-muted/50">{rubFmt(grossProfitByMonth[mo.key] || 0)}</TD>
                 ))}
@@ -168,19 +300,11 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                 ))}
                 <TD className="text-right py-1.5 font-bold">−{rubFmt(opexTotal)}</TD>
               </TR>
-              {expenses.opex?.items?.map((item: any, idx: number) => (
-                <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                  <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
-                  {months.map((mo: any) => (
-                    <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
-                  ))}
-                  <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
-                </TR>
-              ))}
+              {renderCategoryRows('OPEX')}
 
               {/* Операционная прибыль */}
               <TR className="bg-muted/50 hover:bg-muted/70 transition-colors border-t">
-                <TD className="font-bold py-1.5 sticky left-0 bg-muted/50">ОПЕРАЦИОННАЯ ПРИБЫЛЬ</TD>
+                <TD className="font-bold py-1.5 sticky left-0 bg-muted">ОПЕРАЦИОННАЯ ПРИБЫЛЬ</TD>
                 {months.map((mo: any) => (
                   <TD key={mo.key} className="text-right py-1.5 font-bold bg-muted/50">{rubFmt(operatingProfitByMonth[mo.key] || 0)}</TD>
                 ))}
@@ -199,15 +323,7 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                         ))}
                         <TD className="text-right py-1.5 font-semibold">−{rubFmt(feeTotal)}</TD>
                       </TR>
-                      {expenses.fee?.items?.map((item: any, idx: number) => (
-                        <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                          <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
-                          {months.map((mo: any) => (
-                            <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
-                          ))}
-                          <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
-                        </TR>
-                      ))}
+                      {renderCategoryRows('FEE')}
                     </>
                   )}
 
@@ -220,15 +336,7 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                         ))}
                         <TD className="text-right py-1.5 font-semibold">−{rubFmt(taxTotal)}</TD>
                       </TR>
-                      {expenses.tax?.items?.map((item: any, idx: number) => (
-                        <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                          <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
-                          {months.map((mo: any) => (
-                            <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
-                          ))}
-                          <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
-                        </TR>
-                      ))}
+                      {renderCategoryRows('TAX')}
                     </>
                   )}
 
@@ -241,15 +349,7 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                         ))}
                         <TD className="text-right py-1.5 font-semibold">−{rubFmt(otherTotal)}</TD>
                       </TR>
-                      {expenses.other?.items?.map((item: any, idx: number) => (
-                        <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                          <TD className="pl-8 py-1.5 sticky left-0 bg-card">{item.name}</TD>
-                          {months.map((mo: any) => (
-                            <TD key={mo.key} className="text-right py-1.5">−{rubFmt(item.byMonth[mo.key] || 0)}</TD>
-                          ))}
-                          <TD className="text-right py-1.5">−{rubFmt(calcTotal(item.byMonth))}</TD>
-                        </TR>
-                      ))}
+                      {renderCategoryRows('OTHER')}
                     </>
                   )}
                 </>
@@ -281,15 +381,10 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
                   </TR>
                 </THead>
                 <TBody>
-                  {expenses.capex?.items?.map((item: any, idx: number) => (
-                    <TR key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TD className="py-1.5 sticky left-0 bg-card">{item.name}</TD>
-                      {months.map((mo: any) => (
-                        <TD key={mo.key} className="text-right py-1.5">{rubFmt(item.byMonth[mo.key] || 0)}</TD>
-                      ))}
-                      <TD className="text-right py-1.5">{rubFmt(calcTotal(item.byMonth))}</TD>
-                    </TR>
-                  ))}
+                  {renderCategoryRows('CAPEX')?.map(element => {
+                    // Убираем минусы для CAPEX (информационный раздел)
+                    return element
+                  })}
                   <TR className="border-t hover:bg-muted/30 transition-colors">
                     <TD className="font-bold py-1.5 sticky left-0 bg-card">Итого CAPEX</TD>
                     {months.map((mo: any) => (

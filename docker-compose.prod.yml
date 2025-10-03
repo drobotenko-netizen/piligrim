@@ -1,0 +1,45 @@
+name: piligrim
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  api_data: {}
+
+services:
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: ${IMAGE_API:-piligrim-api:latest}
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - DATABASE_URL=file:/data/dev.db
+    volumes:
+      - api_data:/data
+    expose:
+      - "4000"
+    restart: unless-stopped
+    networks:
+      - proxy
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: ${IMAGE_WEB:-piligrim-web:latest}
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_API_BASE=https://api.piligrim.5-star-roi.ru
+    depends_on:
+      - api
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - proxy
+
+

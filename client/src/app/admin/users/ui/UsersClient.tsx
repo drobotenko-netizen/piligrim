@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
@@ -16,12 +16,18 @@ export default function UsersClient({ initialItems }: { initialItems: any[] }) {
   const [activeTab, setActiveTab] = useState<'ACTIVE'|'INACTIVE'>('ACTIVE')
   const [form, setForm] = useState<{ fullName: string; phone: string; role: string }>({ fullName: '', phone: '', role: 'EMPLOYEE' })
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [inviteUrl, setInviteUrl] = useState<string>('')
+  const [tgLink, setTgLink] = useState<string>('')
 
   async function reload() {
     const res = await fetch(`${API_BASE}/api/admin/users`, { credentials: 'include' })
     const json = await res.json()
     setItems(json.items || [])
   }
+
+  useEffect(() => {
+    reload()
+  }, [])
 
   async function save() {
     if (!form.fullName.trim() || !form.phone.trim()) return
@@ -30,6 +36,12 @@ export default function UsersClient({ initialItems }: { initialItems: any[] }) {
       const json = await res.json()
       if (json?.data?.id) {
         await fetch(`${API_BASE}/api/admin/users/${json.data.id}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ roles: [form.role] }) })
+        // Issue magic link immediately for admin to copy and send
+        try {
+          const r = await fetch(`${API_BASE}/api/auth/magic/issue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ userId: json.data.id, redirect: '/employees', ttlMinutes: 15 }) })
+          const j = await r.json()
+          if (r.ok && j?.url) setInviteUrl(j.url)
+        } catch {}
       }
     } else {
       await fetch(`${API_BASE}/api/admin/users/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ fullName: form.fullName, phone: form.phone }) })
@@ -40,15 +52,24 @@ export default function UsersClient({ initialItems }: { initialItems: any[] }) {
     await reload()
   }
 
-  function startEdit(u: any) {
+  async function startEdit(u: any) {
     setEditingId(u.id)
     const firstRole = Array.isArray(u.roles) && u.roles.length > 0 ? String(u.roles[0]) : 'EMPLOYEE'
     setForm({ fullName: u.fullName || '', phone: u.phone || '', role: firstRole })
+    
+    // Generate Telegram binding link immediately
+    try {
+      const r = await fetch(`${API_BASE}/api/admin/users/${u.id}/telegram-binding-code`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include' })
+      const j = await r.json()
+      if (r.ok && j?.deepLink) setTgLink(j.deepLink)
+    } catch {}
   }
 
   function resetForm() {
     setEditingId(null)
     setForm({ fullName: '', phone: '', role: 'EMPLOYEE' })
+    setInviteUrl('')
+    setTgLink('')
   }
 
   const filtered = useMemo(() => {
@@ -131,6 +152,15 @@ export default function UsersClient({ initialItems }: { initialItems: any[] }) {
 
       <Card className="self-start">
         <CardContent className="p-4 space-y-3">
+          {inviteUrl && (
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">Ссылка для входа (15 мин):</div>
+              <div className="flex gap-2">
+                <Input readOnly value={inviteUrl} className="flex-1" />
+                <Button onClick={async () => { try { await navigator.clipboard.writeText(inviteUrl) } catch {} }}>Копировать</Button>
+              </div>
+            </div>
+          )}
           <Select value={form.role} onValueChange={v => setForm(s => ({ ...s, role: v }))}>
             <SelectTrigger><SelectValue placeholder="Тип пользователя" /></SelectTrigger>
             <SelectContent>
@@ -143,6 +173,17 @@ export default function UsersClient({ initialItems }: { initialItems: any[] }) {
           </Select>
           <Input placeholder="Имя" value={form.fullName} onChange={e => setForm(s => ({ ...s, fullName: e.target.value }))} />
           <Input placeholder="Телефон (+7...)" value={form.phone} onChange={e => setForm(s => ({ ...s, phone: e.target.value }))} />
+          {tgLink && (
+            <div className="flex gap-2">
+              <Input readOnly value={tgLink} className="flex-1 text-xs" />
+              <Button size="sm" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(tgLink) } catch {} }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                </svg>
+              </Button>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button onClick={save}>{editingId ? 'Сохранить' : 'Создать'}</Button>
             {editingId && <Button variant="outline" onClick={resetForm}>Новый</Button>}

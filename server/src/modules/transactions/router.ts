@@ -86,22 +86,131 @@ export function createTransactionsRouter(prisma: PrismaClient) {
         const outgoing = group.filter(r => r.amount < 0)
         const incoming = group.filter(r => r.amount > 0)
         
-        // Ищем пары в соседних днях (±2 дня)
+        // Массивы для отслеживания спаренных записей
         const pairedOutgoing: any[] = []
         const pairedIncoming: any[] = []
         const unpairedOutgoing: any[] = []
         const unpairedIncoming: any[] = []
         
+        // СПЕЦИАЛЬНЫЙ СЛУЧАЙ: Один расход разделен на несколько поступлений
+        // Проверяем, есть ли outgoing, сумма которого равна сумме нескольких incoming
+        const multiIncomingPairs: Array<{ out: any, ins: any[] }> = []
+        
         for (const outRow of outgoing) {
+          // Ищем комбинации incoming, которые в сумме дают outgoing
+          const candidates = incoming.filter(inRow => 
+            !pairedIncoming.includes(inRow) && 
+            inRow.wallet !== outRow.wallet &&
+            Math.abs((outRow.date.getTime() - inRow.date.getTime()) / (1000 * 60 * 60 * 24)) <= 3
+          )
+          
+          // Попытка найти 2 incoming, которые в сумме дают outgoing
+          for (let i = 0; i < candidates.length - 1; i++) {
+            for (let j = i + 1; j < candidates.length; j++) {
+              const sum = candidates[i].amount + candidates[j].amount
+              if (Math.abs(sum + outRow.amount) < 100) { // допустимая погрешность в 1 рубль
+                multiIncomingPairs.push({ out: outRow, ins: [candidates[i], candidates[j]] })
+                pairedIncoming.push(candidates[i], candidates[j])
+                pairedOutgoing.push(outRow) // ВАЖНО: отмечаем outRow как использованный!
+                break
+              }
+            }
+            if (multiIncomingPairs.some(p => p.out === outRow)) break
+          }
+        }
+        
+        // Обрабатываем multi-incoming переводы
+        for (const pair of multiIncomingPairs) {
+          const outRow = pair.out
+          const transferAmount = Math.abs(outRow.amount)
+          
+          let fromAccount = await prisma.account.findFirst({
+            where: { tenantId: tenant.id, name: outRow.wallet }
+          })
+          if (!fromAccount && outRow.wallet) {
+            fromAccount = await prisma.account.create({
+              data: { tenantId: tenant.id, name: outRow.wallet, kind: outRow.wallet.toLowerCase().includes('наличн') ? 'cash' : 'bank', createdBy: userId }
+            })
+          }
+          
+          const expenseTransferArticle = await prisma.category.findFirst({
+            where: { tenantId: tenant.id, name: 'Переводы между счетами', type: 'expense', parentId: { not: null } }
+          })
+          
+          await prisma.transaction.create({
+            data: {
+              tenantId: tenant.id,
+              kind: 'expense',
+              paymentDate: outRow.date,
+              accrualYear: outRow.date.getFullYear(),
+              accrualMonth: outRow.date.getMonth() + 1,
+              accountId: fromAccount?.id,
+              fromAccountId: fromAccount?.id,
+              categoryId: expenseTransferArticle?.id,
+              amount: -transferAmount,
+              note: `Перевод (разделенный): ${outRow.wallet} → несколько счетов`,
+              source: 'gsheets',
+              createdBy: userId
+            }
+          })
+          
+          for (const inRow of pair.ins) {
+            let toAccount = await prisma.account.findFirst({
+              where: { tenantId: tenant.id, name: inRow.wallet }
+            })
+            if (!toAccount && inRow.wallet) {
+              toAccount = await prisma.account.create({
+                data: { tenantId: tenant.id, name: inRow.wallet, kind: inRow.wallet.toLowerCase().includes('наличн') ? 'cash' : 'bank', createdBy: userId }
+              })
+            }
+            
+            const incomeTransferArticle = await prisma.category.findFirst({
+              where: { tenantId: tenant.id, name: 'Переводы между счетами', type: 'income', parentId: { not: null } }
+            })
+            
+            await prisma.transaction.create({
+              data: {
+                tenantId: tenant.id,
+                kind: 'income',
+                paymentDate: inRow.date,
+                accrualYear: inRow.date.getFullYear(),
+                accrualMonth: inRow.date.getMonth() + 1,
+                accountId: toAccount?.id,
+                fromAccountId: fromAccount?.id,
+                toAccountId: toAccount?.id,
+                categoryId: incomeTransferArticle?.id,
+                amount: inRow.amount,
+                note: `Перевод (часть): ${outRow.wallet} → ${inRow.wallet}`,
+                source: 'gsheets',
+                createdBy: userId
+              }
+            })
+          }
+          
+          created += (1 + pair.ins.length)
+          fullPairs++
+        }
+        
+        // Обычное спаривание 1:1
+        for (const outRow of outgoing) {
+          // Пропускаем, если уже обработан в multi-incoming
+          if (pairedOutgoing.includes(outRow)) continue
+          
           let foundPair = false
           for (const inRow of incoming) {
             if (pairedIncoming.includes(inRow)) continue
+            
+            // КРИТИЧНО: Пропускаем перевод на тот же счет (это ошибка данных)
+            if (outRow.wallet === inRow.wallet) continue
             
             const daysDiff = Math.abs(
               (outRow.date.getTime() - inRow.date.getTime()) / (1000 * 60 * 60 * 24)
             )
             
-            if (daysDiff <= 2) { // В пределах 2 дней
+            // ИСКЛЮЧЕНИЕ: Если есть комментарий "на лс" - разрешаем до 5 дней
+            const maxDays = outRow.comment?.includes('на лс') || inRow.comment?.includes('на лс') ? 5 : 2
+            
+            if (daysDiff <= maxDays) {
               pairedOutgoing.push(outRow)
               pairedIncoming.push(inRow)
               foundPair = true
@@ -121,11 +230,10 @@ export function createTransactionsRouter(prisma: PrismaClient) {
           }
         }
         
-        // Создаем транзакции для найденных пар
+        // Создаем транзакции для найденных обычных 1:1 пар
         for (let i = 0; i < pairedOutgoing.length; i++) {
           const fromRow = pairedOutgoing[i]
           const toRow = pairedIncoming[i]
-          fullPairs++
           
           // Находим или создаем счета
           let fromAccount = await prisma.account.findFirst({
@@ -217,6 +325,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
           })
           
           created += 2
+          fullPairs++
         }
         
         // Отмечаем неспаренные записи
@@ -326,7 +435,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
             accountId: account?.id,
             categoryId: category?.id,
             counterpartyId: counterparty?.id,
-            activity: 'Операционная',
+            activity: 'operating',
             amount: row.amount,
             note: row.comment || undefined,
             source: 'gsheets',
@@ -339,6 +448,8 @@ export function createTransactionsRouter(prisma: PrismaClient) {
       
       res.json({ 
         created, 
+        fullPairs,
+        incompletePairs,
         skipped, 
         total: gsRows.length
       })

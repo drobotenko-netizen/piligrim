@@ -6,11 +6,11 @@ const iikoClient = new IikoClient()
 
 // Маппинг orderType + deliveryServiceType → Channel
 function mapToChannel(orderType: string | null, deliveryServiceType: string | null): string {
-  if (deliveryServiceType === 'COURIER') return 'Grab' // Курьерская доставка
-  if (deliveryServiceType === 'PICKUP') return 'Pickup' // Самовывоз
-  if (orderType === 'Доставка самовывоз') return 'Pickup'
-  if (orderType === 'Доставка курьером') return 'Delivery'
-  return 'Dine-in' // По умолчанию - в зале
+  if (deliveryServiceType === 'COURIER') return 'Доставка' // Курьерская доставка
+  if (deliveryServiceType === 'PICKUP') return 'Самовывоз' // Самовывоз
+  if (orderType === 'Доставка самовывоз') return 'Самовывоз'
+  if (orderType === 'Доставка курьером') return 'Доставка'
+  return 'Зал' // По умолчанию - в зале
 }
 
 // Маппинг payType из iiko → TenderType
@@ -51,7 +51,7 @@ async function importShiftsFromIiko(fromDate: string, toDate: string, mode: 'mer
   const channelMap = new Map<string, string>()
   const tenderTypeMap = new Map<string, string>()
 
-  const channelNames = ['Dine-in', 'Pickup', 'Delivery', 'Grab', 'Foodpanda']
+  const channelNames = ['Зал', 'Самовывоз', 'Доставка', 'Foodpanda']
   for (const name of channelNames) {
     let channel = await prisma.channel.findFirst({
       where: { tenantId: tenant.id, name }

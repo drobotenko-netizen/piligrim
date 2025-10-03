@@ -231,6 +231,8 @@ export function RevenueClient() {
           day: i + 1,
           month1: month1Data?.net || null,
           month2: month2Data?.net || null,
+          count1: month1Data?.count || null,
+          count2: month2Data?.count || null,
           dateMonth1: month1Data?.date ? formatDate(month1Data.date) : '',
           dateMonth2: month2Data?.date ? formatDate(month2Data.date) : '',
           weekdayMonth1: month1Data?.date ? getWeekday(month1Data.date) : null,
@@ -261,6 +263,8 @@ export function RevenueClient() {
           day: i + 1,
           month1: month1Data?.net || null,
           month2: month2Data?.net || null,
+          count1: month1Data?.count || null,
+          count2: month2Data?.count || null,
           dateMonth1: month1Data?.date ? formatDate(month1Data.date) : '',
           dateMonth2: month2Data?.date ? formatDate(month2Data.date) : ''
         })
@@ -833,6 +837,93 @@ export function RevenueClient() {
               {byWeekday && <WeekdayLabels chartData={chartData} />}
                 </TabsContent>
               </Tabs>
+            </div>
+
+            {/* График по количеству чеков */}
+            <div className="rounded-lg border p-4">
+              <h3 className="text-lg font-semibold mb-4">Количество чеков</h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="day" 
+                      tick={byWeekday ? false : true}
+                      height={byWeekday ? 5 : 30}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      tickFormatter={(value) => formatNumber(value)}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip 
+                      formatter={(value: any, name: string, props: any) => {
+                        if (value === null) return null
+                        
+                        // month1 всегда соответствует year1/month1, month2 - year2/month2
+                        const month1Name = new Date(Date.UTC(year1, month1 - 1)).toLocaleDateString('ru-RU', { month: 'long' })
+                        const month2Name = new Date(Date.UTC(year2, month2 - 1)).toLocaleDateString('ru-RU', { month: 'long' })
+                        
+                        if (byWeekday) {
+                          const payload = props.payload
+                          const weekday = name === 'count1' ? payload.weekdayMonth1 : payload.weekdayMonth2
+                          const date = name === 'count1' ? payload.dateMonth1 : payload.dateMonth2
+                          
+                          return [
+                            `${formatNumber(value)} чеков (${date}, ${getWeekdayName(weekday)})`,
+                            name === 'count1' ? 
+                              `${month1Name} ${year1}` : 
+                              `${month2Name} ${year2}`
+                          ]
+                        } else {
+                          return [
+                            `${formatNumber(value)} чеков`, 
+                            name === 'count1' ? 
+                              `${month1Name} ${year1}` : 
+                              `${month2Name} ${year2}`
+                          ]
+                        }
+                      }}
+                      labelFormatter={(label) => String(label).padStart(2, '0')}
+                    />
+                    {/* Зоны выходных дней */}
+                    {getWeekendAreas().map((area, index) => (
+                      <ReferenceArea
+                        key={`weekend-${index}`}
+                        x1={area.x1}
+                        x2={area.x2}
+                        fill={area.fill}
+                        fillOpacity={area.fillOpacity}
+                      />
+                    ))}
+                    <Line 
+                      type="monotone" 
+                      dataKey="count1" 
+                      stroke="#374151" 
+                      strokeWidth={2}
+                      name="count1"
+                      connectNulls={false}
+                      dot={(props: any) => {
+                        if (props.payload.count1 === null) return null
+                        return <circle key={`count1-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#374151" />
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="count2" 
+                      stroke="#f97316" 
+                      strokeWidth={2}
+                      name="count2"
+                      connectNulls={false}
+                      dot={(props: any) => {
+                        if (props.payload.count2 === null) return null
+                        return <circle key={`count2-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#f97316" />
+                      }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              {byWeekday && <WeekdayLabels chartData={chartData} />}
             </div>
 
             {/* Таблица */}

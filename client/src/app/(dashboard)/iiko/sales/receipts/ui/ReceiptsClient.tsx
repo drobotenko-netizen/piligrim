@@ -150,7 +150,7 @@ export default function ReceiptsClient() {
                 const rowClass = `border-t align-top ${isReturn || isDeleted ? 'text-red-600' : ''}`
                 return (
                   <>
-                    <tr key={`row-${i}`} className={rowClass}>
+                    <tr key={`row-${orderNum}`} className={rowClass}>
                       <td className="px-2 py-1">
                         {hasItems && (
                           <button
@@ -188,7 +188,7 @@ export default function ReceiptsClient() {
                     {isExpanded && hasItems && (
                       <>
                         {r.items.map((item: any, itemIndex: number) => (
-                          <tr key={`item-${i}-${itemIndex}`} className="bg-muted/20">
+                          <tr key={`item-${orderNum}-${itemIndex}`} className="bg-muted/20">
                             <td className="px-2 py-1"></td>
                             <td className="px-2 py-1"></td>
                             <td className="px-2 py-1 pl-6">

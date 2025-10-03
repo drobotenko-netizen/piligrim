@@ -50,7 +50,7 @@ function formatDate(dateStr: string): string {
 export function CustomersClient() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(false)
-  const [fromDate, setFromDate] = useState('2025-09-01')
+  const [fromDate, setFromDate] = useState('2025-01-01')
   const [toDate, setToDate] = useState('2025-09-30')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
 
@@ -76,13 +76,12 @@ export function CustomersClient() {
   const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full min-h-0">
       {/* Фильтры */}
       <Card>
         <CardContent className="p-6">
           <div className="flex gap-4 items-end">
             <div>
-              <label className="text-sm font-medium">С</label>
               <input
                 type="date"
                 value={fromDate}
@@ -91,7 +90,6 @@ export function CustomersClient() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">По</label>
               <input
                 type="date"
                 value={toDate}
@@ -135,30 +133,61 @@ export function CustomersClient() {
       </div>
 
       {/* Таблица клиентов */}
-      <Card>
-        <CardContent className="p-0">
+      <Card className="flex-1 min-h-0 flex flex-col">
+        <CardContent className="p-0 flex-1 min-h-0">
+          <div className="h-full overflow-auto">
           <Table>
-            <THead>
+            <THead className="sticky top-0 bg-background z-10">
               <TR>
-                <TH className="text-xs">Клиент</TH>
-                <TH className="text-xs">Телефон</TH>
+                <TH className="text-xs w-[150px]">Клиент</TH>
+                <TH className="text-xs w-[150px]">Телефон</TH>
                 <TH className="text-xs">Заказов</TH>
                 <TH className="text-xs">Сумма</TH>
                 <TH className="text-xs">Средний чек</TH>
-                <TH className="text-xs">Недель</TH>
-                <TH className="text-xs">Цикл (дни)</TH>
-                <TH className="text-xs">Recency (дни)</TH>
-                <TH className="text-xs">Давность</TH>
-                <TH className="text-xs">Первый заказ</TH>
+                <TH className="text-xs">
+                  Недель
+                  <abbr
+                    title="Количество недель с заказами"
+                    className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full border text-[10px] text-muted-foreground no-underline cursor-help"
+                  >
+                    ?
+                  </abbr>
+                </TH>
+                <TH className="text-xs">
+                  Цикл (дни)
+                  <abbr
+                    title="Средний интервал между заказами в днях"
+                    className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full border text-[10px] text-muted-foreground no-underline cursor-help"
+                  >
+                    ?
+                  </abbr>
+                </TH>
+                <TH className="text-xs">
+                  Recency (дни)
+                  <abbr
+                    title="Дней с последнего заказа"
+                    className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full border text-[10px] text-muted-foreground no-underline cursor-help"
+                  >
+                    ?
+                  </abbr>
+                </TH>
+                <TH className="text-xs">
+                  Давность
+                  <abbr
+                    title="Отношение recency к циклу (зеленый < 1, желтый < 2, красный ≥ 2)"
+                    className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full border text-[10px] text-muted-foreground no-underline cursor-help"
+                  >
+                    ?
+                  </abbr>
+                </TH>
                 <TH className="text-xs">Последний заказ</TH>
-                <TH className="text-xs">Действия</TH>
               </TR>
             </THead>
             <TBody>
               {customers.map((customer, index) => (
                 <TR key={index}>
                   <TD className="font-medium text-xs">{customer.name || 'Не указано'}</TD>
-                  <TD className="text-xs">{customer.phone || 'Не указано'}</TD>
+                  <TD className="text-xs whitespace-normal break-words">{customer.phone || 'Не указано'}</TD>
                   <TD className="text-xs">{customer.totalOrders}</TD>
                   <TD className="text-xs">{formatNumber(customer.totalAmount)} ₽</TD>
                   <TD className="text-xs">{formatNumber(customer.avgOrderAmount)} ₽</TD>
@@ -174,22 +203,12 @@ export function CustomersClient() {
                       {customer.recencyRatio}
                     </span>
                   </TD>
-                  <TD className="text-xs">{formatDate(customer.firstOrder)}</TD>
                   <TD className="text-xs">{formatDate(customer.lastOrder)}</TD>
-                  <TD className="text-xs">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => setSelectedCustomer(customer)}
-                    >
-                      Детали
-                    </Button>
-                  </TD>
                 </TR>
               ))}
             </TBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

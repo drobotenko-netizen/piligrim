@@ -1,0 +1,109 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_WEB: ghcr.io/${{ github.repository }}/piligrim-web
+      IMAGE_API: ghcr.io/${{ github.repository }}/piligrim-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: server
+          file: server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_API }}:${{ github.ref_name }}
+            ${{ env.IMAGE_API }}:latest
+
+      - name: Build and push WEB image
+        uses: docker/build-push-action@v5
+        with:
+          context: client
+          file: client/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_WEB }}:${{ github.ref_name }}
+            ${{ env.IMAGE_WEB }}:latest
+
+      - name: Upload deploy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: |
+            infra/Caddyfile
+            docker-compose.prod.yml
+          target: /opt/apps/piligrim-upload
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            export TAG=${{ github.ref_name }}
+            export IMAGE_WEB=${{ env.IMAGE_WEB }}:${{ github.ref_name }}
+            export IMAGE_API=${{ env.IMAGE_API }}:${{ github.ref_name }}
+
+            # Prepare directories
+            sudo mkdir -p /opt/apps/piligrim
+            sudo mkdir -p /opt/infra/caddy
+
+            # Move uploaded files
+            if [ -f /opt/apps/piligrim-upload/docker-compose.prod.yml ]; then
+              sudo mv /opt/apps/piligrim-upload/docker-compose.prod.yml /opt/apps/piligrim/docker-compose.prod.yml
+            fi
+            if [ -f /opt/apps/piligrim-upload/infra/Caddyfile ]; then
+              sudo mv /opt/apps/piligrim-upload/infra/Caddyfile /opt/infra/caddy/Caddyfile
+            fi
+
+            # Docker login to GHCR for pulls
+            echo ${{ secrets.GHCR_READ_TOKEN }} | sudo docker login ghcr.io -u ${{ secrets.GHCR_READ_USER }} --password-stdin
+
+            # Ensure shared proxy network exists and caddy attached
+            sudo docker network create proxy || true
+            # restart caddy stack (it should already exist from bootstrap)
+            if [ -f /opt/infra/caddy/docker-compose.yml ]; then
+              (cd /opt/infra/caddy && sudo docker compose up -d)
+              # attach to proxy
+              sudo docker network connect proxy caddy || true
+            fi
+
+            # Pull & run application with new images
+            cd /opt/apps/piligrim
+            IMAGE_WEB=$IMAGE_WEB IMAGE_API=$IMAGE_API sudo -E docker compose -f docker-compose.prod.yml pull || true
+            IMAGE_WEB=$IMAGE_WEB IMAGE_API=$IMAGE_API sudo -E docker compose -f docker-compose.prod.yml up -d
+
+            # Health check
+            curl -fsSL https://piligrim.5-star-roi.ru/ -o /dev/null
+            

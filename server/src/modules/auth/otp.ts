@@ -24,6 +24,12 @@ export function createOtpRouter(prisma: PrismaClient) {
       const exists = await prisma.user.findFirst({ where: { tenantId: tenant.id, phone } })
       if (!exists) return res.status(404).json({ error: 'user_not_found' })
 
+      // DEV override: для локального теста не обращаемся к внешнему API
+      if (process.env.NODE_ENV !== 'production') {
+        const devAuthId = `dev-${Date.now()}`
+        return res.status(202).json({ ok: true, auth_id: devAuthId })
+      }
+
       const url = `${MESSAGGIO_BASE_URL}/code`
       const r = await fetch(url, {
         method: 'POST',
@@ -47,6 +53,18 @@ export function createOtpRouter(prisma: PrismaClient) {
       const code = String(req.body?.code || '').trim()
       const phone = String(req.body?.phone || '').trim()
       if (!authId || !code) return res.status(400).json({ error: 'auth_id/code required' })
+
+      // DEV override: принимаем любой dev-* auth_id и фиксированный код
+      if (process.env.NODE_ENV !== 'production' && authId.startsWith('dev-')) {
+        const tenant = await getTenant(prisma, req as any)
+        const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, phone } })
+        if (!user) return res.status(403).json({ error: 'user_not_found' })
+        const userRoles = await prisma.userRole.findMany({ where: { tenantId: tenant.id, userId: user.id }, include: { role: true } })
+        const roles = userRoles.map(ur => ur.role.name)
+        const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, '12h')
+        res.cookie('access_token', token, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 12 * 60 * 60 * 1000 })
+        return res.json({ ok: true })
+      }
 
       const url = `${MESSAGGIO_BASE_URL}/code/verify`
       const r = await fetch(url, {

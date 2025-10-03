@@ -78,6 +78,7 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
       const flowType = String(req.query.flowType || '').trim()
       const search = String(req.query.search || '').trim()
       const incompleteTransfer = String(req.query.incompleteTransfer || '').trim()
+      const notImported = String(req.query.notImported || '').trim()
       const page = Math.max(1, Number(String(req.query.page || '1')) || 1)
       const limit = Math.min(200, Math.max(1, Number(String(req.query.limit || '50')) || 50))
 
@@ -105,6 +106,9 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
       }
       if (incompleteTransfer === 'true') {
         where.raw = { contains: '"incompleteTransfer":true' }
+      }
+      if (notImported === 'true') {
+        where.raw = { contains: '"notImported":true' }
       }
 
       const [total, rows] = await Promise.all([

@@ -110,10 +110,10 @@ export function createReportsRouter(prisma: PrismaClient) {
         cur.setUTCMonth(cur.getUTCMonth() + 1)
       }
 
-      // 1. Выручка из смен (по месяцам закрытия)
+      // 1. Выручка из смен (по месяцам ОТКРЫТИЯ - т.к. смена может закрыться после полуночи)
       const shifts = await prisma.shift.findMany({
         where: {
-          closeAt: {
+          openAt: {
             gte: start,
             lt: end
           }
@@ -132,9 +132,9 @@ export function createReportsRouter(prisma: PrismaClient) {
       const revenueByMonth = new Map<string, number>()
 
       shifts.forEach(shift => {
-        if (!shift.closeAt) return
-        const yy = shift.closeAt.getUTCFullYear()
-        const mm = shift.closeAt.getUTCMonth() + 1
+        // Группируем по дате ОТКРЫТИЯ смены
+        const yy = shift.openAt.getUTCFullYear()
+        const mm = shift.openAt.getUTCMonth() + 1
         const monthKey = `${yy}-${String(mm).padStart(2,'0')}`
 
         shift.sales.forEach(sale => {
@@ -164,6 +164,64 @@ export function createReportsRouter(prisma: PrismaClient) {
         }
       })
 
+      // Получаем все категории для построения иерархии
+      const allCategories = await prisma.category.findMany({ 
+        select: { id: true, name: true, parentId: true, kind: true } 
+      })
+      const catById = new Map(allCategories.map(c => [c.id, c]))
+      
+      // Функция для получения родительской категории с kind
+      function resolveParentCategory(catId: string | null): { id: string; name: string; kind: string } | null {
+        if (!catId) return null
+        const cat = catById.get(catId)
+        if (!cat) return null
+        
+        // Если есть kind - это категория
+        if (cat.kind) {
+          return { id: cat.id, name: cat.name, kind: cat.kind }
+        }
+        
+        // Поднимаемся к родителю
+        if (cat.parentId) {
+          return resolveParentCategory(cat.parentId)
+        }
+        
+        return null
+      }
+
+      // Структура: kind → categoryId → articleId → monthKey → amount
+      type ExpenseRow = { 
+        kind: string;
+        categoryId: string; 
+        categoryName: string; 
+        articleId: string; 
+        articleName: string; 
+        year: number; 
+        month: number; 
+        amount: number 
+      }
+      const expenseRows: ExpenseRow[] = []
+
+      expenses.forEach(exp => {
+        const parentCat = resolveParentCategory(exp.categoryId)
+        if (!parentCat) return // Пропускаем если нет категории с kind
+        
+        const yy = exp.postingPeriod.getUTCFullYear()
+        const mm = exp.postingPeriod.getUTCMonth() + 1
+        
+        expenseRows.push({
+          kind: parentCat.kind,
+          categoryId: parentCat.id,
+          categoryName: parentCat.name,
+          articleId: exp.categoryId,
+          articleName: exp.category.name,
+          year: yy,
+          month: mm,
+          amount: exp.amount
+        })
+      })
+      
+      // Группируем по kind для старой структуры ответа
       const expensesByKindByMonth: Record<string, Map<string, Map<string, number>>> = {
         COGS: new Map(),
         OPEX: new Map(),
@@ -173,19 +231,17 @@ export function createReportsRouter(prisma: PrismaClient) {
         OTHER: new Map()
       }
 
-      expenses.forEach(exp => {
-        const kind = exp.category.kind || 'OTHER'
-        const yy = exp.postingPeriod.getUTCFullYear()
-        const mm = exp.postingPeriod.getUTCMonth() + 1
-        const monthKey = `${yy}-${String(mm).padStart(2,'0')}`
-        const itemKey = `${exp.category.name}${exp.vendor ? ` (${exp.vendor.name})` : ''}`
-
-        if (!expensesByKindByMonth[kind].has(itemKey)) {
-          expensesByKindByMonth[kind].set(itemKey, new Map())
+      for (const row of expenseRows) {
+        const parentCat = catById.get(row.categoryId)
+        const kind = parentCat?.kind || 'OTHER'
+        const monthKey = `${row.year}-${String(row.month).padStart(2,'0')}`
+        
+        if (!expensesByKindByMonth[kind].has(row.categoryName)) {
+          expensesByKindByMonth[kind].set(row.categoryName, new Map())
         }
-        const itemMap = expensesByKindByMonth[kind].get(itemKey)!
-        itemMap.set(monthKey, (itemMap.get(monthKey) || 0) + exp.amount)
-      })
+        const catMap = expensesByKindByMonth[kind].get(row.categoryName)!
+        catMap.set(monthKey, (catMap.get(monthKey) || 0) + row.amount)
+      }
 
       // 3. Подсчёт итогов
       const cogsByMonth = new Map<string, number>()
@@ -231,7 +287,8 @@ export function createReportsRouter(prisma: PrismaClient) {
           tax: { byMonth: Object.fromEntries(taxByMonth), items: Array.from(expensesByKindByMonth.TAX.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
           fee: { byMonth: Object.fromEntries(feeByMonth), items: Array.from(expensesByKindByMonth.FEE.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) },
           other: { byMonth: Object.fromEntries(otherByMonth), items: Array.from(expensesByKindByMonth.OTHER.entries()).map(([name, map]) => ({ name, byMonth: Object.fromEntries(map) })) }
-        }
+        },
+        expenseDetails: expenseRows // Детализация: категория → статья → месяц
       })
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
@@ -324,7 +381,7 @@ export function createReportsRouter(prisma: PrismaClient) {
 
       const shifts = await prisma.shift.findMany({
         where: {
-          closeAt: { gte: from, lt: to }
+          openAt: { gte: from, lt: to }
         },
         include: {
           sales: {
@@ -334,7 +391,7 @@ export function createReportsRouter(prisma: PrismaClient) {
             }
           }
         },
-        orderBy: { closeAt: 'desc' }
+        orderBy: { openAt: 'desc' }
       })
 
       const items = []
@@ -343,7 +400,7 @@ export function createReportsRouter(prisma: PrismaClient) {
           const nettoAmount = sale.grossAmount - sale.discounts - sale.refunds
           items.push({
             shiftId: shift.id,
-            date: shift.closeAt,
+            date: shift.openAt,
             channel: sale.channel.name,
             tenderType: sale.tenderType.name,
             grossAmount: sale.grossAmount,

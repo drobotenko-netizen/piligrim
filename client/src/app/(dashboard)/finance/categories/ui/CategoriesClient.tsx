@@ -51,10 +51,22 @@ function Tree({ nodes, onSelect, selectedId, expanded, onToggle, activity, secti
                 <span className="w-5" />
               )}
               <button
-                className={`text-left flex-1 px-2 py-1 rounded ${selectedId === n.id ? 'bg-accent' : ''}`}
+                className={`text-left flex-1 px-2 py-1 rounded ${selectedId === n.id ? 'bg-accent' : ''} flex items-center gap-2`}
                 onClick={() => onSelect(n)}
               >
-                {n.name}
+                <span>{n.name}</span>
+                {n.kind && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${
+                    n.kind === 'COGS' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                    n.kind === 'OPEX' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                    n.kind === 'CAPEX' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                    n.kind === 'TAX' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                    n.kind === 'FEE' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                    'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                  }`}>
+                    {n.kind}
+                  </span>
+                )}
               </button>
               {!isSystem && (
                 <DropdownMenu>
@@ -162,6 +174,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const [operSection, setOperSection] = useState<'REVENUE'|'COGS'|'OPEX'>('REVENUE')
   const [catChoice, setCatChoice] = useState<'create'|string>('create')
   const [fundChoice, setFundChoice] = useState<string>('none')
+  const [kindChoice, setKindChoice] = useState<string>('none')
   const [activityChoice, setActivityChoice] = useState<'OPERATING'|'FINANCING'|'INVESTING'>('OPERATING')
   const [availableFunds, setAvailableFunds] = useState<string[]>([])
   const [showChildWarn, setShowChildWarn] = useState(false)
@@ -224,6 +237,8 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     setNameInput(n.name)
     // Фонд показывается только для статей (есть parentId)
     setFundChoice(n.parentId ? (n.fund || 'none') : 'none')
+    // Kind показывается для категорий (есть kind)
+    setKindChoice(n.kind || 'none')
     // Устанавливаем категорию для редактирования
     setCatChoice(n.parentId || 'create')
     // activity
@@ -298,6 +313,15 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const revenueRoot = useMemo(() => findSubtreeByName(treeForTab, 'Выручка') || findSubtreeByName(treeForTab, 'Выручка зал'), [treeForTab])
   const cogsRoot = useMemo(() => findSubtreeByName(treeForTab, 'Себестоимость') || findSubtreeByName(treeForTab, 'Сырьё и материалы'), [treeForTab])
   const opexRoot = useMemo(() => findSubtreeByName(treeForTab, 'Операционные расходы'), [treeForTab])
+  
+  // Собираем все корневые категории по kind для показа под разделами
+  const cogsCategoriesFromRoots = useMemo(() => {
+    return treeForTab.filter((n: any) => n.kind === 'COGS' && !n.parentId)
+  }, [treeForTab])
+  
+  const opexCategoriesFromRoots = useMemo(() => {
+    return treeForTab.filter((n: any) => (n.kind === 'OPEX' || n.kind === 'TAX' || n.kind === 'FEE' || n.kind === 'OTHER') && !n.parentId)
+  }, [treeForTab])
 
   const payrollCat = useMemo(() => findDirectChildByName(opexRoot || null, 'Заработная плата'), [opexRoot])
   const isSystemById = (id: string) => {
@@ -489,20 +513,33 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const usedIdsSet = useMemo(() => { const s = new Set<string>(); if (revenueRoot) collectIds(revenueRoot, s); if (cogsRoot) collectIds(cogsRoot, s); return s }, [revenueRoot, cogsRoot])
   const opexRoots = useMemo(() => {
     if (activeActivity !== 'OPERATING') return []
-    // верхнеуровневые корни, не входящие в revenue/cogs
-    return treeForTab.filter(n => !usedIdsSet.has(n.id))
+    // верхнеуровневые корни, не входящие в revenue/cogs И не имеющие kind (те что с kind показываются через cogsCombinedList/opexCombinedList)
+    return treeForTab.filter(n => !usedIdsSet.has(n.id) && !n.kind)
   }, [treeForTab, activeActivity, usedIdsSet])
 
+  const cogsCombinedList = useMemo(() => {
+    // дети корневого «Себестоимость» + корневые категории с kind=COGS
+    const children = cogsRoot?.children || []
+    const combined = [...children, ...cogsCategoriesFromRoots]
+    // Убираем дубликаты по id
+    const seen = new Set<string>()
+    return combined.filter(n => {
+      if (seen.has(n.id)) return false
+      seen.add(n.id)
+      return true
+    })
+  }, [cogsRoot, cogsCategoriesFromRoots])
+
   const opexCombinedList = useMemo(() => {
-    // дети корневого «Операционные расходы» + остальные верхнеуровневые
+    // дети корневого «Операционные расходы» + корневые категории с kind=OPEX/TAX/FEE/OTHER
     const children = opexRoot?.children || []
     const others = opexRoots.filter(n => n.id !== opexRoot?.id)
-    const combined = [...children, ...others]
+    const combined = [...children, ...others, ...opexCategoriesFromRoots]
     // Если есть «Заработная плата» и под корнем, и как верхнеуровневая — показываем только под корнем
     const hasUnderRoot = combined.some(n => n.name === 'Заработная плата' && n.parentId === opexRoot?.id)
     if (!hasUnderRoot) return combined
     return combined.filter(n => n.name !== 'Заработная плата' || n.parentId === opexRoot?.id)
-  }, [opexRoot, opexRoots])
+  }, [opexRoot, opexRoots, opexCategoriesFromRoots])
 
   // Допустимые цели переноса в пределах того же раздела/вида деятельности
   const allowedTransferIds = useMemo(() => {
@@ -536,15 +573,18 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const categoryOptionsForSection = useMemo(() => {
     let root: any = null
     if (activeActivity === 'OPERATING') {
-      if (operSection === 'REVENUE') root = revenueRoot
-      else if (operSection === 'COGS') root = cogsRoot
-      else return opexCombinedList
-      const base = root ? root.children || [] : []
-      return base
+      if (operSection === 'REVENUE') {
+        root = revenueRoot
+        return root ? root.children || [] : []
+      } else if (operSection === 'COGS') {
+        return cogsCombinedList
+      } else {
+        return opexCombinedList
+      }
     }
     // Для финансовой/инвест — показываем все корни
     return treeForTab
-  }, [activeActivity, operSection, revenueRoot, cogsRoot, opexCombinedList, treeForTab])
+  }, [activeActivity, operSection, revenueRoot, cogsCombinedList, opexCombinedList, treeForTab])
 
   // Для OPERATING/OPEX исключаем системные из списка выбора родителя
   const filteredCategoryOptionsForSection = useMemo(() => {
@@ -591,9 +631,17 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
     if (activity === 'OPERATING') {
       if (catChoice === 'create') {
-        const sectionRootId = await ensureOperatingSectionRoot(operSection)
+        // Определяем раздел на основе kind
+        let section = operSection
+        if (kindChoice === 'COGS') {
+          section = 'COGS'
+        } else if (kindChoice === 'OPEX' || kindChoice === 'TAX' || kindChoice === 'FEE' || kindChoice === 'OTHER') {
+          section = 'OPEX'
+        }
+        
+        const sectionRootId = await ensureOperatingSectionRoot(section)
         parentId = sectionRootId
-        type = operSection === 'REVENUE' ? 'income' : 'expense'
+        type = section === 'REVENUE' ? 'income' : 'expense'
       } else {
         parentId = String(catChoice)
         const parentNode = findNodeById(categories, parentId)
@@ -612,11 +660,13 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
     // Фонд можно привязать только к статьям (когда есть parentId)
     const fund = parentId ? (fundChoice === 'none' ? null : fundChoice) : null
+    // Kind для категорий (когда нет fund)
+    const kind = !fund && kindChoice !== 'none' ? kindChoice : null
 
         await fetchWithRole(`${API_BASE}/api/categories`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: nameInput.trim(), type, activity, parentId, fund })
+      body: JSON.stringify({ name: nameInput.trim(), type, activity, parentId, fund, kind })
     })
     await refresh()
     setNameInput('')
@@ -624,15 +674,16 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
   async function smartSave() {
     if (editingId) {
-      // Режим редактирования — обновляем имя, фонд, activity и parentId
+      // Режим редактирования — обновляем имя, фонд, kind, activity и parentId
       const selectedNode = findNodeById(categories, editingId)
       const fund = selectedNode?.parentId ? (fundChoice === 'none' ? null : fundChoice) : null
+      const kind = kindChoice === 'none' ? null : kindChoice
       const parentId = catChoice === 'create' ? null : catChoice
       
       await fetchWithRole(`${API_BASE}/api/categories/${editingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameInput.trim(), fund, activity: activityChoice, parentId })
+        body: JSON.stringify({ name: nameInput.trim(), fund, kind, activity: activityChoice, parentId })
       })
       await refresh()
     } else {
@@ -646,6 +697,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     setNameInput('')
     setCatChoice('create')
     setFundChoice('none')
+    setKindChoice('none')
     setActivityChoice('OPERATING')
   }
 
@@ -715,15 +767,15 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                 </div>
                 <div>
                   <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Себестоимость</div>
-                  {cogsRoot ? (
+                  {cogsCombinedList.length ? (
                     <Tree
-                      nodes={cogsRoot.children || []}
+                      nodes={cogsCombinedList}
                       onSelect={onSelectNode}
                       selectedId={selected?.id}
                       expanded={expanded}
                       onToggle={toggleNode}
                       activity={activeActivity}
-                      sectionRootIds={new Set([revenueRoot?.id, cogsRoot.id, opexRoot?.id].filter(Boolean) as string[])}
+                      sectionRootIds={new Set([revenueRoot?.id, cogsRoot?.id, opexRoot?.id].filter(Boolean) as string[])}
                       payrollId={payrollCat?.id}
                       onDeleteNode={onDeleteNode}
                     />
@@ -756,19 +808,51 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       </Card>
       <Card className="self-start">
         <CardContent className="p-4 space-y-3">
-          {/* Поле вида деятельности показывается только при создании новой категории */}
-          {!editingId && (
-            <Select value={activeActivity} onValueChange={(v) => setActiveActivity(v as any)}>
-              <SelectTrigger><SelectValue placeholder="Вид деятельности" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="OPERATING">Операционная</SelectItem>
-                <SelectItem value="FINANCING">Финансовая</SelectItem>
-                <SelectItem value="INVESTING">Инвестиционная</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          {/* 1. Вид деятельности - ПЕРВОЕ ПОЛЕ */}
+          <Select 
+            value={editingId ? activityChoice : activeActivity} 
+            onValueChange={(v) => {
+              const val = v as 'OPERATING'|'FINANCING'|'INVESTING'
+              if (editingId) {
+                setActivityChoice(val)
+              } else {
+                setActiveActivity(val)
+              }
+            }}
+          >
+            <SelectTrigger><SelectValue placeholder="Вид деятельности" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="OPERATING">Операционная</SelectItem>
+              <SelectItem value="FINANCING">Финансовая</SelectItem>
+              <SelectItem value="INVESTING">Инвестиционная</SelectItem>
+            </SelectContent>
+          </Select>
 
-          {/* Поле раздела показывается только при создании новой категории в операционной деятельности */}
+          {/* 2. Kind (COGS/OPEX/etc) - ВТОРОЕ ПОЛЕ */}
+          <Select value={kindChoice} onValueChange={(v) => {
+            setKindChoice(v)
+            // Автоматически устанавливаем operSection для операционной деятельности
+            if (!editingId && activeActivity === 'OPERATING') {
+              if (v === 'COGS') {
+                setOperSection('COGS')
+              } else if (v === 'OPEX' || v === 'TAX' || v === 'FEE' || v === 'OTHER') {
+                setOperSection('OPEX')
+              }
+            }
+          }}>
+            <SelectTrigger><SelectValue placeholder="Тип (kind)" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Без типа</SelectItem>
+              <SelectItem value="COGS">COGS (Себестоимость)</SelectItem>
+              <SelectItem value="OPEX">OPEX (Операционные расходы)</SelectItem>
+              <SelectItem value="CAPEX">CAPEX (Капитальные расходы)</SelectItem>
+              <SelectItem value="TAX">TAX (Налоги)</SelectItem>
+              <SelectItem value="FEE">FEE (Комиссии)</SelectItem>
+              <SelectItem value="OTHER">OTHER (Прочее)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* 3. Раздел (REVENUE/COGS/OPEX) - только для операционной деятельности при создании */}
           {!editingId && activeActivity === 'OPERATING' && (
             <Select value={operSection} onValueChange={(v) => { setOperSection(v as any); setCatChoice('create') }}>
               <SelectTrigger><SelectValue placeholder="Раздел" /></SelectTrigger>
@@ -780,6 +864,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
             </Select>
           )}
 
+          {/* 4. Категория (родитель) */}
           <Select value={catChoice} onValueChange={(v) => setCatChoice(v as any)}>
             <SelectTrigger><SelectValue placeholder="Категория" /></SelectTrigger>
             <SelectContent className="max-h-60 overflow-auto">
@@ -790,21 +875,10 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
             </SelectContent>
           </Select>
 
+          {/* 5. Название */}
           <Input placeholder="Название" value={nameInput} onChange={e => setNameInput(e.target.value)} />
 
-          {/* Поле вида деятельности показывается только при редактировании */}
-          {editingId && (
-            <Select value={activityChoice} onValueChange={(v) => setActivityChoice(v as 'OPERATING'|'FINANCING'|'INVESTING')}>
-              <SelectTrigger><SelectValue placeholder="Вид деятельности" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="OPERATING">Операционная</SelectItem>
-                <SelectItem value="INVESTING">Инвестиционная</SelectItem>
-                <SelectItem value="FINANCING">Финансовая</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Поле фонда показывается только для статей (когда выбрана конкретная категория) */}
+          {/* 6. Фонд - показывается только для статей (когда выбрана конкретная категория) */}
           {catChoice !== 'create' && (
             <Select value={fundChoice} onValueChange={(v) => setFundChoice(v)}>
               <SelectTrigger><SelectValue placeholder="Фонд (опционально)" /></SelectTrigger>

@@ -201,8 +201,8 @@ export default function ShiftsClient() {
                   
                   // Ссылка с датой и номером смены
                   const receiptsLink = shift.iikoSessionNum 
-                    ? `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}&session=${shift.iikoSessionNum}`
-                    : `http://localhost:3001/iiko/sales/receipts?date=${shiftDate}`
+                    ? `/iiko/sales/receipts?date=${shiftDate}&session=${shift.iikoSessionNum}`
+                    : `/iiko/sales/receipts?date=${shiftDate}`
                   
                   return (
                     <TR key={shift.id}>

@@ -4,12 +4,57 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function LoginOtpPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
   const [phone, setPhone] = useState('')
+  const [code, setCode] = useState('')
+  const [authId, setAuthId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [channel, setChannel] = useState<'sms'|'telegram'>('sms')
+
+  async function sendCode() {
+    setLoading(true); setError(null)
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/otp/send`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, channel: channel === 'telegram' ? 'telegram' : undefined })
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j?.error || 'send_failed')
+      const id = j?.auth_id || j?.requestId || j?.request_id || j?.id || null
+      if (!id) throw new Error('no_auth_id')
+      setAuthId(String(id))
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function verifyCode() {
+    if (!authId) return
+    setLoading(true); setError(null)
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/otp/verify`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_id: authId, code, phone })
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j?.ok) throw new Error(j?.error || 'verify_failed')
+      window.location.href = '/employees'
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function devLogin() {
     setLoading(true); setError(null)
@@ -37,9 +82,37 @@ export default function LoginOtpPage() {
             </div>
             <div className="text-sm text-muted-foreground">Введите номер телефона для входа</div>
             <Input inputMode="tel" placeholder="+7 9XX XXX XX XX" value={phone} onChange={e => setPhone(e.target.value)} />
-            <Button className="w-full" onClick={devLogin} disabled={loading || !phone.trim()}>
-              {loading ? 'Вход…' : 'Войти'}
-            </Button>
+            <div>
+              <Select value={channel} onValueChange={(v) => setChannel(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Канал доставки" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sms">SMS</SelectItem>
+                  <SelectItem value="telegram">Telegram</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!authId ? (
+              <Button className="w-full" onClick={sendCode} disabled={loading || !phone.trim()}>
+                {loading ? 'Отправка…' : 'Получить код'}
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <Input inputMode="numeric" placeholder="Код из SMS" value={code} onChange={e => setCode(e.target.value)} />
+                <Button className="w-full" onClick={verifyCode} disabled={loading || !code.trim()}>
+                  {loading ? 'Проверка…' : 'Войти'}
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => { setAuthId(null); setCode('') }} disabled={loading}>Изменить номер</Button>
+              </div>
+            )}
+
+            {process.env.NODE_ENV === 'development' && (
+              <Button className="w-full" variant="ghost" onClick={devLogin} disabled={loading || !phone.trim()}>
+                Dev‑вход без SMS
+              </Button>
+            )}
             {error && <div className="text-sm text-red-600">{error}</div>}
           </CardContent>
         </Card>

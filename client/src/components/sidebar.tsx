@@ -1,7 +1,7 @@
 "use client"
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, CalendarCheck2, Banknote, FileSpreadsheet, Settings, ChevronDown, Wallet, ListTree, ArrowLeftRight, Contact, FileText, Shield, Tags, TrendingUp, UserCheck, Calculator } from 'lucide-react'
+import { Users, CalendarCheck2, Banknote, FileSpreadsheet, Settings, ChevronDown, Wallet, ListTree, ArrowLeftRight, Contact, FileText, Shield, Tags, TrendingUp, UserCheck, Calculator, ChefHat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 
@@ -23,11 +23,10 @@ const financeItems = [
   { href: '/finance/transactions', label: 'Транзакции', icon: ArrowLeftRight },
   { href: '/finance/counterparties', label: 'Контрагенты', icon: Contact },
   { href: '/finance/counterparty-types', label: 'Типы контрагентов', icon: Tags },
-  { href: '/finance/reports/cashflow', label: 'ДДС', icon: FileSpreadsheet },
-  { href: '/finance/reports/pnl', label: 'ОПиУ', icon: FileSpreadsheet },
+  { href: '/finance/reports/cashflow', label: 'Движение денег', icon: FileSpreadsheet },
+  { href: '/finance/reports/pnl', label: 'Прибыль', icon: FileSpreadsheet },
   { href: '/finance/reports/aging', label: 'Долги', icon: TrendingUp },
   { href: '/finance/balances', label: 'Остатки', icon: Calculator },
-  { href: '/gsheets/cashflow', label: 'ДДС (Google)', icon: FileSpreadsheet },
 ]
 
 const settingsItems = [
@@ -38,19 +37,20 @@ const settingsItems = [
 
 const salesItems = [
   { href: '/sales/revenue', label: 'Выручка', icon: TrendingUp },
+  { href: '/sales/dishes', label: 'Блюда', icon: FileSpreadsheet },
+  { href: '/sales/suppliers', label: 'Поставщики', icon: Contact },
   { href: '/sales/customers', label: 'Клиенты', icon: UserCheck },
+  { href: '/analysis/checks-by-hour', label: 'Чеки по часам', icon: FileSpreadsheet },
 ]
 
 const iikoItems = [
-  { href: '/iiko/auth', label: 'Проверка доступа', icon: Shield },
   { href: '/iiko/sales/summary', label: 'Сводка продаж', icon: FileSpreadsheet },
   { href: '/iiko/sales/paytypes', label: 'Продажи по оплатам', icon: FileSpreadsheet },
-  { href: '/iiko/sales/hours', label: 'Продажи по часам', icon: FileSpreadsheet },
+  // { href: '/iiko/sales/hours', label: 'Продажи по часам', icon: FileSpreadsheet },
   { href: '/iiko/sales/receipts', label: 'Чеки (по блюдам)', icon: FileSpreadsheet },
   { href: '/iiko/stores/balances', label: 'Остатки на складах', icon: ListTree },
   { href: '/iiko/stores/consumption', label: 'Расход за период', icon: ListTree },
-  { href: '/iiko/recipes', label: 'Рецепты и ингредиенты', icon: ListTree },
-  { href: '/iiko/import', label: 'Загрузка данных', icon: Settings },
+  { href: '/iiko/recipes', label: 'Рецепты', icon: ChefHat },
   { href: '/iiko/returns', label: 'Возвраты', icon: FileText },
 ]
 
@@ -62,6 +62,7 @@ export function Sidebar() {
   const [openSettings, setOpenSettings] = useState(false)
   const [me, setMe] = useState<any>(null)
   const [openIiko, setOpenIiko] = useState(false)
+  const [openImport, setOpenImport] = useState(false)
 
   async function fetchMe() {
     try {
@@ -108,12 +109,13 @@ export function Sidebar() {
     } catch {}
   }
 
-  function toggleExclusive(section: 'personnel'|'finance'|'sales'|'settings'|'iiko') {
+  function toggleExclusive(section: 'personnel'|'finance'|'sales'|'settings'|'iiko'|'import') {
     setOpenPersonnel(section === 'personnel')
     setOpenFinance(section === 'finance')
     setOpenSales(section === 'sales')
     setOpenSettings(section === 'settings')
     setOpenIiko(section === 'iiko')
+    setOpenImport(section === 'import')
   }
   return (
     <aside className="w-[15%] min-w-[220px] border-r bg-card flex flex-col">
@@ -121,6 +123,31 @@ export function Sidebar() {
         <img src="/logo.png" alt="logo" className="h-12 w-auto" />
       </div>
       <nav className="p-2 space-y-2 flex-1">
+        <div>
+          <button
+            type="button"
+            className="w-full px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between hover:text-foreground"
+            onClick={() => toggleExclusive('sales')}
+            aria-expanded={openSales}
+          >
+            <span className="ml-[5px]">Анализ</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${openSales ? 'rotate-0' : '-rotate-90'}`} />
+          </button>
+          <div className={`space-y-1 mt-1 ${openSales ? '' : 'hidden'}`}>
+            {salesItems.map(({ href, label, icon: Icon }) => {
+              const active = pathname?.startsWith(href)
+              return (
+                <Button key={href} asChild variant={active ? 'secondary' : 'ghost'} className="w-full justify-start gap-2">
+                  <Link href={href}>
+                    <Icon size={18} />
+                    {label}
+                  </Link>
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+
         <div>
           <button
             type="button"
@@ -175,14 +202,14 @@ export function Sidebar() {
           <button
             type="button"
             className="w-full px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between hover:text-foreground"
-            onClick={() => toggleExclusive('sales')}
-            aria-expanded={openSales}
+            onClick={() => toggleExclusive('iiko')}
+            aria-expanded={openIiko}
           >
-            <span className="ml-[5px]">Продажи</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${openSales ? 'rotate-0' : '-rotate-90'}`} />
+            <span className="ml-[5px]">iiko</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${openIiko ? 'rotate-0' : '-rotate-90'}`} />
           </button>
-          <div className={`space-y-1 mt-1 ${openSales ? '' : 'hidden'}`}>
-            {salesItems.map(({ href, label, icon: Icon }) => {
+          <div className={`space-y-1 mt-1 ${openIiko ? '' : 'hidden'}`}>
+            {iikoItems.map(({ href, label, icon: Icon }) => {
               const active = pathname?.startsWith(href)
               return (
                 <Button key={href} asChild variant={active ? 'secondary' : 'ghost'} className="w-full justify-start gap-2">
@@ -200,14 +227,14 @@ export function Sidebar() {
           <button
             type="button"
             className="w-full px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between hover:text-foreground"
-            onClick={() => toggleExclusive('iiko')}
-            aria-expanded={openIiko}
+            onClick={() => toggleExclusive('import')}
+            aria-expanded={openImport}
           >
-            <span className="ml-[5px]">iiko</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${openIiko ? 'rotate-0' : '-rotate-90'}`} />
+            <span className="ml-[5px]">Импорт данных</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${openImport ? 'rotate-0' : '-rotate-90'}`} />
           </button>
-          <div className={`space-y-1 mt-1 ${openIiko ? '' : 'hidden'}`}>
-            {iikoItems.map(({ href, label, icon: Icon }) => {
+          <div className={`space-y-1 mt-1 ${openImport ? '' : 'hidden'}`}>
+            {[{ href: '/iiko/import', label: 'Загрузка данных из iiko', icon: Settings }, { href: '/gsheets/cashflow', label: 'Движение денег (Google)', icon: FileSpreadsheet }].map(({ href, label, icon: Icon }) => {
               const active = pathname?.startsWith(href)
               return (
                 <Button key={href} asChild variant={active ? 'secondary' : 'ghost'} className="w-full justify-start gap-2">

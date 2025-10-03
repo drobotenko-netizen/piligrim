@@ -34,6 +34,9 @@ model Tenant {
   expenseDocs    ExpenseDoc[]
   payments       Payment[]
   cashTxs        CashTx[]
+  telegramBindings TelegramBinding[]
+  telegramBindRequests TelegramBindRequest[]
+  magicLinkTokens MagicLinkToken[]
 }
 
 model Position {
@@ -222,6 +225,9 @@ model User {
   updatedAt DateTime   @updatedAt
   roles     UserRole[]
   auditLogs AuditLog[]
+  telegramBindings TelegramBinding[]
+  telegramBindRequests TelegramBindRequest[]
+  magicLinkTokens MagicLinkToken[]
 }
 
 model Role {
@@ -283,6 +289,52 @@ model AuditLog {
   @@index([tenantId, entity])
 }
 
+// ===== Telegram Binding & Magic Links =====
+
+model TelegramBinding {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  chatId    String   // telegram chat_id (в личке == user id)
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, userId])
+  @@unique([tenantId, chatId])
+}
+
+model TelegramBindRequest {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  code      String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId])
+}
+
+model MagicLinkToken {
+  id        String   @id @default(cuid()) // jti
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  redirect  String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedIp    String?
+  usedUa    String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId])
+  @@index([expiresAt])
+}
+
 model Counterparty {
   id           String        @id @default(cuid())
   tenantId     String
@@ -320,6 +372,7 @@ model Transaction {
   amount         Int
   note           String?
   source         String?
+  activity       String? // 'operating' | 'investing' | 'financing'
   createdBy      String?
   updatedBy      String?
   createdAt      DateTime      @default(now())
@@ -527,21 +580,23 @@ model IikoReceipt {
 }
 
 model IikoReceiptItem {
-  receiptId   String
-  lineNo      Int
-  dishId      String?
-  dishName    String?
-  size        String?
-  qty         Int?
-  net         Int?
-  cost        Int?
-  measureUnit String?
-  returnSum   Int?
-  rawJson     String? // полный OLAP-ряд по позиции
+  receiptId    String
+  lineNo       Int
+  dishId       String?
+  dishName     String?
+  dishCategory String? // категория блюда из iiko (DishCategory)
+  size         String?
+  qty          Int?
+  net          Int?
+  cost         Int?
+  measureUnit  String?
+  returnSum    Int?
+  rawJson      String? // полный OLAP-ряд по позиции
 
   receipt IikoReceipt @relation(fields: [receiptId], references: [id])
 
   @@id([receiptId, lineNo])
+  @@index([dishCategory]) // для быстрой фильтрации по категориям
 }
 
 // Нормализованное хранилище всех колонок OLAP SALES (чек/позиция) в формате ключ-значение

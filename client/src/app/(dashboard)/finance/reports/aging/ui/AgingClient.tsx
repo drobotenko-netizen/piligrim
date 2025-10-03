@@ -12,7 +12,7 @@ export default function AgingClient() {
   const [summary, setSummary] = useState<any>({})
   const [vendors, setVendors] = useState<any[]>([])
   const [filters, setFilters] = useState({
-    vendorId: '',
+    vendorId: 'all',
     asOfDate: new Date().toISOString().slice(0, 10)
   })
 
@@ -24,7 +24,7 @@ export default function AgingClient() {
   async function loadData() {
     try {
       const params = new URLSearchParams()
-      if (filters.vendorId) params.set('vendorId', filters.vendorId)
+      if (filters.vendorId && filters.vendorId !== 'all') params.set('vendorId', filters.vendorId)
       if (filters.asOfDate) params.set('asOfDate', filters.asOfDate)
 
       const res = await fetch(`${API_BASE}/api/reports/aging?${params}`, { credentials: 'include' })
@@ -82,7 +82,7 @@ export default function AgingClient() {
                   <SelectValue placeholder="Все поставщики" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Все поставщики</SelectItem>
+                  <SelectItem value="all">Все поставщики</SelectItem>
                   {vendors.map(v => (
                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                   ))}

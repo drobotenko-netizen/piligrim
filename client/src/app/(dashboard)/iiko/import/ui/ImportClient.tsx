@@ -189,7 +189,7 @@ export default function ImportClient() {
               return (
                 <tr key={m} className="border-t">
                   <td className="px-2 py-2 capitalize">{label}</td>
-                  <td className="px-2 py-2">{mo ? `${mo.receipts} чеков` : '-'}</td>
+                  <td className="px-2 py-2">{mo?.receipts ? `${mo.receipts} чеков` : '-'}</td>
                   <td className="px-2 py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button

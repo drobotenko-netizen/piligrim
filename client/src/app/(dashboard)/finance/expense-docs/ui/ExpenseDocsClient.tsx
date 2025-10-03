@@ -30,8 +30,8 @@ export default function ExpenseDocsClient() {
   })
 
   const [filters, setFilters] = useState({
-    status: '',
-    vendorId: ''
+    status: 'all',
+    vendorId: 'all'
   })
 
   useEffect(() => {
@@ -43,8 +43,8 @@ export default function ExpenseDocsClient() {
   async function loadDocs() {
     try {
       const params = new URLSearchParams()
-      if (filters.status) params.set('status', filters.status)
-      if (filters.vendorId) params.set('vendorId', filters.vendorId)
+      if (filters.status && filters.status !== 'all') params.set('status', filters.status)
+      if (filters.vendorId && filters.vendorId !== 'all') params.set('vendorId', filters.vendorId)
 
       const res = await fetch(`${API_BASE}/api/expense-docs?${params}`, { credentials: 'include' })
       const data = await res.json()
@@ -87,7 +87,7 @@ export default function ExpenseDocsClient() {
   async function saveDoc() {
     try {
       const body = {
-        vendorId: form.vendorId || undefined,
+        vendorId: (form.vendorId && form.vendorId !== 'none') ? form.vendorId : undefined,
         categoryId: form.categoryId,
         operationDate: form.operationDate,
         postingPeriod: form.postingPeriod,
@@ -211,7 +211,7 @@ export default function ExpenseDocsClient() {
                     <SelectValue placeholder="Выберите поставщика" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Без поставщика</SelectItem>
+                    <SelectItem value="none">Без поставщика</SelectItem>
                     {vendors.map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                     ))}
@@ -312,7 +312,7 @@ export default function ExpenseDocsClient() {
                 <SelectValue placeholder="Все статусы" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Все статусы</SelectItem>
+                <SelectItem value="all">Все статусы</SelectItem>
                 <SelectItem value="draft">Черновик</SelectItem>
                 <SelectItem value="unpaid">Не оплачен</SelectItem>
                 <SelectItem value="partial">Частично</SelectItem>
@@ -326,7 +326,7 @@ export default function ExpenseDocsClient() {
                 <SelectValue placeholder="Все поставщики" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Все поставщики</SelectItem>
+                <SelectItem value="all">Все поставщики</SelectItem>
                 {vendors.map(v => (
                   <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                 ))}

@@ -3,8 +3,11 @@ import type { Metadata } from 'next'
 import { ReactNode } from 'react'
 
 export const metadata: Metadata = {
-  title: 'Payroll App',
-  description: 'Cafe payroll management'
+  title: 'Piligrim App',
+  description: 'Piligrim management',
+  icons: {
+    icon: '/favicon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

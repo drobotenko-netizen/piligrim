@@ -1,10 +1,30 @@
 import { Router } from 'express'
 import { IikoClient, buildDayRangeIso } from './client'
+import { createIikoLocalRouter } from './local-router'
+import { createIikoSalesRouter } from './sales-router'
+import { createIikoReportsRouter } from './reports-router'
+import { createIikoStoresRouter } from './stores-router'
+import { createIikoRecipesRouter } from './recipes-router'
+import { createIikoEntitiesRouter } from './entities-router'
+import { createIikoReceiptsRouter } from './receipts-router'
 import { importReceiptsForDate, importReceiptsRange } from './etl/receipts'
 
 export function createIikoRouter() {
   const router = Router()
   const client = new IikoClient()
+
+  // mount local subrouter (access prisma via app)
+  router.use('/local', (req, _res, next) => { (req as any).prisma = (req as any).prisma || req.app.get('prisma'); next() }, createIikoLocalRouter({ buildDayRangeIso }))
+
+  // mount receipts subrouter (access prisma via app)
+  router.use('/local', (req, _res, next) => { (req as any).prisma = (req as any).prisma || req.app.get('prisma'); next() }, createIikoReceiptsRouter({ buildDayRangeIso, client }))
+
+  // mount sales/report subrouters
+  router.use('/sales', createIikoSalesRouter(client))
+  router.use('/reports', createIikoReportsRouter(client))
+  router.use('/stores', createIikoStoresRouter(client))
+  router.use('/recipes', createIikoRecipesRouter(client))
+  router.use('/entities', createIikoEntitiesRouter(client))
 
   router.get('/auth/test', async (_req, res) => {
     try {
@@ -306,9 +326,10 @@ export function createIikoRouter() {
       for (const r of receipts) {
         const d = new Date(r.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
-        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0 }
+        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0, count: 0 }
         e.net += Number(r.net || 0)
         e.gross += Number(r.net || 0) // Для обычных чеков gross = net
+        e.count += 1 // Считаем количество чеков
         byDay.set(ymd, e)
       }
       const revenue = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
@@ -318,8 +339,127 @@ export function createIikoRouter() {
     }
   })
 
-  // GET /iiko/local/sales/returns/month?year=YYYY&month=MM
-  router.get('/local/sales/returns/month', async (req, res) => {
+  // GET /iiko/local/sales/hours?from=YYYY-MM-DD&to=YYYY-MM-DD
+  router.get('/local/sales/hours', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    const from = String(req.query.from || '').trim()
+    const to = String(req.query.to || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return res.status(400).json({ error: 'from/to must be YYYY-MM-DD' })
+    }
+    try {
+      const start = new Date(from + 'T00:00:00.000Z')
+      const end = new Date(to + 'T23:59:59.999Z')
+
+      // Загружаем только актуальные (не возвраты и не удаленные) чеки
+      const receipts = await prisma.iikoReceipt.findMany({
+        where: {
+          date: { gte: start, lt: end },
+          AND: [
+            { OR: [{ isReturn: false }, { isReturn: null }] },
+            { OR: [{ isDeleted: false }, { isDeleted: null }] }
+          ]
+        },
+        select: { date: true, net: true }
+      })
+
+      // Часовой пояс: локально используем UTC+7 как в остальных местах
+      const TZ_OFFSET = 7
+      const hours = new Array(24).fill(0).map((_, h) => ({ hour: h, count: 0, net: 0 }))
+      for (const r of receipts) {
+        const d = new Date(r.date)
+        let h = d.getUTCHours() + TZ_OFFSET
+        if (h >= 24) h -= 24
+        if (h < 0) h += 24
+        const e = hours[h]
+        e.count += 1
+        e.net += Number(r.net || 0)
+      }
+
+      // Округлим суммы до целого рубля для консистентности ответа
+      const rows = hours.map(x => ({ hour: String(x.hour).padStart(2, '0'), count: x.count, net: Math.round(x.net) }))
+      res.json({ from, to, rows })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
+  // GET /iiko/local/sales/hours/matrix?from=YYYY-MM-DD&to=YYYY-MM-DD
+  router.get('/local/sales/hours/matrix', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    const from = String(req.query.from || '').trim()
+    const to = String(req.query.to || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return res.status(400).json({ error: 'from/to must be YYYY-MM-DD' })
+    }
+    try {
+      // Build date columns list (UTC, by YMD)
+      const start = new Date(from + 'T00:00:00.000Z')
+      const end = new Date(to + 'T23:59:59.999Z')
+      const min = start.getTime() <= end.getTime() ? start : end
+      const max = start.getTime() <= end.getTime() ? end : start
+      const cols: string[] = []
+      for (let d = new Date(Date.UTC(min.getUTCFullYear(), min.getUTCMonth(), min.getUTCDate())); d <= max; d = new Date(d.getTime() + 24 * 60 * 60 * 1000)) {
+        cols.push(d.toISOString().slice(0, 10))
+      }
+
+      const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))
+      const count: Record<string, Record<string, number>> = {}
+      const net: Record<string, Record<string, number>> = {}
+      const countW: Record<string, Record<string, number>> = {}
+      const netW: Record<string, Record<string, number>> = {}
+      for (const h of HOURS) {
+        count[h] = Object.fromEntries(cols.map(c => [c, 0]))
+        net[h] = Object.fromEntries(cols.map(c => [c, 0]))
+        countW[h] = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0 }
+        netW[h] = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0 }
+      }
+
+      // Load locally from DB (exclude returns and deleted) with stored times
+      const receipts = await prisma.iikoReceipt.findMany({
+        where: {
+          date: { gte: min, lt: new Date(max.getTime() + 1) },
+          AND: [
+            { OR: [{ isReturn: false }, { isReturn: null }] },
+            { OR: [{ isDeleted: false }, { isDeleted: null }] }
+          ]
+        },
+        select: { date: true, net: true, orderNum: true, openTime: true, closeTime: true }
+      })
+
+      // Bucket using stored openTime/closeTime (no OLAP calls)
+      for (const r of receipts) {
+        const ts: Date = (r as any).openTime || (r as any).closeTime || r.date
+        const d = new Date(ts)
+        // Use local hour to match UI expectations
+        const hour = String(d.getHours()).padStart(2, '0')
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+        const ymd = `${y}-${m}-${dd}`
+        const wd = String((d.getDay() || 7))
+        if (count[hour] && (ymd in count[hour])) count[hour][ymd] += 1
+        if (net[hour] && (ymd in net[hour])) net[hour][ymd] += Number(r.net || 0)
+        if (countW[hour] && (wd in countW[hour])) countW[hour][wd] += 1
+        if (netW[hour] && (wd in netW[hour])) netW[hour][wd] += Number(r.net || 0)
+      }
+
+      // Round net
+      for (const h of HOURS) {
+        for (const c of cols) net[h][c] = Math.round(net[h][c])
+        for (const w of ['1','2','3','4','5','6','7']) netW[h][w] = Math.round(netW[h][w])
+      }
+
+      res.json({ from, to, cols, hours: HOURS, count, net, countW, netW })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
+  // moved to local-router
+  /*router.get('/local/sales/returns/month', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const year = Number(String(req.query.year || ''))
@@ -350,10 +490,9 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
-  // GET /iiko/local/sales/deleted/month?year=YYYY&month=MM
-  router.get('/local/sales/deleted/month', async (req, res) => {
+  /*router.get('/local/sales/deleted/month', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const year = Number(String(req.query.year || ''))
@@ -384,10 +523,275 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
-  // GET /iiko/local/sales/total/month?year=YYYY&month=MM
-  router.get('/local/sales/total/month', async (req, res) => {
+  /*router.get('/local/sales/dish-categories', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    
+    try {
+      const categories = await prisma.iikoReceiptItem.findMany({
+        where: {
+          dishCategory: { not: null },
+          receipt: {
+            AND: [
+              {
+                OR: [
+                  { isDeleted: false },
+                  { isDeleted: null }
+                ]
+              },
+              {
+                OR: [
+                  { isReturn: false },
+                  { isReturn: null }
+                ]
+              }
+            ]
+          }
+        },
+        select: {
+          dishCategory: true
+        },
+        distinct: ['dishCategory']
+      })
+      
+      const categoryList = categories.map(c => c.dishCategory).filter(Boolean).sort()
+      
+      res.json({ categories: categoryList })
+    } catch (e: any) {
+      console.error('Error in /local/sales/dish-categories:', e)
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })*/
+
+  /*router.get('/local/sales/dishes', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    
+    const categoryFilter = req.query.category ? String(req.query.category) : null
+    
+    try {
+      const whereClause: any = {
+        receipt: {
+          AND: [
+            {
+              OR: [
+                { isDeleted: false },
+                { isDeleted: null }
+              ]
+            },
+            {
+              OR: [
+                { isReturn: false },
+                { isReturn: null }
+              ]
+            }
+          ]
+        },
+        dishId: { not: null },
+        dishName: { not: null }
+      }
+      
+      if (categoryFilter) {
+        whereClause.dishCategory = categoryFilter
+      }
+      
+      const items = await prisma.iikoReceiptItem.findMany({
+        where: whereClause,
+        select: {
+          dishId: true,
+          dishName: true,
+          dishCategory: true,
+          qty: true,
+          net: true
+        }
+      })
+      
+      console.log(`Found ${items.length} receipt items`)
+      
+      // Группируем по блюдам
+      const dishMap = new Map<string, { dishId: string; dishName: string; dishCategory: string | null; totalQty: number; totalRevenue: number }>()
+      
+      items.forEach(item => {
+        if (!item.dishId || !item.dishName) return
+        
+        const key = item.dishId
+        const existing = dishMap.get(key) || { 
+          dishId: key, 
+          dishName: item.dishName,
+          dishCategory: item.dishCategory || null,
+          totalQty: 0, 
+          totalRevenue: 0 
+        }
+        
+        existing.totalQty += item.qty || 0
+        existing.totalRevenue += item.net || 0
+        
+        dishMap.set(key, existing)
+      })
+      
+      console.log(`Grouped into ${dishMap.size} unique dishes`)
+      
+      // Сортируем по выручке
+      const dishes = Array.from(dishMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue)
+      
+      res.json({ dishes })
+    } catch (e: any) {
+      console.error('Error in /local/sales/dishes:', e)
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })*/
+
+  /*router.get('/local/sales/dish/:dishId', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    
+    const dishId = req.params.dishId
+    const from = req.query.from ? String(req.query.from) : null
+    const to = req.query.to ? String(req.query.to) : null
+    
+    if (!from || !to) {
+      return res.status(400).json({ error: 'from and to dates required (YYYY-MM-DD)' })
+    }
+    
+    try {
+      const start = new Date(from)
+      const end = new Date(to)
+      end.setDate(end.getDate() + 1) // Включаем последний день
+      
+      const items = await prisma.iikoReceiptItem.findMany({
+        where: {
+          dishId,
+          receipt: {
+            date: { gte: start, lt: end },
+            AND: [
+              {
+                OR: [
+                  { isDeleted: false },
+                  { isDeleted: null }
+                ]
+              },
+              {
+                OR: [
+                  { isReturn: false },
+                  { isReturn: null }
+                ]
+              }
+            ]
+          }
+        },
+        select: {
+          qty: true,
+          net: true,
+          cost: true,
+          receipt: {
+            select: {
+              date: true
+            }
+          }
+        }
+      })
+      
+      // Группируем по дням
+      const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
+      
+      items.forEach(item => {
+        const d = new Date(item.receipt.date)
+        const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
+        
+        const existing = byDay.get(ymd) || { date: ymd, qty: 0, revenue: 0, cost: 0 }
+        existing.qty += item.qty || 0
+        existing.revenue += item.net || 0
+        existing.cost += item.cost || 0
+        
+        byDay.set(ymd, existing)
+      })
+      
+      const daily = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
+      
+      res.json({ dishId, from, to, daily })
+    } catch (e: any) {
+      console.error('Error in /local/sales/dish/:dishId:', e)
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })*/
+
+  /*router.get('/local/sales/category/:category', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    
+    const category = req.params.category
+    const from = req.query.from ? String(req.query.from) : null
+    const to = req.query.to ? String(req.query.to) : null
+    
+    if (!from || !to) {
+      return res.status(400).json({ error: 'from and to dates required (YYYY-MM-DD)' })
+    }
+    
+    try {
+      const start = new Date(from)
+      const end = new Date(to)
+      end.setDate(end.getDate() + 1) // Включаем последний день
+      
+      const items = await prisma.iikoReceiptItem.findMany({
+        where: {
+          dishCategory: category,
+          receipt: {
+            date: { gte: start, lt: end },
+            AND: [
+              {
+                OR: [
+                  { isDeleted: false },
+                  { isDeleted: null }
+                ]
+              },
+              {
+                OR: [
+                  { isReturn: false },
+                  { isReturn: null }
+                ]
+              }
+            ]
+          }
+        },
+        select: {
+          qty: true,
+          net: true,
+          cost: true,
+          receipt: {
+            select: {
+              date: true
+            }
+          }
+        }
+      })
+      
+      // Группируем по дням
+      const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
+      
+      items.forEach(item => {
+        const d = new Date(item.receipt.date)
+        const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
+        
+        const existing = byDay.get(ymd) || { date: ymd, qty: 0, revenue: 0, cost: 0 }
+        existing.qty += item.qty || 0
+        existing.revenue += item.net || 0
+        existing.cost += item.cost || 0
+        
+        byDay.set(ymd, existing)
+      })
+      
+      const daily = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
+      
+      res.json({ category, from, to, daily })
+    } catch (e: any) {
+      console.error('Error in /local/sales/category/:category:', e)
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })*/
+
+  /*router.get('/local/sales/total/month', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const year = Number(String(req.query.year || ''))
@@ -423,10 +827,9 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
-  // GET /iiko/local/sales/available-months
-  router.get('/local/sales/available-months', async (req, res) => {
+  /*router.get('/local/sales/available-months', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     try {
@@ -448,7 +851,7 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
   // Функция для получения номера недели
   function getWeekNumber(date: Date): number {
@@ -459,8 +862,7 @@ export function createIikoRouter() {
     return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
   }
 
-  // GET /iiko/local/sales/customers?from=YYYY-MM-DD&to=YYYY-MM-DD
-  router.get('/local/sales/customers', async (req, res) => {
+  /*router.get('/local/sales/customers', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const from = String(req.query.from || '').trim()
@@ -573,10 +975,9 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
-  // GET /iiko/local/returns?from=YYYY-MM-DD&to=YYYY-MM-DD&group=waiter|register
-  router.get('/local/returns', async (req, res) => {
+  /*router.get('/local/returns', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const from = String(req.query.from || '').trim()
@@ -617,10 +1018,9 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
-  // GET /iiko/local/sales/deleted?date=YYYY-MM-DD&includeItems=1
-  router.get('/local/sales/deleted', async (req, res) => {
+  /*router.get('/local/sales/deleted', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const date = String(req.query.date || '').trim()
@@ -669,7 +1069,7 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
   // Функция для конвертации времени из UTC в правильный часовой пояс (UTC+7)
   function toCorrectTime(dateTime: any): string | null {
@@ -691,8 +1091,7 @@ export function createIikoRouter() {
     return null
   }
 
-  // GET /iiko/local/sales/receipts?date=YYYY-MM-DD&includeItems=1
-  router.get('/local/sales/receipts', async (req, res) => {
+  /*router.get('/local/sales/receipts', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const date = String(req.query.date || '').trim()
@@ -804,10 +1203,9 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
-  // GET /iiko/local/import/status?year=YYYY
-  router.get('/local/import/status', async (req, res) => {
+  /*router.get('/local/import/status', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const year = Number(String(req.query.year || ''))
@@ -835,7 +1233,7 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })
+  })*/
 
   // GET /iiko/sales/waiters?date=YYYY-MM-DD
   router.get('/sales/waiters', async (req, res) => {
@@ -1615,41 +2013,149 @@ export function createIikoRouter() {
       const to = new Date(toDate)
       to.setDate(to.getDate() + 1) // Включаем toDate
       
-      console.log('🗑️  Удаляем старые смены за период:', fromDate, '-', toDate)
+      console.log('🗑️  ШАГ 1: Удаляем старые смены за период:', fromDate, '-', toDate)
+      // Удаляем смены по openAt (так же как группируем в P&L)
+      // Важно: группируем по дате открытия, т.к. смена может закрыться после полуночи
       const shiftsToDelete = await prisma.shift.findMany({
         where: {
-          OR: [
-            { openAt: { gte: from, lt: to } },
-            { closeAt: { gte: from, lt: to } }
-          ]
+          openAt: {
+            gte: from,
+            lt: to
+          }
         },
         select: { id: true }
       })
       
       const shiftIds = shiftsToDelete.map(s => s.id)
       if (shiftIds.length > 0) {
+        console.log(`   Найдено смен для удаления: ${shiftIds.length}`)
         await prisma.shiftSale.deleteMany({ where: { shiftId: { in: shiftIds } } })
         await prisma.shift.deleteMany({ where: { id: { in: shiftIds } } })
-        console.log(`✅ Удалено ${shiftIds.length} смен`)
+        console.log(`✅ Удалено ${shiftIds.length} смен и их продаж`)
+      } else {
+        console.log('   Смен для удаления не найдено')
       }
 
-      // 2. ИМПОРТИРУЕМ заново
+      // 2. ПРОВЕРЯЕМ что удалились
+      console.log('🔍 ШАГ 2: Проверяем что смены удалились...')
+      const remainingShifts = await prisma.shift.count({
+        where: {
+          openAt: {
+            gte: from,
+            lt: to
+          }
+        }
+      })
+      
+      if (remainingShifts > 0) {
+        console.error(`❌ ОШИБКА: Осталось ${remainingShifts} смен после удаления!`)
+        return res.status(500).json({ 
+          error: 'Failed to delete all shifts', 
+          remaining: remainingShifts 
+        })
+      }
+      
+      console.log('✅ Все смены успешно удалены, можно импортировать')
+
+      // 3. ИМПОРТИРУЕМ заново
+      console.log('📥 ШАГ 3: Импортируем смены из iiko...')
       const { exec } = await import('child_process')
       const { promisify } = await import('util')
       const execAsync = promisify(exec)
 
       const mode = mergeByDay ? 'merge' : 'separate'
       const cmd = `npx tsx scripts/import-shifts-from-iiko.ts "${fromDate}" "${toDate}" "${mode}"`
-      console.log('🔧 Running command:', cmd)
+      console.log('🔧 Запускаем команду:', cmd)
       
       const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() })
+      
+      console.log('✅ Импорт завершён')
 
       res.json({ 
         ok: true, 
+        deleted: shiftIds.length,
         output: stdout,
         errors: stderr || undefined
       })
     } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
+  // GET /iiko/local/sales/all?from=YYYY-MM-DD&to=YYYY-MM-DD - общая статистика по всем блюдам
+  router.get('/local/sales/all', async (req, res) => {
+    const prisma = (req as any).prisma || req.app.get('prisma')
+    if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    
+    const from = req.query.from ? String(req.query.from) : null
+    const to = req.query.to ? String(req.query.to) : null
+    
+    if (!from || !to) {
+      return res.status(400).json({ error: 'from and to dates required (YYYY-MM-DD)' })
+    }
+    
+    try {
+      const start = new Date(from)
+      const end = new Date(to)
+      end.setDate(end.getDate() + 1) // Включаем последний день
+      
+      const items = await prisma.iikoReceiptItem.findMany({
+        where: {
+          receipt: {
+            date: { gte: start, lt: end },
+            AND: [
+              {
+                OR: [
+                  { isDeleted: false },
+                  { isDeleted: null }
+                ]
+              },
+              {
+                OR: [
+                  { isReturn: false },
+                  { isReturn: null }
+                ]
+              }
+            ]
+          }
+        },
+        select: {
+          qty: true,
+          net: true,
+          cost: true,
+          receipt: {
+            select: {
+              date: true
+            }
+          }
+        },
+        orderBy: {
+          receipt: {
+            date: 'asc'
+          }
+        }
+      })
+      
+      // Группируем по дням
+      const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
+      
+      items.forEach(item => {
+        const d = new Date(item.receipt.date)
+        const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
+        
+        const existing = byDay.get(ymd) || { date: ymd, qty: 0, revenue: 0, cost: 0 }
+        existing.qty += item.qty || 0
+        existing.revenue += item.net || 0
+        existing.cost += item.cost || 0
+        
+        byDay.set(ymd, existing)
+      })
+      
+      const daily = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
+      
+      res.json({ from, to, daily })
+    } catch (e: any) {
+      console.error('Error in /local/sales/all:', e)
       res.status(500).json({ error: String(e?.message || e) })
     }
   })
