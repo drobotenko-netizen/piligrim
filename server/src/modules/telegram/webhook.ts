@@ -71,6 +71,7 @@ export function createTelegramWebhook(prisma: PrismaClient) {
         // Выдаём маг‑ссылку через внутренний endpoint (подпишет токен)
         const issueUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/issue`
         try {
+          // Сначала инвалидируем возможные активные токены и создаём новый через /issue
           const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
           const issueJson: any = await issueRes.json().catch(() => ({}))
           if (issueRes.ok && issueJson?.url) {

@@ -28,6 +28,12 @@ export function createMagicRouter(prisma: PrismaClient) {
       const ttlMinutes = Number(req.body?.ttlMinutes || 15)
       const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000)
 
+      // Invalidate any previous active tokens for this user (strict one-time links)
+      await prisma.magicLinkToken.updateMany({
+        where: { tenantId: tenant.id, userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() }
+      })
+
       const tokenId = await prisma.magicLinkToken.create({
         data: { tenantId: tenant.id, userId: user.id, redirect, expiresAt }
       })
@@ -62,14 +68,11 @@ export function createMagicRouter(prisma: PrismaClient) {
       if (!dbToken || dbToken.userId !== userId || dbToken.tenantId !== tenantId) {
         return res.status(400).send('Token not found')
       }
-      // Idempotent: если уже использован, но не истёк — всё равно залогиним и редиректим
-      const expired = dbToken.expiresAt.getTime() < Date.now()
-      if (expired) return res.status(400).send('Token expired')
+      if (dbToken.usedAt) return res.status(400).send('Token already used')
+      if (dbToken.expiresAt.getTime() < Date.now()) return res.status(400).send('Token expired')
 
-      // Mark used если ещё не использован
-      if (!dbToken.usedAt) {
-        await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
-      }
+      // Mark used
+      await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
 
       // Create session cookie
       const roles = (await prisma.userRole.findMany({ where: { tenantId, userId }, include: { role: true } })).map(r => r.role.name)
