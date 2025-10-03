@@ -95,7 +95,7 @@ export async function startTelegramPolling(prisma: PrismaClient) {
           const ttlMinutes = 15
           const issueUrl = `${process.env.SERVER_PUBLIC_URL || 'http://localhost:4000'}/api/auth/magic/issue`
           try {
-          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
+          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/sales/revenue', ttlMinutes }) })
           const issueJson: any = await issueRes.json().catch(() => ({}))
             if (issueRes.ok && issueJson?.url) {
               await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}`)

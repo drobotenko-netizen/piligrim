@@ -38,7 +38,7 @@ export default function UsersClient({ initialItems }: { initialItems: any[] }) {
         await fetch(`${API_BASE}/api/admin/users/${json.data.id}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ roles: [form.role] }) })
         // Issue magic link immediately for admin to copy and send
         try {
-          const r = await fetch(`${API_BASE}/api/auth/magic/issue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ userId: json.data.id, redirect: '/employees', ttlMinutes: 15 }) })
+          const r = await fetch(`${API_BASE}/api/auth/magic/issue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ userId: json.data.id, redirect: '/sales/revenue', ttlMinutes: 15 }) })
           const j = await r.json()
           if (r.ok && j?.url) setInviteUrl(j.url)
         } catch {}

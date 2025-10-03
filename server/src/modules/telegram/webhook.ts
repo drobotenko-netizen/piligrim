@@ -72,7 +72,7 @@ export function createTelegramWebhook(prisma: PrismaClient) {
         const issueUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/issue`
         try {
           // Сначала инвалидируем возможные активные токены и создаём новый через /issue
-          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
+          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/sales/revenue', ttlMinutes }) })
           const issueJson: any = await issueRes.json().catch(() => ({}))
           if (issueRes.ok && issueJson?.url) {
             // Добавим hint про копирование если Telegram может сделать пререндера
