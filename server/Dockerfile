@@ -4,7 +4,8 @@ WORKDIR /app
 
 # Install app dependencies (include dev to have tooling)
 COPY package*.json ./
-RUN npm ci
+# Use npm install to avoid strict lockfile requirement (no local lockfile)
+RUN npm install --omit=dev
 
 # Prisma schema and generate client
 COPY prisma ./prisma

@@ -8,8 +8,3 @@ piligrim.5-star-roi.ru {
     reverse_proxy web:3000
   }
 }
-
-api.piligrim.5-star-roi.ru {
-  encode gzip zstd
-  reverse_proxy api:4000
-}
