@@ -1,13 +1,13 @@
 # Multi-stage build for Next.js (production standalone)
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY client/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY client .
+COPY . .
 # Build as standalone to reduce runtime deps
 RUN npm run build
 

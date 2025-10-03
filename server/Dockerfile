@@ -3,13 +3,13 @@ FROM node:20-alpine AS base
 WORKDIR /app
 
 # Install deps first (better layer caching)
-COPY server/package*.json ./
+COPY package*.json ./
 RUN npm ci --omit=dev
 
 # Copy project sources
-COPY server/tsconfig.json ./
-COPY server/prisma ./prisma
-COPY server/src ./src
+COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY src ./src
 
 # Generate Prisma client (uses schema from ./prisma)
 RUN npx prisma generate
