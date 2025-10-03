@@ -156,5 +156,29 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     }
   })
 
+  // Фонды, не привязанные ни к одной статье (category.fund)
+  router.get('/funds/unmapped', async (req, res) => {
+    try {
+      const funds = await prisma.gsCashflowRow.findMany({
+        where: { fund: { not: null } },
+        select: { fund: true },
+        distinct: ['fund'],
+        orderBy: { fund: 'asc' }
+      })
+      const fundList = funds.map(f => f.fund).filter(Boolean) as string[]
+      if (fundList.length === 0) return res.json({ unmapped: [] })
+
+      const mappedCats = await prisma.category.findMany({
+        where: { fund: { in: fundList } },
+        select: { fund: true }
+      })
+      const mappedSet = new Set((mappedCats.map(c => c.fund) as (string|null)[]).filter(Boolean) as string[])
+      const unmapped = fundList.filter(f => !mappedSet.has(f))
+      res.json({ unmapped })
+    } catch (error: any) {
+      res.status(500).json({ error: String(error?.message || error) })
+    }
+  })
+
   return router
 }
