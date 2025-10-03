@@ -8,7 +8,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
   const router = Router()
 
   // POST /transactions/clear
-  router.post('/clear', requireRole('ADMIN'), async (req, res) => {
+  router.post('/clear', requireRole(['ADMIN']), async (req, res) => {
     try {
       const tenant = await getTenant(prisma, req as any)
       // Удаляем транзакции с 01.01.2025, оставляя начальные остатки на 31.12.2024
@@ -25,7 +25,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
   })
 
   // POST /transactions/load-from-gsheets
-  router.post('/load-from-gsheets', requireRole('ADMIN'), async (req, res) => {
+  router.post('/load-from-gsheets', requireRole(['ADMIN']), async (req, res) => {
     try {
       const { spreadsheetId, gid } = req.body || {}
       if (!spreadsheetId) return res.status(400).json({ error: 'spreadsheetId required' })
@@ -528,6 +528,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
       amount: z.number(),
       note: z.string().nullable().optional(),
       source: z.string().nullable().optional(),
+      activity: z.enum(['operating','investing','financing']).nullable().optional(),
     })
     const parsed = bodySchema.safeParse(req.body || {})
     if (!parsed.success) return res.status(400).json({ error: 'bad request', details: parsed.error.flatten() })
@@ -536,7 +537,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
     if (!['expense','income','adjustment'].includes(body.kind)) return res.status(400).json({ error: 'invalid kind' })
     if (!body.paymentDate || !body.accountId || !Number.isFinite(body.amount)) return res.status(400).json({ error: 'bad request' })
     // Наследование activity из категории, если не задано явно
-    let activity: string | null = body.activity ?? null
+    let activity: string | null = (body as any).activity ?? null
     if (!activity && body.categoryId && (prisma as any).category) {
       const cat = await prisma.category.findUnique({ where: { id: body.categoryId } })
       activity = cat?.activity ?? null
@@ -577,6 +578,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
       method: z.string().nullable().optional(),
       amount: z.number().optional(),
       note: z.string().nullable().optional(),
+      activity: z.enum(['operating','investing','financing']).nullable().optional(),
     })
     const parsed = bodySchema.safeParse(req.body || {})
     if (!parsed.success) return res.status(400).json({ error: 'bad request', details: parsed.error.flatten() })
@@ -606,7 +608,7 @@ export function createTransactionsRouter(prisma: PrismaClient) {
     if (Object.prototype.hasOwnProperty.call(body, 'employeeId')) patch.employeeId = body.employeeId ?? null
     if (Object.prototype.hasOwnProperty.call(body, 'counterpartyId')) patch.counterpartyId = body.counterpartyId ?? null
     if (Object.prototype.hasOwnProperty.call(body, 'method')) patch.method = body.method ?? null
-    if (Object.prototype.hasOwnProperty.call(body, 'amount') && Number.isFinite(body.amount)) patch.amount = Math.trunc(Math.abs(body.amount as number))
+    if (Object.prototype.hasOwnProperty.call(body, 'amount') && Number.isFinite((body as any).amount)) patch.amount = Math.trunc(Math.abs((body as any).amount as number))
     if (Object.prototype.hasOwnProperty.call(body, 'note')) patch.note = body.note ?? null
     if (activity !== undefined) patch.activity = activity
 

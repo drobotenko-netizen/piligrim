@@ -36,12 +36,14 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   }
   
   function expandAllCategories() {
-    setCollapsedCategories(new Set())
+    setCollapsedCategories(new Set<string>())
   }
   
   function collapseAllCategories() {
     if (!data?.expenseDetails) return
-    const allCategoryIds = new Set(data.expenseDetails.map((r: any) => r.categoryId))
+    const allCategoryIds = new Set<string>(
+      data.expenseDetails.map((r: any) => String(r.categoryId))
+    )
     setCollapsedCategories(allCategoryIds)
   }
 

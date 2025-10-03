@@ -61,7 +61,7 @@ export function createOtpRouter(prisma: PrismaClient) {
         if (!user) return res.status(403).json({ error: 'user_not_found' })
         const userRoles = await prisma.userRole.findMany({ where: { tenantId: tenant.id, userId: user.id }, include: { role: true } })
         const roles = userRoles.map(ur => ur.role.name)
-        const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, '12h')
+        const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, 12 * 60 * 60)
         res.cookie('access_token', token, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 12 * 60 * 60 * 1000 })
         return res.json({ ok: true })
       }
@@ -75,9 +75,9 @@ export function createOtpRouter(prisma: PrismaClient) {
         },
         body: JSON.stringify({ auth_id: authId, code })
       })
-      const json = await r.json().catch(() => ({}))
+      const json: any = await r.json().catch(() => ({}))
       if (!r.ok) return res.status(r.status).json(json)
-      if (json?.status !== 'CODE_VERIFIED') return res.status(400).json(json)
+      if (String(json?.status || '').toUpperCase() !== 'CODE_VERIFIED') return res.status(400).json(json)
       const tenant = await getTenant(prisma, req as any)
       // Пользователь должен существовать в системе
       const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, phone } })
@@ -86,7 +86,7 @@ export function createOtpRouter(prisma: PrismaClient) {
       const userRoles = await prisma.userRole.findMany({ where: { tenantId: tenant.id, userId: user.id }, include: { role: true } })
       const roles = userRoles.map(ur => ur.role.name)
       // JWT теперь содержит userId в sub
-      const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, '12h')
+      const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, 12 * 60 * 60)
       res.cookie('access_token', token, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 12 * 60 * 60 * 1000 })
       res.json({ ok: true })
     } catch (e) {
@@ -105,7 +105,7 @@ export function createOtpRouter(prisma: PrismaClient) {
       // Берём роли пользователя и добавляем ADMIN поверх для полного доступа
       const userRoles = await prisma.userRole.findMany({ where: { tenantId: tenant.id, userId: user.id }, include: { role: true } })
       const roles = Array.from(new Set(['ADMIN', ...userRoles.map(ur => ur.role.name)]))
-      const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, '12h')
+      const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, 12 * 60 * 60)
       res.cookie('access_token', token, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 12 * 60 * 60 * 1000 })
       res.json({ ok: true, roles, user: { id: user.id, fullName: user.fullName, phone: user.phone } })
     } catch {

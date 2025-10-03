@@ -264,13 +264,13 @@ export function createAdminAuditRouter(prisma: PrismaClient) {
         } catch {}
       }
       // Разрешаем имена сотрудников
-      const uniqEmployeeIds = Array.from(new Set(Array.from(groups.values()).map((g: any) => g.employeeId)))
+      const uniqEmployeeIds = Array.from(new Set(Array.from(groups.values()).map((g: any) => String(g.employeeId))))
       const employees = await prisma.employee.findMany({ where: { id: { in: uniqEmployeeIds } }, select: { id: true, fullName: true } })
       const empById = new Map(employees.map(e => [e.id, e.fullName]))
       const items: any[] = []
       for (const g of Array.from(groups.values())) {
         const dates = Array.from(g.days.keys()).sort()
-        const days = dates.map((d: string) => {
+        const days = dates.map((d) => {
           const v = g.days.get(d) || {}
           const from = typeof v.from === 'number' ? v.from : 0
           const to = typeof v.to === 'number' ? v.to : from

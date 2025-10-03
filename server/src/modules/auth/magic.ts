@@ -70,7 +70,7 @@ export function createMagicRouter(prisma: PrismaClient) {
 
       // Create session cookie
       const roles = (await prisma.userRole.findMany({ where: { tenantId, userId }, include: { role: true } })).map(r => r.role.name)
-      const access = signAccessToken({ sub: userId, ten: tenantId, roles }, '30d')
+      const access = signAccessToken({ sub: userId, ten: tenantId, roles }, 30 * 24 * 60 * 60)
       res.cookie('access_token', access, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 30 * 24 * 60 * 60 * 1000 })
       const target = `${FRONTEND_BASE_URL}${redirect.startsWith('/') ? '' : '/'}${redirect}`
       return res.redirect(target)

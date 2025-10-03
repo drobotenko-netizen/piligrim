@@ -1,0 +1,86 @@
+# Git-деплой Piligrim (SSH + Docker Compose)
+
+Ниже схема деплоя на Linux‑сервер (например, ВМ в Яндекс Облаке) через bare‑репозиторий и git hook `post-receive`, который собирает образы и поднимает стек Caddy+web+api.
+
+## 1) Подготовка на сервере (однократно)
+
+```bash
+# Директории
+sudo mkdir -p /srv/piligrim/{repo,app}
+sudo chown -R $USER:$USER /srv/piligrim
+
+# Bare‑репозиторий
+git init --bare /srv/piligrim/repo
+
+# Хук post-receive
+cat >/srv/piligrim/repo/hooks/post-receive <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# PATH важен для docker compose в хуках
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+LOG="/var/log/piligrim-deploy.log"
+mkdir -p /var/log >/dev/null 2>&1 || true
+exec >>"$LOG" 2>&1
+
+REPO="/srv/piligrim/repo"
+WORK_TREE="/srv/piligrim/app"
+export TAG="$(date -u +%Y%m%d%H%M%S)"
+
+echo "[deploy] ---- $(date -u +%F %T) ----"
+echo "[deploy] checkout to $WORK_TREE"
+git --work-tree="$WORK_TREE" --git-dir="$REPO" checkout -f
+cd "$WORK_TREE"
+
+# Сборка образов согласно docker-compose.prod.yml
+# Получатся образы piligrim-web:${TAG} и piligrim-api:${TAG}
+echo "[deploy] build images (client/server)"
+IMAGE_WEB="piligrim-web:${TAG}" IMAGE_API="piligrim-api:${TAG}" \
+  docker compose -f docker-compose.prod.yml build --pull
+
+# Поднятие стека из infra/docker-compose.yml
+# Caddy проксирует web:3000 и api:4000
+# Переменная TAG прокинется во второй compose (infra)
+echo "[deploy] up stack (Caddy + images)"
+TAG="$TAG" docker compose -f infra/docker-compose.yml up -d
+
+# Уборка висячих образов
+docker image prune -f || true
+
+echo "[deploy] done TAG=$TAG"
+SH
+chmod +x /srv/piligrim/repo/hooks/post-receive
+
+# Сеть для обратного прокси (если ещё нет)
+docker network create proxy || true
+```
+
+## 2) Настройка окружения
+
+- На сервере создайте `server/.env` (см. `docs/env.md`).
+- Проверьте домены в `infra/Caddyfile` и откройте 80/443.
+- Убедитесь, что у пользователя есть права на запуск Docker.
+
+## 3) Первичный деплой
+
+На вашей машины добавьте remote и запушьте ветку:
+
+```bash
+git remote add prod ssh://<user>@<server>/srv/piligrim/repo
+git push prod main
+```
+
+## 4) Диагностика
+
+```bash
+# На сервере
+sudo tail -n 200 /var/log/piligrim-deploy.log
+
+docker compose -f infra/docker-compose.yml ps
+docker compose -f infra/docker-compose.yml logs --tail=200 web
+docker compose -f infra/docker-compose.yml logs --tail=200 api
+```
+
+## Примечания
+
+- Если хотите собирать/push образы в Yandex Container Registry, замените этап build на CI‑сборку и `docker compose pull && up -d` в хуке, а `infra/docker-compose.yml` переключите на `image: cr.yandex/...:${TAG}`.

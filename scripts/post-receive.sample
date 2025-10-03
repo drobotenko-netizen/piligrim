@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# PATH нужен, чтобы из git hook видеть docker compose
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+LOG="/var/log/piligrim-deploy.log"
+mkdir -p /var/log >/dev/null 2>&1 || true
+exec >>"$LOG" 2>&1
+
+REPO="/srv/piligrim/repo"
+WORK_TREE="/srv/piligrim/app"
+export TAG="$(date -u +%Y%m%d%H%M%S)"
+
+echo "[deploy] ---- $(date -u +%F %T) ----"
+echo "[deploy] checkout to $WORK_TREE"
+/git --work-tree="$WORK_TREE" --git-dir="$REPO" checkout -f
+cd "$WORK_TREE"
+
+echo "[deploy] build images"
+IMAGE_WEB="piligrim-web:${TAG}" IMAGE_API="piligrim-api:${TAG}" \
+  docker compose -f docker-compose.prod.yml build --pull
+
+echo "[deploy] up stack"
+TAG="$TAG" docker compose -f infra/docker-compose.yml up -d
+
+docker image prune -f || true
+
+echo "[deploy] done TAG=$TAG"

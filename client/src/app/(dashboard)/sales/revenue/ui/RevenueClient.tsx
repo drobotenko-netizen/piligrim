@@ -7,6 +7,18 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
+type ChartPoint = {
+  day: number
+  month1: number | null
+  month2: number | null
+  count1: number | null
+  count2: number | null
+  dateMonth1: string
+  dateMonth2: string
+  weekdayMonth1?: number | null
+  weekdayMonth2?: number | null
+}
+
 function formatNumber(value: number | null): string {
   if (value === null || value === undefined) return '-'
   return value.toLocaleString('ru-RU')
@@ -53,7 +65,7 @@ function groupByWeekday(data: any[]): { [key: number]: { sum: number, count: num
 
 
 // Компонент для отображения подписей под графиком
-const WeekdayLabels = ({ chartData }: { chartData: any[] }) => {
+const WeekdayLabels = ({ chartData }: { chartData: ChartPoint[] }) => {
   if (!chartData.length) return null
   
   return (
@@ -65,12 +77,12 @@ const WeekdayLabels = ({ chartData }: { chartData: any[] }) => {
         >
           {/* День недели */}
           <div className="text-xs mb-1 h-4 flex items-center justify-center" style={{ 
-            color: (data.weekdayMonth1 !== null && (data.weekdayMonth1 === 0 || data.weekdayMonth1 === 6)) || 
-                   (data.weekdayMonth2 !== null && (data.weekdayMonth2 === 0 || data.weekdayMonth2 === 6)) 
+            color: ((data.weekdayMonth1 != null) && (data.weekdayMonth1 === 0 || data.weekdayMonth1 === 6)) || 
+                   ((data.weekdayMonth2 != null) && (data.weekdayMonth2 === 0 || data.weekdayMonth2 === 6)) 
                    ? '#dc2626' : '#6b7280' 
           }}>
-            {data.weekdayMonth1 !== null ? getWeekdayName(data.weekdayMonth1) : 
-             data.weekdayMonth2 !== null ? getWeekdayName(data.weekdayMonth2) : '\u00A0'}
+            {data.weekdayMonth1 != null ? getWeekdayName(data.weekdayMonth1) : 
+             data.weekdayMonth2 != null ? getWeekdayName(data.weekdayMonth2) : '\u00A0'}
           </div>
           {/* Горизонтальная линия */}
           <div className="w-full h-px bg-gray-300 mb-1"></div>
@@ -201,7 +213,7 @@ export function RevenueClient() {
   }, [year1, month1, year2, month2, activeTab])
 
   // Объединяем данные для графика
-  const chartData = useMemo(() => {
+  const chartData = useMemo<ChartPoint[]>(() => {
     if (byWeekday) {
       // Режим по дням недели - сдвигаем данные так, чтобы дни недели совпадали
       const isEarlier = (year1 < year2) || (year1 === year2 && month1 < month2)
@@ -217,7 +229,7 @@ export function RevenueClient() {
       if (shift < 0) shift += 7 // Если отрицательный, добавляем 7 дней
       
       const maxDays = Math.max(earlierData.length, laterData.length + shift)
-      const result = []
+      const result: ChartPoint[] = []
       
       for (let i = 0; i < maxDays; i++) {
         const dayEarlier = earlierData[i]
@@ -244,7 +256,7 @@ export function RevenueClient() {
     } else {
       // Обычный режим по дням
       const maxDays = Math.max(data1.length, data2.length)
-      const result = []
+      const result: ChartPoint[] = []
       
       // Определяем, какой месяц раньше
       const isEarlier = (year1 < year2) || (year1 === year2 && month1 < month2)
@@ -311,8 +323,10 @@ export function RevenueClient() {
     
     for (let i = 0; i < chartData.length; i++) {
       const data = chartData[i]
-      const isWeekend = (data.weekdayEarlier === 0 || data.weekdayEarlier === 6) || 
-                       (data.weekdayLater === 0 || data.weekdayLater === 6)
+      const isWeekend = (
+        (data.weekdayMonth1 === 0 || data.weekdayMonth1 === 6) ||
+        (data.weekdayMonth2 === 0 || data.weekdayMonth2 === 6)
+      )
       
       if (isWeekend && weekendStart === null) {
         weekendStart = i + 1 // day начинается с 1
@@ -566,7 +580,7 @@ export function RevenueClient() {
                           name="month1"
                           connectNulls={false}
                           dot={(props: any) => {
-                            if (props.payload.month1 === null) return null
+                            if (props.payload.month1 === null) return (<g />)
                             return <circle key={`month1-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#374151" />
                           }}
                         />
@@ -578,7 +592,7 @@ export function RevenueClient() {
                           name="month2"
                           connectNulls={false}
                           dot={(props: any) => {
-                            if (props.payload.month2 === null) return null
+                            if (props.payload.month2 === null) return (<g />)
                             return <circle key={`month2-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#f97316" />
                           }}
                         />
@@ -649,7 +663,7 @@ export function RevenueClient() {
                           name="month1"
                           connectNulls={false}
                           dot={(props: any) => {
-                            if (props.payload.month1 === null) return null
+                            if (props.payload.month1 === null) return (<g />)
                             return <circle key={`month1-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#374151" />
                           }}
                         />
@@ -661,7 +675,7 @@ export function RevenueClient() {
                           name="month2"
                           connectNulls={false}
                           dot={(props: any) => {
-                            if (props.payload.month2 === null) return null
+                            if (props.payload.month2 === null) return (<g />)
                             return <circle key={`month2-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#f97316" />
                           }}
                         />
@@ -732,7 +746,7 @@ export function RevenueClient() {
                           name="month1"
                           connectNulls={false}
                           dot={(props: any) => {
-                            if (props.payload.month1 === null) return null
+                            if (props.payload.month1 === null) return <g />
                             return <circle key={`month1-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#374151" />
                           }}
                         />
@@ -744,7 +758,7 @@ export function RevenueClient() {
                           name="month2"
                           connectNulls={false}
                           dot={(props: any) => {
-                            if (props.payload.month2 === null) return null
+                            if (props.payload.month2 === null) return <g />
                             return <circle key={`month2-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#f97316" />
                           }}
                         />
@@ -815,7 +829,7 @@ export function RevenueClient() {
                           name="month1"
                       connectNulls={false}
                       dot={(props: any) => {
-                            if (props.payload.month1 === null) return null
+                            if (props.payload.month1 === null) return (<g />)
                             return <circle key={`month1-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#374151" />
                       }}
                     />
@@ -827,7 +841,7 @@ export function RevenueClient() {
                           name="month2"
                       connectNulls={false}
                       dot={(props: any) => {
-                            if (props.payload.month2 === null) return null
+                            if (props.payload.month2 === null) return (<g />)
                             return <circle key={`month2-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#f97316" />
                       }}
                     />
@@ -850,7 +864,6 @@ export function RevenueClient() {
                       dataKey="day" 
                       tick={byWeekday ? false : true}
                       height={byWeekday ? 5 : 30}
-                      tick={{ fontSize: 12 }}
                     />
                     <YAxis 
                       tickFormatter={(value) => formatNumber(value)}
@@ -904,7 +917,7 @@ export function RevenueClient() {
                       name="count1"
                       connectNulls={false}
                       dot={(props: any) => {
-                        if (props.payload.count1 === null) return null
+                        if (props.payload.count1 === null) return (<g />)
                         return <circle key={`count1-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#374151" />
                       }}
                     />
@@ -916,7 +929,7 @@ export function RevenueClient() {
                       name="count2"
                       connectNulls={false}
                       dot={(props: any) => {
-                        if (props.payload.count2 === null) return null
+                        if (props.payload.count2 === null) return (<g />)
                         return <circle key={`count2-${props.index}`} cx={props.cx} cy={props.cy} r={3} fill="#f97316" />
                       }}
                     />

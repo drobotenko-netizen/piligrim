@@ -7,9 +7,9 @@ export function createIikoStoresRouter(client: any) {
     const timestamp = String(req.query.timestamp || '').trim()
     if (!timestamp) return res.status(400).json({ error: 'timestamp required (yyyy-MM-ddTHH:mm:ss.SSS)' })
     try {
-      const departments = ([] as string[]).concat(req.query.department || []).map(String)
-      const stores = ([] as string[]).concat(req.query.store || []).map(String)
-      const products = ([] as string[]).concat(req.query.product || []).map(String)
+      const departments: string[] = ([] as any[]).concat(req.query.department || []).map(String)
+      const stores: string[] = ([] as any[]).concat(req.query.store || []).map(String)
+      const products: string[] = ([] as any[]).concat(req.query.product || []).map(String)
       const data = await client.getStoreBalances({ timestampIso: timestamp, departmentIds: departments, storeIds: stores, productIds: products })
       res.json({ timestamp, rows: data })
     } catch (e: any) {

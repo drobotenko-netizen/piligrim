@@ -9,7 +9,7 @@ async function sendMessage(chatId: string, text: string, extra?: any) {
   console.log(`[tg-polling] Sending message to ${chatId}: "${text}"`)
   try {
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const result = await response.json()
+    const result: any = await response.json()
     console.log(`[tg-polling] Send result:`, result)
     if (!result.ok) {
       console.error(`[tg-polling] Failed to send message:`, result)
@@ -30,7 +30,7 @@ export async function startTelegramPolling(prisma: PrismaClient) {
     try {
       const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=30&offset=${offset}`
       const r = await fetch(url)
-      const j = await r.json().catch(() => ({ result: [] }))
+      const j: any = await r.json().catch(() => ({ result: [] }))
       const updates = Array.isArray(j.result) ? j.result : []
       for (const up of updates) {
         offset = Math.max(offset, (up.update_id || 0) + 1)
@@ -81,7 +81,7 @@ export async function startTelegramPolling(prisma: PrismaClient) {
           }
           
           console.log(`[tg-polling] Sending success message`)
-          await sendMessage(chatId, `Привет, ${msg.from?.first_name || 'пользователь'}! Ваш аккаунт успешно привязан. Теперь вы можете использовать команду /login для входа в систему.`)
+          await sendMessage(chatId, `Привет, ${String(msg?.from?.first_name || 'пользователь')}! Ваш аккаунт успешно привязан. Теперь вы можете использовать команду /login для входа в систему.`)
           continue
         }
 
@@ -95,8 +95,8 @@ export async function startTelegramPolling(prisma: PrismaClient) {
           const ttlMinutes = 15
           const issueUrl = `${process.env.SERVER_PUBLIC_URL || 'http://localhost:4000'}/api/auth/magic/issue`
           try {
-            const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
-            const issueJson = await issueRes.json()
+          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
+          const issueJson: any = await issueRes.json().catch(() => ({}))
             if (issueRes.ok && issueJson?.url) {
               await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}`)
             } else {

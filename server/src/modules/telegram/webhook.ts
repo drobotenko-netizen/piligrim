@@ -12,7 +12,7 @@ async function sendMessage(chatId: string, text: string, extra?: any) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`
   const body: any = { chat_id: chatId, text, parse_mode: 'HTML', ...extra }
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  const j = await r.json().catch(() => ({}))
+  const j: any = await r.json().catch(() => ({}))
   if (!j.ok) throw new Error('telegram_send_failed')
   return j
 }
@@ -26,11 +26,11 @@ export function createTelegramWebhook(prisma: PrismaClient) {
 
   router.post(`/webhook/${TELEGRAM_WEBHOOK_SECRET}`, async (req: any, res) => {
     try {
-      const update = req.body || {}
+      const update: any = req.body || {}
       const msg = update.message || update.edited_message || null
       const chatId = String(msg?.chat?.id || '')
       const text = String(msg?.text || '').trim()
-      const from = msg?.from
+      const from: any = msg?.from
       if (!chatId) return res.json({ ok: true })
 
       // Commands
@@ -74,7 +74,7 @@ export function createTelegramWebhook(prisma: PrismaClient) {
         const issueUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/issue`
         try {
           const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
-          const issueJson = await issueRes.json()
+          const issueJson: any = await issueRes.json().catch(() => ({}))
           if (issueRes.ok && issueJson?.url) {
             await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}`)
           } else {

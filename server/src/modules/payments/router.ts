@@ -11,15 +11,15 @@ export function createPaymentsRouter(prisma: PrismaClient) {
   router.get('/', async (req, res) => {
     try {
       const tenant = await getTenant(prisma, req as any)
-      const { from, to, accountId, counterpartyId } = req.query
+      const { from, to, accountId, counterpartyId } = req.query as any
       
       const where: any = { tenantId: tenant.id }
       if (accountId) where.accountId = String(accountId)
       
       if (from || to) {
         where.date = {}
-        if (from) where.date.gte = new Date(String(from))
-        if (to) where.date.lt = new Date(String(to))
+        if (from) (where.date as any).gte = new Date(String(from))
+        if (to) (where.date as any).lt = new Date(String(to))
       }
 
       // Фильтрация по контрагенту (поставщику)
@@ -73,7 +73,7 @@ export function createPaymentsRouter(prisma: PrismaClient) {
           id: item.id,
           date: item.date.toISOString().slice(0, 10),
           amount: item.amount,
-          description: item.description,
+          description: (item as any).description ?? item.memo ?? null,
           vendor: item.expenseDoc?.vendor?.name || 'Неизвестный поставщик'
         }))
         
@@ -284,7 +284,7 @@ export function createPaymentsRouter(prisma: PrismaClient) {
   })
 
   // POST /api/payments/load-from-gsheets - импорт из Google Sheets в ExpenseDoc + Payment
-  router.post('/load-from-gsheets', requireRole('ADMIN'), async (req, res) => {
+  router.post('/load-from-gsheets', requireRole(['ADMIN']), async (req, res) => {
     try {
       const { spreadsheetId, gid } = req.body || {}
       if (!spreadsheetId) return res.status(400).json({ error: 'spreadsheetId required' })

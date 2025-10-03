@@ -1,4 +1,6 @@
 import { Router } from 'express'
+import { IikoClient, buildDayRangeIso } from './client' // Assuming client is needed for OLAP calls
+import { PrismaClient } from '@prisma/client'
 
 function safeParseArray(s?: string | null): string[] {
   if (!s) return []
@@ -28,11 +30,10 @@ function toCorrectTime(dateTime: any): string | null {
   return null
 }
 
-export function createIikoReceiptsRouter(deps: { buildDayRangeIso: (d: string) => { from: string; to: string }, client: any }) {
+export function createIikoReceiptsRouter(deps: { buildDayRangeIso: (d: string) => { from: string; to: string }, client: IikoClient }) {
   const router = Router()
   const { buildDayRangeIso, client } = deps
 
-  // GET /local/sales/receipts?date=YYYY-MM-DD&includeItems=1
   router.get('/sales/receipts', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
@@ -47,11 +48,9 @@ export function createIikoReceiptsRouter(deps: { buildDayRangeIso: (d: string) =
         orderBy: { net: 'desc' },
         include: includeItems ? { items: true } : { items: false as any }
       })
-      
       // Enrich with times/source and returns mapping from OLAP for the day
       let timeMap = new Map<string, { openTime?: string | null; closeTime?: string | null; sourceOrderNum?: string | null; storned?: string | null }>()
       let returnsBySource = new Map<string, { returnOrderNum: string; returnOpenTime?: string | null; returnCloseTime?: string | null }>()
-      
       try {
         const { from, to } = buildDayRangeIso(date)
         const body = {
@@ -76,7 +75,6 @@ export function createIikoReceiptsRouter(deps: { buildDayRangeIso: (d: string) =
             storned: r?.Storned || null
           })
         }
-        
         // Returns mapping: Storned TRUE rows to their SourceOrderNum
         const bodyRet = {
           reportType: 'SALES',
@@ -99,55 +97,51 @@ export function createIikoReceiptsRouter(deps: { buildDayRangeIso: (d: string) =
           if (!returnsBySource.has(src)) returnsBySource.set(src, { returnOrderNum: ret, returnOpenTime: r?.OpenTime || null, returnCloseTime: r?.CloseTime || null })
         }
       } catch {}
-      
       const rows = receipts.map((r: any) => {
         // Для возвратов используем returnSum вместо net
         const netAmount = r.isReturn ? (r.returnSum || 0) : (r.net || 0)
         return {
-          orderNum: r.orderNum,
-          net: netAmount,
-          cost: r.cost || 0,
-          foodCostPct: netAmount ? Math.round(((r.cost || 0) / netAmount) * 10000) / 100 : 0,
-          dishes: r.items ? r.items.reduce((a: number, it: any) => a + (it.qty || 0), 0) : undefined,
-          guests: r.guests || 0,
-          payTypes: safeParseArray(r.payTypesJson),
-          waiter: r.waiter,
-          register: r.register,
-          sessionNumber: r.sessionNumber,
-          cashRegNumber: r.cashRegNumber,
-          customerName: r.customerName,
-          customerPhone: r.customerPhone,
-          orderType: r.orderType || null,
-          deliveryServiceType: r.deliveryServiceType || null,
-          isReturn: !!r.isReturn || false,
-          returnSum: r.returnSum || 0,
-          isDeleted: !!r.isDeleted || false,
-          deletedWithWriteoff: !!r.deletedWithWriteoff || false,
-          openTime: toCorrectTime(r.openTime || timeMap.get(r.orderNum)?.openTime || null),
-          closeTime: toCorrectTime(r.closeTime || timeMap.get(r.orderNum)?.closeTime || null),
-          sourceOrderNum: timeMap.get(r.orderNum)?.sourceOrderNum || null,
-          returnOrderNum: returnsBySource.get(r.orderNum)?.returnOrderNum || null,
-          returnTime: toCorrectTime(returnsBySource.get(r.orderNum)?.returnOpenTime || returnsBySource.get(r.orderNum)?.returnCloseTime || null),
-          items: includeItems ? (r.items || []).map((it: any) => {
-            // Для позиций в возвратах используем returnSum вместо net
-            const itemNet = r.isReturn ? (it.returnSum || 0) : (it.net || 0)
-            return {
-              dishId: it.dishId,
-              dishName: it.dishName,
-              size: it.size,
-              qty: it.qty || 0,
-              net: itemNet,
-              cost: it.cost || 0,
-              measureUnit: it.measureUnit || null
-            }
-          }) : undefined
-        }
-      }).sort((a, b) => {
+        orderNum: r.orderNum,
+        net: netAmount,
+        cost: r.cost || 0,
+        foodCostPct: netAmount ? Math.round(((r.cost || 0) / netAmount) * 10000) / 100 : 0,
+        dishes: r.items ? r.items.reduce((a: number, it: any) => a + (it.qty || 0), 0) : undefined,
+        guests: r.guests || 0,
+        payTypes: safeParseArray(r.payTypesJson),
+        waiter: r.waiter,
+        register: r.register,
+        sessionNumber: r.sessionNumber,
+        cashRegNumber: r.cashRegNumber,
+        customerName: r.customerName,
+        customerPhone: r.customerPhone,
+        orderType: r.orderType || null,
+        deliveryServiceType: r.deliveryServiceType || null,
+        isReturn: !!r.isReturn || false,
+        returnSum: r.returnSum || 0,
+        isDeleted: !!r.isDeleted || false,
+        deletedWithWriteoff: !!r.deletedWithWriteoff || false,
+        openTime: toCorrectTime(r.openTime || timeMap.get(r.orderNum)?.openTime || null),
+        closeTime: toCorrectTime(r.closeTime || timeMap.get(r.orderNum)?.closeTime || null),
+        sourceOrderNum: timeMap.get(r.orderNum)?.sourceOrderNum || null,
+        returnOrderNum: returnsBySource.get(r.orderNum)?.returnOrderNum || null,
+        returnTime: toCorrectTime(returnsBySource.get(r.orderNum)?.returnOpenTime || returnsBySource.get(r.orderNum)?.returnCloseTime || null),
+        items: includeItems ? (r.items || []).map((it: any) => {
+          // Для позиций в возвратах используем returnSum вместо net
+          const itemNet = r.isReturn ? (it.returnSum || 0) : (it.net || 0)
+          return {
+          dishId: it.dishId,
+          dishName: it.dishName,
+          size: it.size,
+          qty: it.qty || 0,
+          net: itemNet,
+          cost: it.cost || 0,
+          measureUnit: it.measureUnit || null
+        }}) : undefined
+      }}).sort((a: any, b: any) => {
         const ta = String(a.openTime || a.closeTime || '')
         const tb = String(b.openTime || b.closeTime || '')
         return ta.localeCompare(tb)
       })
-      
       res.json({ date, rows })
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })

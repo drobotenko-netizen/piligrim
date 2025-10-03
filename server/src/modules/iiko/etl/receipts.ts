@@ -11,7 +11,7 @@ function logToFile(message: string) {
   console.log(message) // Также выводим в консоль
 }
 
-export type ImportResult = { date: string; created: number; updated: number }
+export type ImportResult = { date: string; created: number; updated: number; items?: number; receipts?: number }
 
 export async function importReceiptsForDate(prisma: PrismaClient, client: IikoClient, ymd: string): Promise<ImportResult> {
   const tag = `[iiko][etl] ${ymd}`
@@ -660,7 +660,7 @@ export async function importReceiptsForDate(prisma: PrismaClient, client: IikoCl
     })) })
   }
 
-  const result = { date: ymd, created, updated }
+  const result = { date: ymd, created, updated, receipts: Array.from(map.values()).length, items: Array.from(map.values()).reduce((s, e: any) => s + ((e.items || []).length), 0) }
   logToFile(`${tag} done created=${created} updated=${updated}`)
   console.timeEnd(tag)
   return result
@@ -690,7 +690,7 @@ export async function importReceiptsRange(prisma: PrismaClient, client: IikoClie
     logToFile(`[RANGE] День ${ymd} завершен. Импортировано: ${r.receipts} чеков, ${r.items} позиций`)
   }
   
-  logToFile(`[RANGE] Импорт диапазона завершен. Всего дней: ${processedDays}, чеков: ${results.reduce((sum, r) => sum + r.receipts, 0)}, позиций: ${results.reduce((sum, r) => sum + r.items, 0)}`)
+  logToFile(`[RANGE] Импорт диапазона завершен. Всего дней: ${processedDays}, чеков: ${results.reduce((sum, r) => sum + (r.receipts || 0), 0)}, позиций: ${results.reduce((sum, r) => sum + (r.items || 0), 0)}`)
   
   return results
 }

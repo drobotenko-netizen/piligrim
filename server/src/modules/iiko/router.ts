@@ -147,7 +147,7 @@ export function createIikoRouter() {
       })
       const net = receipts.reduce((a: number, r: any) => a + (r.net || 0), 0)
       const cost = receipts.reduce((a: number, r: any) => a + (r.cost || 0), 0)
-      const deletedWithWriteoff = receipts.filter(r => r.deletedWithWriteoff).length
+      const deletedWithWriteoff = receipts.filter((r: any) => r.deletedWithWriteoff).length
       const deletedWithoutWriteoff = receipts.length - deletedWithWriteoff
       res.json({ 
         date, 
@@ -173,8 +173,8 @@ export function createIikoRouter() {
       const day = new Date(date + 'T00:00:00.000Z')
       const next = new Date(day.getTime() + 24 * 60 * 60 * 1000)
       const rows = await prisma.iikoReceipt.findMany({ where: { date: { gte: day, lt: next } }, select: { net: true, cost: true } })
-      const net = rows.reduce((a: number, r: any) => a + (r.net || 0), 0)
-      const cost = rows.reduce((a: number, r: any) => a + (r.cost || 0), 0)
+      const net = rows.reduce((a: number, r: any) => a + (Number(r.net) || 0), 0)
+      const cost = rows.reduce((a: number, r: any) => a + (Number(r.cost) || 0), 0)
       const gross = net // gross недоступен локально, подставляем net
       const discount = gross - net // 0
       res.json({ date, gross, net, discount, foodCost: cost })
@@ -195,7 +195,7 @@ export function createIikoRouter() {
       const receipts = await prisma.iikoReceipt.findMany({ where: { date: { gte: day, lt: next } }, select: { net: true, payTypesJson: true } })
       const map = new Map<string, { gross: number; net: number; discount: number }>()
       for (const r of receipts) {
-        const net = r.net || 0
+        const net = Number(r.net || 0)
         let pt: string[] = []
         try { pt = JSON.parse(r.payTypesJson || '[]') } catch {}
         const key = (pt[0] || '(не указано)') as string
@@ -696,7 +696,7 @@ export function createIikoRouter() {
       // Группируем по дням
       const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
       
-      items.forEach(item => {
+      items.forEach((item: { qty: number | null; net: number | null; cost: number | null; receipt: { date: Date } }) => {
         const d = new Date(item.receipt.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
         
@@ -770,7 +770,7 @@ export function createIikoRouter() {
       // Группируем по дням
       const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
       
-      items.forEach(item => {
+      items.forEach((item: any) => {
         const d = new Date(item.receipt.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
         
@@ -1755,7 +1755,7 @@ export function createIikoRouter() {
         } catch {}
       }
 
-      const rows = retRows.map(r => ({
+      const rows = retRows.map((r: any) => ({
         source: bySource.get(r.sourceOrderNum || r.returnOrderNum) || { orderNum: r.sourceOrderNum || r.returnOrderNum, items: [] },
         returnOrderNum: r.returnOrderNum,
         returnTime: r.returnTime,
@@ -1772,9 +1772,9 @@ export function createIikoRouter() {
     const timestamp = String(req.query.timestamp || '').trim()
     if (!timestamp) return res.status(400).json({ error: 'timestamp required (yyyy-MM-ddTHH:mm:ss.SSS)' })
     try {
-      const departments = ([] as string[]).concat(req.query.department || []).map(String)
-      const stores = ([] as string[]).concat(req.query.store || []).map(String)
-      const products = ([] as string[]).concat(req.query.product || []).map(String)
+      const departments: string[] = ([] as any[]).concat(req.query.department || []).map(String)
+      const stores: string[] = ([] as any[]).concat(req.query.store || []).map(String)
+      const products: string[] = ([] as any[]).concat(req.query.product || []).map(String)
       const data = await client.getStoreBalances({ timestampIso: timestamp, departmentIds: departments, storeIds: stores, productIds: products })
       res.json({ timestamp, rows: data })
     } catch (e: any) {
@@ -1850,7 +1850,7 @@ export function createIikoRouter() {
       const data = await client.getRecipePrepared({ date, productId, departmentId })
       // enrich with units via a targeted products lookup if missing
       const items = Array.isArray(data?.preparedCharts?.[0]?.items) ? data.preparedCharts[0].items : []
-      const ids = Array.from(new Set(items.map((it: any) => String(it?.productId || '')).filter(Boolean)))
+      const ids = Array.from(new Set(items.map((it: any) => String(it?.productId || '')).filter(Boolean) as string[]))
       if (ids.length) {
         try {
           const plist: any = await client.listProductsByIds(ids)
@@ -2026,7 +2026,7 @@ export function createIikoRouter() {
         select: { id: true }
       })
       
-      const shiftIds = shiftsToDelete.map(s => s.id)
+      const shiftIds = shiftsToDelete.map((s: any) => s.id)
       if (shiftIds.length > 0) {
         console.log(`   Найдено смен для удаления: ${shiftIds.length}`)
         await prisma.shiftSale.deleteMany({ where: { shiftId: { in: shiftIds } } })
@@ -2139,7 +2139,7 @@ export function createIikoRouter() {
       // Группируем по дням
       const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
       
-      items.forEach(item => {
+      items.forEach((item: any) => {
         const d = new Date(item.receipt.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
         
