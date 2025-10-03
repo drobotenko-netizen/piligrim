@@ -68,9 +68,7 @@ export function createTelegramWebhook(prisma: PrismaClient) {
         // Issue magic link
         const ttlMinutes = 15
         const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000)
-        const token = await (prisma as any).magicLinkToken.create({ data: { tenantId: binding.tenantId, userId: binding.userId, redirect: '/employees', expiresAt } })
-        // Signed token is issued by /api/auth/magic/issue as well, but we can reuse callback by crafting URL with server signing endpoint if needed
-        // For simplicity, we will call our own /api/auth/magic/issue to get signed URL
+        // Выдаём маг‑ссылку через внутренний endpoint (подпишет токен)
         const issueUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/issue`
         try {
           const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/employees', ttlMinutes }) })
