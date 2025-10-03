@@ -105,7 +105,7 @@ export async function importCashflowRange(
 
   const flush = async () => {
     if (batch.length === 0) return
-    await prisma.gsCashflowRow.createMany({ data: batch, skipDuplicates: true })
+    await prisma.gsCashflowRow.createMany({ data: batch })
     batch = []
   }
 
@@ -128,7 +128,7 @@ export async function importCashflowRange(
     const isEmpty = !monthName && !monthNum && !dateText && amountCents === null && !wallet && !supplier && !comment && !fund && !flowType && !activity
     if (isEmpty) continue
 
-    batch.push({
+    const record: any = {
       spreadsheet: spreadsheetId,
       sheet,
       rowNum,
@@ -144,7 +144,11 @@ export async function importCashflowRange(
       flowType: flowType || undefined,
       activity: activity || undefined,
       raw: JSON.stringify(r),
-    })
+    }
+    for (const k of Object.keys(record)) {
+      if (record[k] === undefined) delete record[k]
+    }
+    batch.push(record)
     processed++
 
     if (batch.length >= CHUNK_SIZE) {
