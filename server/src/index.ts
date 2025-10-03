@@ -9,7 +9,7 @@ import { createAdjustmentsRouter } from './modules/adjustments/router'
 import { createPayrollRouter } from './modules/payroll/router'
 import { createAccountsRouter } from './modules/accounts/router'
 import { createPayoutsRouter } from './modules/payouts/router'
-import { createCategoriesRouter } from './modules/categories/router'
+import { createCategoriesRouter, createAdminCategoriesTools } from './modules/categories/router'
 import { createTransactionsRouter } from './modules/transactions/router'
 import { createReportsRouter } from './modules/reports/router'
 import { createCounterpartiesRouter } from './modules/counterparties/router'
@@ -82,6 +82,7 @@ app.use('/api/payroll', createPayrollRouter(prisma))
 app.use('/api/accounts', createAccountsRouter(prisma))
 app.use('/api/payouts', createPayoutsRouter(prisma))
 app.use('/api/categories', createCategoriesRouter(prisma))
+app.use('/api/admin/categories', createAdminCategoriesTools(prisma))
 app.use('/api/transactions', createTransactionsRouter(prisma))
 app.use('/api/reports', createReportsRouter(prisma))
 app.use('/api/iiko', createIikoRouter())

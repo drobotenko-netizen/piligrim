@@ -227,3 +227,14 @@ export function createCategoriesRouter(prisma: PrismaClient) {
 
   return router
 }
+
+export function createAdminCategoriesTools(prisma: PrismaClient) {
+  const router = Router()
+  // Soft-clear: деактивировать все категории текущего tenant
+  router.post('/clear', requireRole(['ADMIN']), async (req, res) => {
+    const tenant = await getTenant(prisma, req as any)
+    const r = await prisma.category.updateMany({ where: { tenantId: tenant.id, active: true }, data: { active: false } })
+    res.json({ deactivated: r.count })
+  })
+  return router
+}
