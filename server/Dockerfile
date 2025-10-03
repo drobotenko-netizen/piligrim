@@ -1,27 +1,28 @@
 # Build and run the Express API (TypeScript) with Prisma
-FROM node:20-alpine AS base
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install deps first (better layer caching)
+# Install ALL deps for build (tsc, prisma, etc.)
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
-# Copy project sources
+# Build sources
 COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
+RUN npx prisma generate && npm run build
 
-# Generate Prisma client (uses schema from ./prisma)
-RUN npx prisma generate
-
-# Build TypeScript -> dist
-RUN npm run build
+# Production-only dependencies
+FROM node:20-alpine AS proddeps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
 
 # Final runtime image
 FROM node:20-alpine
 WORKDIR /app
 
-# Create a place for the SQLite database by default
+# Place for SQLite database by default
 RUN mkdir -p /data
 VOLUME /data
 
@@ -29,10 +30,10 @@ ENV NODE_ENV=production \
     PORT=4000 \
     DATABASE_URL="file:/data/dev.db"
 
-# Copy built app and prisma schema (for runtime client)
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/dist ./dist
-COPY --from=base /app/prisma ./prisma
+# Copy production deps and built app
+COPY --from=proddeps /app/node_modules ./node_modules
+COPY --from=deps /app/dist ./dist
+COPY --from=deps /app/prisma ./prisma
 
 EXPOSE 4000
 CMD ["node", "dist/index.js"]
