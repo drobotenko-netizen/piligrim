@@ -445,7 +445,28 @@ export function createTransactionsRouter(prisma: PrismaClient) {
         
         created++
       }
-      
+      // Финальная нормализация типов контрагентов: все контрагенты,
+      // фигурирующие в расходах по статьям под корнем "Себестоимость" → supplier
+      try {
+        const vendorIds: Array<{ id: string }> = await (prisma as any).$queryRawUnsafe(
+          `SELECT DISTINCT t.counterpartyId AS id
+           FROM Transaction t
+           LEFT JOIN Category c ON c.id = t.categoryId
+           LEFT JOIN Category r ON r.id = c.parentId
+           WHERE t.tenantId = ? AND t.counterpartyId IS NOT NULL AND t.kind = 'expense'
+             AND (
+               c.name = 'Поставщики' OR
+               (r.kind = 'COGS') OR
+               (r.name = 'Себестоимость')
+             )`,
+          tenant.id
+        )
+        const ids = vendorIds.map(v => String(v.id)).filter(Boolean)
+        if (ids.length > 0) {
+          await prisma.counterparty.updateMany({ where: { id: { in: ids } }, data: { kind: 'supplier' } })
+        }
+      } catch {}
+
       res.json({ 
         created, 
         fullPairs,

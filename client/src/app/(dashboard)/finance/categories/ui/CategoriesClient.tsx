@@ -176,7 +176,9 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const [transferTarget, setTransferTarget] = useState<string>('')
   const [expandMode, setExpandMode] = useState<'EXPANDED'|'COLLAPSED'>('EXPANDED')
   const [payrollEnsured, setPayrollEnsured] = useState(false)
+  const [payrollEnsuring, setPayrollEnsuring] = useState(false)
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const ENABLE_AUTO_PAYROLL_FIX = process.env.NEXT_PUBLIC_ENABLE_AUTO_PAYROLL_FIX === '1'
 
   // Набор раскрытых узлов
   const initialExpanded = useMemo(() => {
@@ -324,6 +326,9 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
   async function ensurePayrollSystemCategoryAndArticles() {
     if (activeActivity !== 'OPERATING') return
+    if (payrollEnsuring) return
+    setPayrollEnsuring(true)
+    try {
     // Берём всегда свежие данные из API, не из локального state
     const fetchFresh = async () => {
       const r = await fetchWithRole(`${API_BASE}/api/categories`)
@@ -438,14 +443,20 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       }
     }
     await refresh()
+    } catch (e) {
+      console.error('ensurePayrollSystemCategoryAndArticles failed', e)
+    } finally {
+      setPayrollEnsuring(false)
+    }
   }
 
   useEffect(() => {
+    if (!ENABLE_AUTO_PAYROLL_FIX) return
     if (!payrollEnsured && activeActivity === 'OPERATING') {
       ensurePayrollSystemCategoryAndArticles().finally(() => setPayrollEnsured(true))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payrollEnsured, activeActivity])
+  }, [payrollEnsured, activeActivity, ENABLE_AUTO_PAYROLL_FIX])
 
   useEffect(() => {
     loadFunds()

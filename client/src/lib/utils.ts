@@ -12,6 +12,22 @@ export async function fetchWithRole(input: string, init: RequestInit = {}) {
   if (isDev && !headers.has('x-role')) {
     headers.set('x-role', 'ADMIN')
   }
-  return fetch(input, { ...init, headers })
+  const maxAttempts = 3
+  const baseDelayMs = 300
+  let lastErr: any = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fetch(input, { ...init, headers })
+    } catch (e) {
+      lastErr = e
+      if (attempt < maxAttempts) {
+        const delay = baseDelayMs * attempt
+        await new Promise(res => setTimeout(res, delay))
+        continue
+      }
+      throw e
+    }
+  }
+  throw lastErr
 }
 

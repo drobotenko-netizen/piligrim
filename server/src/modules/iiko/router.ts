@@ -556,7 +556,10 @@ export function createIikoRouter() {
         distinct: ['dishCategory']
       })
       
-      const categoryList = categories.map(c => c.dishCategory).filter(Boolean).sort()
+      const categoryList = categories
+        .map((c: { dishCategory: string | null }) => c.dishCategory)
+        .filter(Boolean)
+        .sort()
       
       res.json({ categories: categoryList })
     } catch (e: any) {
@@ -613,7 +616,7 @@ export function createIikoRouter() {
       // Группируем по блюдам
       const dishMap = new Map<string, { dishId: string; dishName: string; dishCategory: string | null; totalQty: number; totalRevenue: number }>()
       
-      items.forEach(item => {
+      items.forEach((item: { dishId: string | null; dishName: string | null; dishCategory: string | null; qty: number | null; net: number | null }) => {
         if (!item.dishId || !item.dishName) return
         
         const key = item.dishId
@@ -643,7 +646,7 @@ export function createIikoRouter() {
     }
   })
 
-  /*router.get('/local/sales/dish/:dishId', async (req, res) => {
+  router.get('/local/sales/dish/:dishId', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     
@@ -715,9 +718,9 @@ export function createIikoRouter() {
       console.error('Error in /local/sales/dish/:dishId:', e)
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })*/
+  })
 
-  /*router.get('/local/sales/category/:category', async (req, res) => {
+  router.get('/local/sales/category/:category', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     
@@ -789,7 +792,7 @@ export function createIikoRouter() {
       console.error('Error in /local/sales/category/:category:', e)
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })*/
+  })
 
   /*router.get('/local/sales/total/month', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
@@ -862,7 +865,7 @@ export function createIikoRouter() {
     return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
   }
 
-  /*router.get('/local/sales/customers', async (req, res) => {
+  router.get('/local/sales/customers', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const from = String(req.query.from || '').trim()
@@ -975,7 +978,7 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })*/
+  })
 
   /*router.get('/local/returns', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')

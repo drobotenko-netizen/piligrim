@@ -89,6 +89,31 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
+  // Авто-раскрытие нужной секции в зависимости от текущего пути
+  useEffect(() => {
+    if (!pathname) return
+    if (pathname.startsWith('/sales/')) {
+      toggleExclusive('sales')
+    } else if (pathname.startsWith('/finance/')) {
+      toggleExclusive('finance')
+    } else if (
+      pathname.startsWith('/timesheets') ||
+      pathname.startsWith('/adjustments') ||
+      pathname.startsWith('/payouts') ||
+      pathname.startsWith('/payroll') ||
+      pathname.startsWith('/employees') ||
+      pathname.startsWith('/positions')
+    ) {
+      toggleExclusive('personnel')
+    } else if (pathname.startsWith('/iiko/')) {
+      toggleExclusive('iiko')
+    } else if (pathname.startsWith('/gsheets/') || pathname.startsWith('/iiko/import')) {
+      toggleExclusive('import')
+    } else if (pathname.startsWith('/admin/')) {
+      toggleExclusive('settings')
+    }
+  }, [pathname])
+
   useEffect(() => {
     const onFocus = () => fetchMe()
     const onVisibility = () => { if (!document.hidden) fetchMe() }

@@ -94,36 +94,41 @@ export function SuppliersClient() {
   const [dateFrom, setDateFrom] = useState('2025-01-01')
   const [dateTo, setDateTo] = useState(now.toISOString().slice(0, 10))
   
-  const [selectedSupplier, setSelectedSupplier] = useState<string>('all')
+  const [selectedCounterparty, setSelectedCounterparty] = useState<string>('all')
+  const [counterpartyType, setCounterpartyType] = useState<string>('supplier')
   const [groupBy, setGroupBy] = useState<'days' | 'weeks' | 'months'>('months')
-  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [counterparties, setCounterparties] = useState<any[]>([])
   const [dataCurrent, setDataCurrent] = useState<any[]>([])
   const [dataLastYear, setDataLastYear] = useState<any[]>([])
   const [totalRevenue, setTotalRevenue] = useState<number>(0)
   const [totalRevenueByPeriod, setTotalRevenueByPeriod] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [chartTab, setChartTab] = useState<'revenue' | 'share'>('revenue')
 
-  // Загрузка списка поставщиков
-  const loadSuppliers = async () => {
+  // Загрузка списка контрагентов
+  const loadCounterparties = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/counterparties?type=supplier`, { credentials: 'include' })
+      const u = new URL(`${API_BASE}/api/counterparties`)
+      if (counterpartyType && counterpartyType !== 'all') u.searchParams.set('type', counterpartyType)
+      const res = await fetch(u.toString(), { credentials: 'include' })
       const json = await res.json()
-      console.log('Loaded suppliers:', json)
-      setSuppliers(json.counterparties || [])
-      // Автоматически выбираем первого поставщика
-      if (json.counterparties?.length > 0) {
-        setSelectedSupplier(json.counterparties[0].id)
+      const list = (json.counterparties || json.items || [])
+      console.log('Loaded counterparties:', { type: counterpartyType, count: list.length })
+      setCounterparties(list)
+      // Автоматически выбираем первого
+      if (list.length > 0) {
+        setSelectedCounterparty(list[0].id)
       }
     } catch (e) {
-      console.error('Error loading suppliers:', e)
+      console.error('Error loading counterparties:', e)
     }
   }
 
   // Загрузка данных по поставщику
   const loadData = async () => {
-    if (selectedSupplier === 'all') return
+    if (selectedCounterparty === 'all') return
     
-    console.log('Loading data for supplier:', selectedSupplier)
+    console.log('Loading data for counterparty:', selectedCounterparty)
     setLoading(true)
     try {
       // Вычисляем период год назад
@@ -137,8 +142,8 @@ export function SuppliersClient() {
       lastYearTo.setFullYear(lastYearTo.getFullYear() - 1)
       
       const [resCurrent, resLastYear, resTotalRevenue] = await Promise.all([
-        fetch(`${API_BASE}/api/payments?counterpartyId=${selectedSupplier}&from=${dateFrom}&to=${dateTo}`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/payments?counterpartyId=${selectedSupplier}&from=${lastYearFrom.toISOString().slice(0, 10)}&to=${lastYearTo.toISOString().slice(0, 10)}`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/payments?counterpartyId=${selectedCounterparty}&from=${dateFrom}&to=${dateTo}`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/payments?counterpartyId=${selectedCounterparty}&from=${lastYearFrom.toISOString().slice(0, 10)}&to=${lastYearTo.toISOString().slice(0, 10)}`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/payments?from=${dateFrom}&to=${dateTo}`, { credentials: 'include' })
       ])
       
@@ -215,12 +220,12 @@ export function SuppliersClient() {
   }
 
   useEffect(() => {
-    loadSuppliers()
-  }, [])
+    loadCounterparties()
+  }, [counterpartyType])
 
   useEffect(() => {
     loadData()
-  }, [dateFrom, dateTo, selectedSupplier, groupBy])
+  }, [dateFrom, dateTo, selectedCounterparty, groupBy])
 
   // Объединяем данные для графика с учетом группировки
   const chartData = useMemo(() => {
@@ -356,7 +361,7 @@ export function SuppliersClient() {
   const totalCountCurrent = dataCurrent.reduce((sum, d) => sum + (d?.count || 0), 0)
   const totalCountLastYear = dataLastYear.reduce((sum, d) => sum + (d?.count || 0), 0)
 
-  const selectedSupplierData = suppliers.find(s => s.id === selectedSupplier)
+  const selectedCounterpartyData = counterparties.find(s => s.id === selectedCounterparty)
 
   return (
     <div className="space-y-6 px-6 py-6">
@@ -383,22 +388,40 @@ export function SuppliersClient() {
                 />
               </div>
 
-              {/* Выбор поставщика */}
+              {/* Тип контрагента */}
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Поставщик:</span>
-                <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                  <SelectTrigger className="w-[300px]">
-                    <SelectValue placeholder="Выберите поставщика" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[400px]">
-                    {suppliers.map(supplier => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                 <Select value={counterpartyType} onValueChange={setCounterpartyType}>
+                   <SelectTrigger className="w-[220px]">
+                     <SelectValue placeholder="Тип контрагента" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="supplier">Поставщик</SelectItem>
+                     <SelectItem value="service">Услуги</SelectItem>
+                     <SelectItem value="personnel">Персонал</SelectItem>
+                     <SelectItem value="bank">Банк</SelectItem>
+                     <SelectItem value="tax">Налоги</SelectItem>
+                     <SelectItem value="transfer">Переводы</SelectItem>
+                     <SelectItem value="other">Прочее</SelectItem>
+                     <SelectItem value="all">Все</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+              {/* Выбор контрагента */}
+              <div className="flex items-center gap-2">
+                 <Select value={selectedCounterparty} onValueChange={setSelectedCounterparty}>
+                   <SelectTrigger className="w-[300px]">
+                     <SelectValue placeholder="Выберите контрагента" />
+                   </SelectTrigger>
+                   <SelectContent className="max-h-[400px]">
+                     {counterparties.map(cp => (
+                       <SelectItem key={cp.id} value={cp.id}>
+                         {cp.name}
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+               </div>
 
               {/* Группировка */}
               <div className="flex items-center gap-2 ml-auto">
@@ -415,12 +438,12 @@ export function SuppliersClient() {
         </Card>
 
         {/* Статистика */}
-        {selectedSupplierData && (
+        {selectedCounterpartyData && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-4">
-                <div className="text-sm text-muted-foreground">Поставщик</div>
-                <div className="text-lg font-semibold">{selectedSupplierData.name}</div>
+                <div className="text-sm text-muted-foreground">Контрагент</div>
+                <div className="text-lg font-semibold">{selectedCounterpartyData.name}</div>
               </CardContent>
             </Card>
             <Card>
@@ -454,94 +477,56 @@ export function SuppliersClient() {
           </div>
         )}
 
-        {/* График */}
+        {/* Графики: один Card с табами */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold">Динамика платежей</h3>
+              <Tabs value={chartTab} onValueChange={(v: any) => setChartTab(v)}>
+                <TabsList>
+                  <TabsTrigger value="revenue">Выручка</TabsTrigger>
+                  <TabsTrigger value="share">Доля %</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
             {loading ? (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                Загрузка...
-              </div>
-            ) : dataCurrent.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
-                <div className="text-lg mb-2">Нет данных за выбранный период</div>
-                <div className="text-sm">Попробуйте изменить период или поставщика</div>
-              </div>
+              <div className="h-64 flex items-center justify-center text-muted-foreground">Загрузка...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="x" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={(value) => formatNumber(value)} tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    formatter={(value: any, name: string) => [
-                      formatCurrency(value), 
-                      name === 'amountCurrent' ? 'Текущий период' : 'Прошлый год'
-                    ]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="amountCurrent" 
-                    stroke="#f97316" 
-                    strokeWidth={2}
-                    name="Текущий период"
-                    dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="amountLastYear" 
-                    stroke="#6b7280" 
-                    strokeWidth={2}
-                    name="Прошлый год"
-                    dot={{ fill: '#6b7280', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* График процентов */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold">Доля в общей выручке (%)</h3>
-            </div>
-            {loading ? (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                Загрузка...
-              </div>
-            ) : dataCurrent.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
-                <div className="text-lg mb-2">Нет данных за выбранный период</div>
-                <div className="text-sm">Попробуйте изменить период или поставщика</div>
-              </div>
-            ) : totalRevenue === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
-                <div className="text-lg mb-2">Нет данных общей выручки</div>
-                <div className="text-sm">Не удалось загрузить общую выручку за период</div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={percentageChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="x" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'Доля в выручке']}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="percentage" 
-                    stroke="#f97316" 
-                    strokeWidth={2}
-                    name="Доля в выручке"
-                    dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              chartTab === 'revenue' ? (
+                dataCurrent.length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+                    <div className="text-lg mb-2">Нет данных за выбранный период</div>
+                    <div className="text-sm">Попробуйте изменить период или контрагента</div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="x" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={(value) => formatNumber(value)} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(value: any, name: string) => [formatCurrency(value), name === 'amountCurrent' ? 'Текущий период' : 'Прошлый год']} />
+                      <Line type="monotone" dataKey="amountCurrent" stroke="#f97316" strokeWidth={2} name="Текущий период" dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} />
+                      <Line type="monotone" dataKey="amountLastYear" stroke="#6b7280" strokeWidth={2} name="Прошлый год" dot={{ fill: '#6b7280', strokeWidth: 2, r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )
+              ) : (
+                totalRevenue === 0 || dataCurrent.length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+                    <div className="text-lg mb-2">Нет данных</div>
+                    <div className="text-sm">Не удалось загрузить общую выручку или нет данных периода</div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={percentageChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="x" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'Доля в выручке']} />
+                      <Line type="monotone" dataKey="percentage" stroke="#f97316" strokeWidth={2} name="Доля в выручке" dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )
+              )
             )}
           </CardContent>
         </Card>

@@ -8,22 +8,30 @@ export function createCategoriesRouter(prisma: PrismaClient) {
   const router = Router()
 
   router.get('/', async (req, res) => {
-    if (!prisma.category) return res.json({ items: [] })
     const tenant = await getTenant(prisma, req as any)
-    const rows = await prisma.category.findMany({ where: { tenantId: tenant.id, active: true }, orderBy: [{ name: 'asc' }] })
-    // формируем простое дерево по parentId
-    const idToNode: Record<string, any> = {}
-    rows.forEach((r: any) => (idToNode[r.id] = { ...r, children: [] }))
-    const roots: any[] = []
-    rows.forEach((r: any) => {
-      if (r.parentId && idToNode[r.parentId]) idToNode[r.parentId].children.push(idToNode[r.id])
-      else roots.push(idToNode[r.id])
-    })
-    res.json({ items: roots })
+    const roots = await prisma.category.findMany({ where: { tenantId: tenant.id, active: true }, orderBy: [{ name: 'asc' }] })
+    const rootIds = roots.map(r => r.id)
+    const articles = await prisma.article.findMany({ where: { tenantId: tenant.id, active: true, categoryId: { in: rootIds } }, orderBy: [{ name: 'asc' }] })
+    const byCat: Record<string, any[]> = {}
+    for (const a of articles as any[]) {
+      (byCat[a.categoryId] = byCat[a.categoryId] || []).push({
+        id: a.id,
+        name: a.name,
+        parentId: a.categoryId,
+        fund: a.fund,
+        active: a.active,
+      })
+    }
+    const items = (roots as any[]).map(r => ({
+      ...r,
+      parentId: null,
+      fund: null,
+      children: (byCat[r.id] || []).map((ch: any) => ({ ...ch, activity: r.activity }))
+    }))
+    res.json({ items })
   })
 
   router.post('/', requireRole(['ADMIN','ACCOUNTANT']), async (req, res) => {
-    if (!prisma.category) return res.status(503).json({ error: 'categories model not available (run prisma migrate/generate)' })
     const bodySchema = z.object({
       name: z.string().trim().min(1),
       type: z.enum(['expense','income']),
@@ -35,20 +43,20 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     const parsed = bodySchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ error: 'bad request', details: parsed.error.flatten() })
     const { name, type, kind, activity, parentId, fund } = parsed.data
-    
-    // Проверяем: если есть parentId, то это статья и можно привязать фонд
-    // Если нет parentId, то это корневая категория и фонд должен быть null
-    if (!parentId && fund) {
-      return res.status(400).json({ error: 'fund_not_allowed_for_root', message: 'Фонд можно привязать только к статьям (не к корневым категориям)' })
-    }
-    
     const tenant = await getTenant(prisma, req as any)
-    const created = await prisma.category.create({ data: { tenantId: tenant.id, name, type, kind, activity, parentId, fund, createdBy: getUserId(req as any) } })
-    res.json({ data: created })
+    if (parentId) {
+      // создаём статью под категорией parentId
+      const article = await prisma.article.create({ data: { tenantId: tenant.id, categoryId: parentId, name, fund: fund || null } })
+      return res.json({ data: { id: article.id, name: article.name, parentId: article.categoryId, fund: article.fund, active: article.active } })
+    } else {
+      // создаём корневую категорию
+      if (fund) return res.status(400).json({ error: 'fund_not_allowed_for_root' })
+      const created = await prisma.category.create({ data: { tenantId: tenant.id, name, type, kind, activity, createdBy: getUserId(req as any) } })
+      return res.json({ data: { ...created, parentId: null, fund: null } })
+    }
   })
 
   router.patch('/:id', requireRole(['ADMIN','ACCOUNTANT']), async (req, res) => {
-    if (!prisma.category) return res.status(503).json({ error: 'categories model not available (run prisma migrate/generate)' })
     const id = req.params.id
     const bodySchema = z.object({
       name: z.string().trim().optional(),
@@ -62,82 +70,70 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     const parsed = bodySchema.safeParse(req.body || {})
     if (!parsed.success) return res.status(400).json({ error: 'bad request', details: parsed.error.flatten() })
     const body = parsed.data
-    
-    // Получаем текущую категорию
-    const currentCategory = await prisma.category.findUnique({ where: { id } })
-    if (!currentCategory) return res.status(404).json({ error: 'category_not_found' })
-    
-    // Проверяем: если это корневая категория (нет parentId), то фонд должен быть null
-    const finalParentId = body.parentId !== undefined ? body.parentId : currentCategory.parentId
-    if (!finalParentId && body.fund) {
-      return res.status(400).json({ error: 'fund_not_allowed_for_root', message: 'Фонд можно привязать только к статьям (не к корневым категориям)' })
+    // Попытка как категория (root)
+    const cat = await prisma.category.findUnique({ where: { id } })
+    if (cat) {
+      if (body.fund) return res.status(400).json({ error: 'fund_not_allowed_for_root' })
+      const patch: any = {}
+      if (body.name !== undefined) patch.name = body.name
+      if (body.type !== undefined) patch.type = body.type
+      if (body.kind !== undefined) patch.kind = body.kind
+      if (body.activity !== undefined) patch.activity = body.activity
+      if (body.active !== undefined) patch.active = body.active
+      patch.updatedBy = getUserId(req as any)
+      const updated = await prisma.category.update({ where: { id }, data: patch })
+      return res.json({ data: { ...updated, parentId: null, fund: null } })
     }
-    
-    const patch: any = {}
-    if (body.name !== undefined) patch.name = body.name
-    if (body.type !== undefined) patch.type = body.type
-    if (body.kind !== undefined) patch.kind = body.kind
-    if (body.activity !== undefined) patch.activity = body.activity
-    if (body.parentId !== undefined) patch.parentId = body.parentId
-    if (body.fund !== undefined) patch.fund = body.fund
-    if (body.active !== undefined) patch.active = body.active
-    patch.updatedBy = getUserId(req as any)
-    
-    // Если меняется activity, обновляем все дочерние категории
-    if (body.activity !== undefined && body.activity !== currentCategory.activity) {
-      await prisma.category.updateMany({
-        where: { 
-          parentId: id,
-          tenantId: currentCategory.tenantId
-        },
-        data: { 
-          activity: body.activity,
-          updatedBy: getUserId(req as any)
-        }
-      })
-    }
-    
-    const updated = await prisma.category.update({ where: { id }, data: patch })
-    res.json({ data: updated })
+    // Попытка как статья
+    const art = await prisma.article.findUnique({ where: { id } })
+    if (!art) return res.status(404).json({ error: 'not_found' })
+    const patchA: any = {}
+    if (body.name !== undefined) patchA.name = body.name
+    if (body.fund !== undefined) patchA.fund = body.fund
+    if (body.parentId !== undefined && body.parentId) patchA.categoryId = body.parentId
+    if (body.active !== undefined) patchA.active = body.active
+    const updatedA = await prisma.article.update({ where: { id }, data: patchA })
+    return res.json({ data: { id: updatedA.id, name: updatedA.name, parentId: updatedA.categoryId, fund: updatedA.fund, active: updatedA.active } })
   })
 
   // мягкое удаление с проверками и переносом транзакций
   router.delete('/:id', requireRole(['ADMIN','ACCOUNTANT']), async (req, res) => {
-    if (!prisma.category) return res.status(503).json({ error: 'categories model not available (run prisma migrate/generate)' })
     const id = req.params.id
     const body = req.body || {}
-
-    // Запрещаем удаление, если есть активные дочерние
-    const childrenCount = await prisma.category.count({ where: { parentId: id, active: true } })
-    if (childrenCount > 0) {
-      return res.status(400).json({ error: 'has_children', message: 'Нельзя удалить категорию: есть вложенные статьи.' })
+    // Если это корневая категория
+    const cat = await prisma.category.findUnique({ where: { id } })
+    if (cat) {
+      const childrenCount = await prisma.article.count({ where: { categoryId: id, active: true } })
+      if (childrenCount > 0) {
+        return res.status(400).json({ error: 'has_children', message: 'Нельзя удалить категорию: есть вложенные статьи.' })
+      }
+      const txCount = await prisma.transaction.count({ where: { categoryId: id } })
+      if (txCount > 0) {
+        const moveToCategoryId = body.moveToCategoryId ? String(body.moveToCategoryId) : null
+        if (!moveToCategoryId) {
+          return res.status(409).json({ error: 'has_transactions', count: txCount, message: 'Есть операции по этой статье. Выберите статью для переноса.' })
+        }
+        const [fromCat, toCat] = await Promise.all([
+          prisma.category.findUnique({ where: { id } }),
+          prisma.category.findUnique({ where: { id: moveToCategoryId } })
+        ])
+        if (!toCat) return res.status(404).json({ error: 'move_target_not_found' })
+        if (fromCat?.type && toCat.type && fromCat.type !== toCat.type) {
+          return res.status(400).json({ error: 'incompatible_type', message: 'Нельзя переносить операции между доходами и расходами.' })
+        }
+        if (fromCat?.activity && toCat.activity && fromCat.activity !== toCat.activity) {
+          return res.status(400).json({ error: 'incompatible_activity', message: 'Нельзя переносить операции между разными видами деятельности.' })
+        }
+        await prisma.transaction.updateMany({ where: { categoryId: id }, data: { categoryId: moveToCategoryId } })
+      }
+      const updated = await prisma.category.update({ where: { id }, data: { active: false, updatedBy: getUserId(req as any) } })
+      return res.json({ data: updated })
     }
-
-    // Если есть транзакции — нужна перенастройка
-    const txCount = await prisma.transaction.count({ where: { categoryId: id } })
-    if (txCount > 0) {
-      const moveToCategoryId = body.moveToCategoryId ? String(body.moveToCategoryId) : null
-      if (!moveToCategoryId) {
-        return res.status(409).json({ error: 'has_transactions', count: txCount, message: 'Есть операции по этой статье. Выберите статью для переноса.' })
-      }
-      // проверяем совместимость type/activity
-      const [fromCat, toCat] = await Promise.all([
-        prisma.category.findUnique({ where: { id } }),
-        prisma.category.findUnique({ where: { id: moveToCategoryId } })
-      ])
-      if (!toCat) return res.status(404).json({ error: 'move_target_not_found' })
-      if (fromCat?.type && toCat.type && fromCat.type !== toCat.type) {
-        return res.status(400).json({ error: 'incompatible_type', message: 'Нельзя переносить операции между доходами и расходами.' })
-      }
-      if (fromCat?.activity && toCat.activity && fromCat.activity !== toCat.activity) {
-        return res.status(400).json({ error: 'incompatible_activity', message: 'Нельзя переносить операции между разными видами деятельности.' })
-      }
-      // переносим транзакции и деактивируем категорию
-      await prisma.transaction.updateMany({ where: { categoryId: id }, data: { categoryId: moveToCategoryId } })
-    }
-
-    const updated = await prisma.category.update({ where: { id }, data: { active: false, updatedBy: getUserId(req as any) } })
-    res.json({ data: updated })
+    // иначе — статья
+    const art = await prisma.article.findUnique({ where: { id } })
+    if (!art) return res.status(404).json({ error: 'not_found' })
+    const updatedA = await prisma.article.update({ where: { id }, data: { active: false } })
+    return res.json({ data: { id: updatedA.id, name: updatedA.name, parentId: updatedA.categoryId, fund: updatedA.fund, active: updatedA.active } })
   })
 
   // Получение списка фондов из Google Sheets
@@ -156,7 +152,7 @@ export function createCategoriesRouter(prisma: PrismaClient) {
     }
   })
 
-  // Фонды, не привязанные ни к одной статье (category.fund)
+  // Фонды, не привязанные ни к одной статье
   router.get('/funds/unmapped', async (req, res) => {
     try {
       const funds = await prisma.gsCashflowRow.findMany({
@@ -168,11 +164,11 @@ export function createCategoriesRouter(prisma: PrismaClient) {
       const fundList = funds.map(f => f.fund).filter(Boolean) as string[]
       if (fundList.length === 0) return res.json({ unmapped: [] })
 
-      const mappedCats = await prisma.category.findMany({
+      const mappedArts = await prisma.article.findMany({
         where: { fund: { in: fundList } },
         select: { fund: true }
       })
-      const mappedSet = new Set((mappedCats.map(c => c.fund) as (string|null)[]).filter(Boolean) as string[])
+      const mappedSet = new Set((mappedArts.map(a => a.fund) as (string|null)[]).filter(Boolean) as string[])
       const unmapped = fundList.filter(f => !mappedSet.has(f))
       res.json({ unmapped })
     } catch (error: any) {
@@ -233,15 +229,16 @@ export function createAdminCategoriesTools(prisma: PrismaClient) {
   // Soft-clear: деактивировать все категории текущего tenant
   router.post('/clear', requireRole(['ADMIN']), async (req, res) => {
     const tenant = await getTenant(prisma, req as any)
-    const r = await prisma.category.updateMany({ where: { tenantId: tenant.id, active: true }, data: { active: false } })
-    res.json({ deactivated: r.count })
+    const rc = await prisma.category.updateMany({ where: { tenantId: tenant.id, active: true }, data: { active: false } })
+    const ra = await prisma.article.updateMany({ where: { tenantId: tenant.id, active: true }, data: { active: false } })
+    res.json({ deactivatedCategories: rc.count, deactivatedArticles: ra.count })
   })
 
   // Нормализация: убрать fund у всех корневых категорий (parentId=null)
   router.post('/normalize-roots', requireRole(['ADMIN']), async (req, res) => {
     const tenant = await getTenant(prisma, req as any)
-    const r = await prisma.category.updateMany({ where: { tenantId: tenant.id, parentId: null, NOT: { fund: null } }, data: { fund: null } })
-    res.json({ rootsFundCleared: r.count })
+    // В новой модели fund у категорий не хранится
+    res.json({ rootsFundCleared: 0 })
   })
 
   // Seed план: создать категории и статьи, привязать фонды (двухуровневая структура)
@@ -429,28 +426,94 @@ export function createAdminCategoriesTools(prisma: PrismaClient) {
       // Имя статьи: для выручки — "Выручка", для переводов — как в фонде, иначе по фонду
       let articleName = nf
       if (nf === 'ВЫРУЧКА') articleName = 'Выручка'
-      // Для персонала имена статей = фондам (ЗП ..., Еда под ЗП, Подарки ...)
-
-      // Тип статьи: берём из категории (родителя)
-      const parent = await prisma.category.findUnique({ where: { id: parentId } })
-      const type = parent?.type === 'income' ? 'income' : 'expense'
-      const activity = parent?.activity || 'OPERATING'
-
-      const existing = await prisma.category.findFirst({ where: { tenantId: tenant.id, name: articleName, parentId } })
+      // Поиск/создание статьи
+      const existing = await prisma.article.findFirst({ where: { tenantId: tenant.id, name: articleName, categoryId: parentId } })
       if (existing) {
-        const needUpdate = (!existing.active) || (existing.fund !== originalFund) || (existing.type !== type) || (existing.activity !== activity)
+        const needUpdate = (!existing.active) || (existing.fund !== originalFund)
         if (needUpdate) {
-          await prisma.category.update({ where: { id: existing.id }, data: { active: true, fund: originalFund, type, activity } })
+          await prisma.article.update({ where: { id: existing.id }, data: { active: true, fund: originalFund } })
           if (!existing.active) reactivated++
           else updated++
         }
       } else {
-        await prisma.category.create({ data: { tenantId: tenant.id, name: articleName, parentId, fund: originalFund, type, activity } })
+        await prisma.article.create({ data: { tenantId: tenant.id, categoryId: parentId, name: articleName, fund: originalFund } })
         created++
       }
     }
 
     res.json({ ok: true, categories: baseCategories.length, created, reactivated, updated })
+  })
+  
+  // Переклассификация фондов: перенос статей (fund) под правильные корни
+  router.post('/reclassify-funds', requireRole(['ADMIN']), async (req, res) => {
+    const tenant = await getTenant(prisma, req as any)
+    function normalizeFund(input: string): string {
+      return String(input || '')
+        .replace(/\u00A0|\u200B|\uFEFF/g, ' ')
+        .replace(/[–—−]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase()
+    }
+    const plan: Record<string, { parent: string; type: 'income'|'expense'; kind?: 'COGS'|'OPEX'|'CAPEX'|'TAX'|'FEE'|'OTHER' }> = {
+      'ВЫРУЧКА': { parent: 'Выручка', type: 'income' },
+      'ВЫРУЧКА ДОСТАВКА': { parent: 'Выручка', type: 'income' },
+      'ВЫРУЧКА ПРОЧЕЕ': { parent: 'Выручка', type: 'income' },
+      'ИЗЛИШКИ': { parent: 'Выручка', type: 'income' },
+      'ПОСТАВЩИКИ': { parent: 'Себестоимость', type: 'expense', kind: 'COGS' },
+      'ЭКВАЙРИНГ (ПРОЦЕНТ)': { parent: 'Банковские комиссии', type: 'expense', kind: 'FEE' },
+      'КОММИССИЯ БАНКА': { parent: 'Банковские комиссии', type: 'expense', kind: 'FEE' },
+      'ДОСТАВКА': { parent: 'Логистика', type: 'expense', kind: 'OPEX' },
+      'ДОСТАВКА ИЗ ВЛАДИВОСТОКА': { parent: 'Логистика', type: 'expense', kind: 'OPEX' },
+      'ДОСТАВКА ПО ГОРОДУ': { parent: 'Логистика', type: 'expense', kind: 'OPEX' },
+      'РАСХОДЫ НА ТАКСИ': { parent: 'Транспорт', type: 'expense', kind: 'OPEX' },
+      'IT И СЕРВИСЫ': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'ВЕБСАЙТ': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'ДОКСИНБОКС': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'ПРОЧИЕ ПРОГРАММЫ': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'СМАРТОМАТО': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'IIKO': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'ОРГТЕХНИКА И ОБСЛУЖИВАНИЕ': { parent: 'IT и сервисы', type: 'expense', kind: 'OPEX' },
+      'НАЛОГИ НА ЗП': { parent: 'Налоги', type: 'expense', kind: 'TAX' },
+      'НАЛОГИ ПАТЕНТ': { parent: 'Налоги', type: 'expense', kind: 'TAX' },
+      'ИНТЕРНЕТ': { parent: 'Связь', type: 'expense', kind: 'OPEX' },
+      'ТЕЛЕФОН': { parent: 'Связь', type: 'expense', kind: 'OPEX' },
+      'КОММУНАЛЬНЫЕ УСЛУГИ': { parent: 'Коммунальные услуги', type: 'expense', kind: 'OPEX' },
+      'ЭЛЕКТРИЧЕСТВО': { parent: 'Коммунальные услуги', type: 'expense', kind: 'OPEX' },
+      'АРЕНДА': { parent: 'Аренда', type: 'expense', kind: 'OPEX' },
+      'АРЕНДА ОБОРУДОВАНИЯ': { parent: 'Аренда', type: 'expense', kind: 'OPEX' },
+      'УПАКОВКА/ХОЗКА': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'КАНЦТОВАРЫ': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'ВЫВОЗ МУСОРА': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'СТИРКА': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'БОЙ ПОСУДЫ': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'ОХРАНА': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'ПОКУПКА МЕЛКОГО ИНВЕНТАРЯ И МЕЛОЧЕЙ': { parent: 'Хозяйственные расходы', type: 'expense', kind: 'OPEX' },
+      'РЕЗЕРВНЫЙ ФОНД': { parent: 'Прочее (OPEX)', type: 'expense', kind: 'OPEX' },
+      'КОМАНДИРОВКИ': { parent: 'Прочее (OPEX)', type: 'expense', kind: 'OPEX' },
+      'НЕДОСДАЧА': { parent: 'Прочее (OPEX)', type: 'expense', kind: 'OPEX' },
+      'МАРКЕТИНГ': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' },
+      'РЕКЛАМА': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' },
+      'СМС-РАССЫЛКА': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' },
+      'ФОТОГРАФ': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' },
+      'ДИЗАЙН МАКЕТОВ': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' },
+      'ПОЛИГРАФИЯ/НАРУЖКА': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' },
+      'ОРГАНИЗАЦИЯ МЕРОПРИЯТИЙ': { parent: 'Маркетинг', type: 'expense', kind: 'OPEX' }
+    }
+    let moved = 0
+    for (const art of await prisma.category.findMany({ where: { tenantId: tenant.id, parentId: { not: null }, active: true } })) {
+      const nf = art.fund ? normalizeFund(art.fund) : ''
+      if (!nf) continue
+      const target = plan[nf]
+      if (!target) continue
+      const root = await prisma.category.findFirst({ where: { tenantId: tenant.id, parentId: null, name: target.parent } })
+      if (!root) continue
+      if (art.parentId !== root.id) {
+        await prisma.category.update({ where: { id: art.id }, data: { parentId: root.id } })
+        moved++
+      }
+    }
+    res.json({ ok: true, moved })
   })
   return router
 }

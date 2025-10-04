@@ -146,9 +146,10 @@ export function createIikoLocalRouter(deps: { buildDayRangeIso: (d: string) => {
       for (const r of receipts) {
         const d = new Date(r.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
-        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0 }
+        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0, count: 0 }
         e.net += Number(r.returnSum || 0)
         e.gross += Number(r.returnSum || 0)
+        e.count += 1
         byDay.set(ymd, e)
       }
       const revenue = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
@@ -177,9 +178,10 @@ export function createIikoLocalRouter(deps: { buildDayRangeIso: (d: string) => {
       for (const r of receipts) {
         const d = new Date(r.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
-        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0 }
+        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0, count: 0 }
         e.net += Number(r.net || 0)
         e.gross += Number(r.net || 0)
+        e.count += 1
         byDay.set(ymd, e)
       }
       const revenue = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
@@ -208,9 +210,10 @@ export function createIikoLocalRouter(deps: { buildDayRangeIso: (d: string) => {
       for (const r of receipts) {
         const d = new Date(r.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
-        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0 }
+        const e = byDay.get(ymd) || { date: ymd, net: 0, gross: 0, discount: 0, count: 0 }
         if (r.isReturn) e.net += Number(r.returnSum || 0); else e.net += Number(r.net || 0)
         e.gross += Number(r.net || 0)
+        e.count += 1
         byDay.set(ymd, e)
       }
       const revenue = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))

@@ -82,6 +82,7 @@ export function DishesClient() {
   const [selectedDish, setSelectedDish] = useState<string>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [groupBy, setGroupBy] = useState<'days' | 'weeks' | 'months'>('months')
+  const [displayMode, setDisplayMode] = useState<'sales' | 'receipts'>('sales')
   const [dishes, setDishes] = useState<any[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [dataCurrent, setDataCurrent] = useState<any[]>([])
@@ -210,7 +211,9 @@ export function DishesClient() {
           qtyCurrent: currentData?.qty || null,
           qtyLastYear: lastYearData?.qty || null,
           revenueCurrent: currentData?.revenue || null,
-          revenueLastYear: lastYearData?.revenue || null
+          revenueLastYear: lastYearData?.revenue || null,
+          current: displayMode === 'sales' ? (currentData?.revenue || null) : (currentData?.qty || null),
+          lastYear: displayMode === 'sales' ? (lastYearData?.revenue || null) : (lastYearData?.qty || null)
         })
       }
       
@@ -258,7 +261,9 @@ export function DishesClient() {
           qtyCurrent: wCurrent?.qty || null,
           qtyLastYear: wLastYear?.qty || null,
           revenueCurrent: wCurrent?.revenue || null,
-          revenueLastYear: wLastYear?.revenue || null
+          revenueLastYear: wLastYear?.revenue || null,
+          current: displayMode === 'sales' ? (wCurrent?.revenue || null) : (wCurrent?.qty || null),
+          lastYear: displayMode === 'sales' ? (wLastYear?.revenue || null) : (wLastYear?.qty || null)
         })
       }
       
@@ -339,14 +344,16 @@ export function DishesClient() {
         qtyCurrent: mCurrent?.qty || null,
         qtyLastYear: mLastYear?.qty || null,
         revenueCurrent: mCurrent?.revenue || null,
-        revenueLastYear: mLastYear?.revenue || null
+        revenueLastYear: mLastYear?.revenue || null,
+        current: displayMode === 'sales' ? (mCurrent?.revenue || null) : (mCurrent?.qty || null),
+        lastYear: displayMode === 'sales' ? (mLastYear?.revenue || null) : (mLastYear?.qty || null)
       })
     }
     
     console.log('Final chart data:', result.map(r => ({ x: r.x, qtyCurrent: r.qtyCurrent, qtyLastYear: r.qtyLastYear })))
     
     return result
-  }, [dataCurrent, dataLastYear, groupBy, dateFrom, dateTo])
+  }, [dataCurrent, dataLastYear, groupBy, dateFrom, dateTo, displayMode])
 
   const totalQtyCurrent = dataCurrent.reduce((sum, d) => sum + (d?.qty || 0), 0)
   const totalQtyLastYear = dataLastYear.reduce((sum, d) => sum + (d?.qty || 0), 0)
@@ -370,20 +377,19 @@ export function DishesClient() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
       {(() => {
         const title = getPageTitle()
-        if (title === 'Анализ всех блюд') return null
+        if (title === 'Анализ всех блюд' || title.startsWith('Анализ категории') || title.startsWith('Анализ блюда')) return null
         return (
           <div className="mb-6">
             <h1 className="text-3xl font-bold">{title}</h1>
           </div>
         )
       })()}
-      <Card>
-        <CardContent className="p-6 space-y-6">
-          {/* Фильтры и табы в одной строке */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+      
+      {/* Фильтры и табы */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Выбор категории */}
               <div className="flex items-center gap-2">
@@ -455,12 +461,12 @@ export function DishesClient() {
             </Tabs>
           </div>
 
-          {loading ? (
-            <div className="p-8 text-center text-muted-foreground">Загрузка данных...</div>
-          ) : (
-            <>
-              {/* Карточки с итогами */}
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      {loading ? (
+        <div className="p-8 text-center text-muted-foreground">Загрузка данных...</div>
+      ) : (
+        <>
+          {/* Карточки с итогами */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="rounded-lg border p-4">
                   <div className="text-sm text-muted-foreground">Продано (текущий период)</div>
                   <div className="text-2xl font-bold" style={{ color: '#f97316' }}>{formatNumber(totalQtyCurrent)} шт</div>
@@ -497,98 +503,78 @@ export function DishesClient() {
                 </div>
               </div>
 
-              {/* График количества */}
-              <div className="rounded-lg border p-4">
-                <h3 className="text-lg font-semibold mb-4">График продаж (количество)</h3>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="x"
-                        tick={{ fontSize: 12 }}
-                        angle={groupBy === 'months' ? -45 : 0}
-                        textAnchor={groupBy === 'months' ? 'end' : 'middle'}
-                      />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip 
-                        formatter={(value: any) => value !== null ? `${formatNumber(value)} шт` : null}
-                        labelFormatter={(label) => label}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="qtyCurrent" 
-                        stroke="#374151" 
-                        strokeWidth={2}
-                        name="Текущий период"
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="qtyLastYear" 
-                        stroke="#f97316" 
-                        strokeWidth={2}
-                        name="Год назад"
-                        connectNulls={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+          {/* График с табами */}
+          <Card>
+            <CardContent className="p-4">
+                <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as 'sales' | 'receipts')}>
+                  <div className="flex justify-between items-center mb-4">
+                    <TabsList className="grid w-full max-w-xs grid-cols-2">
+                      <TabsTrigger value="sales">Продажи</TabsTrigger>
+                      <TabsTrigger value="receipts">Чеки</TabsTrigger>
+                    </TabsList>
+                  </div>
+                  
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="x"
+                          tick={{ fontSize: 12 }}
+                          angle={groupBy === 'months' ? -45 : 0}
+                          textAnchor={groupBy === 'months' ? 'end' : 'middle'}
+                        />
+                        <YAxis 
+                          tickFormatter={displayMode === 'sales' ? (value) => formatNumber(value) : undefined}
+                          tick={{ fontSize: 10 }} 
+                        />
+                        <Tooltip 
+                          formatter={(value: any) => {
+                            if (value === null) return null
+                            const unit = displayMode === 'sales' ? '₽' : 'шт'
+                            return `${formatNumber(value)} ${unit}`
+                          }}
+                          labelFormatter={(label) => label}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="current" 
+                          stroke="#374151" 
+                          strokeWidth={2}
+                          name="Текущий период"
+                          connectNulls={false}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="lastYear" 
+                          stroke="#f97316" 
+                          strokeWidth={2}
+                          name="Год назад"
+                          connectNulls={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Tabs>
+            </CardContent>
+          </Card>
 
-              {/* График выручки */}
-              <div className="rounded-lg border p-4">
-                <h3 className="text-lg font-semibold mb-4">График выручки</h3>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="x"
-                        tick={{ fontSize: 12 }}
-                        angle={groupBy === 'months' ? -45 : 0}
-                        textAnchor={groupBy === 'months' ? 'end' : 'middle'}
-                      />
-                      <YAxis tickFormatter={(value) => formatNumber(value)} tick={{ fontSize: 10 }} />
-                      <Tooltip 
-                        formatter={(value: any) => value !== null ? `${formatNumber(value)} ₽` : null}
-                        labelFormatter={(label) => label}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="revenueCurrent" 
-                        stroke="#374151" 
-                        strokeWidth={2}
-                        name="Текущий период"
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="revenueLastYear" 
-                        stroke="#f97316" 
-                        strokeWidth={2}
-                        name="Год назад"
-                        connectNulls={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Таблица */}
-              <div className="rounded-lg border p-4">
-                <h3 className="text-lg font-semibold mb-4">Детализация</h3>
+          {/* Таблица */}
+          <Card>
+            <CardContent className="p-4">
                 <div className="overflow-auto">
                   <Table className="w-full">
                   <THead>
                     <TR>
                       <TH className="w-32">{groupBy === 'days' ? 'День' : groupBy === 'weeks' ? 'Неделя' : 'Месяц'}</TH>
                       <TH className="text-right">Кол-во (текущий)</TH>
-                      <TH className="text-right">Выручка (текущий)</TH>
                       <TH className="text-right">Кол-во (год назад)</TH>
+                      <TH className="text-right">Кол-во (разница)</TH>
+                      <TH className="text-right">Кол-во (разница %)</TH>
+                      <TH className="text-right">Выручка (текущий)</TH>
                       <TH className="text-right">Выручка (год назад)</TH>
-                      <TH className="text-right">Разница (кол-во)</TH>
-                      <TH className="text-right">Разница (₽)</TH>
+                      <TH className="text-right">Выручка (разница)</TH>
+                      <TH className="text-right">Выручка (разница %)</TH>
                     </TR>
                   </THead>
                   <TBody>
@@ -596,22 +582,40 @@ export function DishesClient() {
                       const qtyDiff = (row.qtyCurrent || 0) - (row.qtyLastYear || 0)
                       const revDiff = (row.revenueCurrent || 0) - (row.revenueLastYear || 0)
                       
+                      const qtyDiffPercent = row.qtyLastYear && row.qtyLastYear !== 0 
+                        ? Math.round((qtyDiff / row.qtyLastYear) * 100) 
+                        : null
+                      
+                      const revDiffPercent = row.revenueLastYear && row.revenueLastYear !== 0 
+                        ? Math.round((revDiff / row.revenueLastYear) * 100) 
+                        : null
+                      
                       return (
                         <TR key={idx}>
                           <TD className="font-medium">{row.x}</TD>
                           <TD className="text-right">{row.qtyCurrent !== null ? formatNumber(row.qtyCurrent) : ''}</TD>
-                          <TD className="text-right">{row.revenueCurrent !== null ? formatNumber(row.revenueCurrent) : ''}</TD>
                           <TD className="text-right">{row.qtyLastYear !== null ? formatNumber(row.qtyLastYear) : ''}</TD>
-                          <TD className="text-right">{row.revenueLastYear !== null ? formatNumber(row.revenueLastYear) : ''}</TD>
                           <TD className={`text-right font-medium ${
                             qtyDiff > 0 ? 'text-green-600' : qtyDiff < 0 ? 'text-red-600' : ''
                           }`}>
                             {row.qtyCurrent !== null && row.qtyLastYear !== null ? formatNumber(qtyDiff) : ''}
                           </TD>
                           <TD className={`text-right font-medium ${
+                            qtyDiffPercent !== null ? (qtyDiffPercent > 0 ? 'text-green-600' : qtyDiffPercent < 0 ? 'text-red-600' : '') : ''
+                          }`}>
+                            {qtyDiffPercent !== null ? `${qtyDiffPercent > 0 ? '+' : ''}${qtyDiffPercent}%` : ''}
+                          </TD>
+                          <TD className="text-right">{row.revenueCurrent !== null ? formatNumber(row.revenueCurrent) : ''}</TD>
+                          <TD className="text-right">{row.revenueLastYear !== null ? formatNumber(row.revenueLastYear) : ''}</TD>
+                          <TD className={`text-right font-medium ${
                             revDiff > 0 ? 'text-green-600' : revDiff < 0 ? 'text-red-600' : ''
                           }`}>
                             {row.revenueCurrent !== null && row.revenueLastYear !== null ? formatNumber(revDiff) : ''}
+                          </TD>
+                          <TD className={`text-right font-medium ${
+                            revDiffPercent !== null ? (revDiffPercent > 0 ? 'text-green-600' : revDiffPercent < 0 ? 'text-red-600' : '') : ''
+                          }`}>
+                            {revDiffPercent !== null ? `${revDiffPercent > 0 ? '+' : ''}${revDiffPercent}%` : ''}
                           </TD>
                         </TR>
                       )
@@ -619,11 +623,10 @@ export function DishesClient() {
                     </TBody>
                   </Table>
                 </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

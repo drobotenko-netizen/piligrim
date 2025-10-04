@@ -22,6 +22,7 @@ model Tenant {
   positionRates  PositionRate[]
   accounts       Account[]
   categories     Category[]
+  articles       Article[]
   transactions   Transaction[]
   counterparties Counterparty[]
   statements     Statement[]
@@ -168,7 +169,7 @@ model Category {
   parentId     String?
   parent       Category?     @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children     Category[]    @relation("CategoryHierarchy")
-  fund         String? // Связь с фондом из Google Sheets
+  fund         String?
   active       Boolean       @default(true)
   createdBy    String?
   updatedBy    String?
@@ -176,6 +177,24 @@ model Category {
   updatedAt    DateTime      @updatedAt
   transactions Transaction[]
   expenseDocs  ExpenseDoc[]
+  articles     Article[]
+}
+
+// Новая сущность: статьи как дети корневых категорий
+model Article {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  name       String
+  fund       String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, name])
+  @@index([fund])
 }
 
 model Statement {

@@ -10,21 +10,8 @@ export function createCounterpartiesRouter(prisma: PrismaClient) {
   router.get('/', async (req, res) => {
     if (!prisma.counterparty) return res.json({ items: [] })
     const tenant = await getTenant(prisma, req as any)
-    const { type } = req.query
-    
-    const where: any = { tenantId: tenant.id }
-    if (type) {
-      where.kind = String(type)
-    }
-    
-    const data = await prisma.counterparty.findMany({ where, orderBy: { name: 'asc' } })
-    
-    // Если запрашиваются поставщики, возвращаем в специальном формате
-    if (type === 'supplier') {
-      res.json({ counterparties: data })
-    } else {
-      res.json({ items: data })
-    }
+    const data = await prisma.counterparty.findMany({ where: { tenantId: tenant.id }, orderBy: { name: 'asc' } })
+    res.json({ items: data })
   })
 
   router.post('/', requireRole(['ADMIN','ACCOUNTANT']), async (req, res) => {

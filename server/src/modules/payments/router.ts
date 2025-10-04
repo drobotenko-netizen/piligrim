@@ -291,6 +291,57 @@ export function createPaymentsRouter(prisma: PrismaClient) {
       
       const tenant = await getTenant(prisma, req as any)
       const userId = getUserId(req as any)
+
+      // === Обеспечим наличие справочника типов контрагентов ===
+      const ensureTypesTableSQL = `CREATE TABLE IF NOT EXISTS CounterpartyType (
+        id TEXT PRIMARY KEY,
+        tenantId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        label TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+        updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(tenantId, name)
+      );`
+      await (prisma as any).$executeRawUnsafe(ensureTypesTableSQL)
+      const baseTypes: Array<{ name: string; label: string }> = [
+        { name: 'supplier', label: 'Поставщик' },
+        { name: 'service', label: 'Услуги' },
+        { name: 'personnel', label: 'Персонал' },
+        { name: 'bank', label: 'Банк' },
+        { name: 'tax', label: 'Налоги' },
+        { name: 'transfer', label: 'Перевод' },
+        { name: 'other', label: 'Прочее' },
+      ]
+      const existingTypes: any[] = await (prisma as any).$queryRawUnsafe(
+        `SELECT name FROM CounterpartyType WHERE tenantId = ?`, tenant.id
+      )
+      const existingSet = new Set((existingTypes || []).map((r: any) => String(r.name)))
+      for (const t of baseTypes) {
+        if (!existingSet.has(t.name)) {
+          const id = (global as any).crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
+          await (prisma as any).$executeRawUnsafe(
+            `INSERT INTO CounterpartyType (id, tenantId, name, label, active) VALUES (?, ?, ?, ?, 1)`,
+            id, tenant.id, t.name, t.label
+          )
+        }
+      }
+
+      // Нормализация уже существующих контрагентов: привести kind к каноническим ключам
+      const kindsMap: Array<{ from: string, to: string }> = [
+        { from: 'банк', to: 'bank' },
+        { from: 'персонал', to: 'personnel' },
+        { from: 'услуги', to: 'service' },
+        { from: 'поставщик', to: 'supplier' },
+        { from: 'налоги', to: 'tax' },
+        { from: 'перевод', to: 'transfer' },
+        { from: 'vendor', to: 'supplier' },
+        { from: 'company', to: 'service' },
+        { from: 'person', to: 'service' }
+      ]
+      for (const m of kindsMap) {
+        await prisma.counterparty.updateMany({ where: { tenantId: tenant.id, kind: m.from }, data: { kind: m.to } })
+      }
       
       // 1. Удаляем все старые Payment и ExpenseDoc
       const deletedPayments = await prisma.payment.deleteMany({
@@ -638,6 +689,118 @@ export function createPaymentsRouter(prisma: PrismaClient) {
         }
       }
       
+      // Вспомогательные функции для категорий/контрагентов
+      const normalizeFund = (input: string): string => String(input || '')
+        .replace(/\u00A0|\u200B|\uFEFF/g, ' ')
+        .replace(/[–—−]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      const planToCategory: Record<string, { parent: string; type: 'income'|'expense'; rootKind?: 'COGS'|'OPEX'|'CAPEX'|'TAX'|'FEE'|'OTHER' }> = {
+        'ВЫРУЧКА': { parent: 'Выручка', type: 'income' },
+        'ВЫРУЧКА ДОСТАВКА': { parent: 'Выручка', type: 'income' },
+        'ВЫРУЧКА ПРОЧЕЕ': { parent: 'Выручка', type: 'income' },
+        'ИЗЛИШКИ': { parent: 'Выручка', type: 'income' },
+        'Эквайринг (процент)': { parent: 'Банковские комиссии', type: 'expense', rootKind: 'FEE' },
+        'Комиссия банка': { parent: 'Банковские комиссии', type: 'expense', rootKind: 'FEE' },
+        'Расходы на такси': { parent: 'Транспорт', type: 'expense', rootKind: 'OPEX' },
+        'Вебсайт': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'Консалтинг / обучение': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'ДоксИнБокс': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'Прочие программы': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'Смартомато': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'IIKO': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'Оргтехника и обслуживание': { parent: 'IT и сервисы', type: 'expense', rootKind: 'OPEX' },
+        'Подарки персоналу / дни рождения': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'Еда под ЗП': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'ЗП курьеры': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'ЗП кухня': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'ЗП посуда': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'ЗП гардеробщик': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'ЗП офис': { parent: 'Персонал', type: 'expense', rootKind: 'OPEX' },
+        'Интернет': { parent: 'Связь', type: 'expense', rootKind: 'OPEX' },
+        'Телефон': { parent: 'Связь', type: 'expense', rootKind: 'OPEX' },
+        'Коммунальные услуги': { parent: 'Коммунальные услуги', type: 'expense', rootKind: 'OPEX' },
+        'Электричество': { parent: 'Коммунальные услуги', type: 'expense', rootKind: 'OPEX' },
+        'Аренда': { parent: 'Аренда', type: 'expense', rootKind: 'OPEX' },
+        'Аренда оборудования': { parent: 'Аренда', type: 'expense', rootKind: 'OPEX' },
+        'Упаковка/хозка': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'Канцтовары': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'Вывоз мусора': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'Стирка': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'бой посуды': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'Охрана': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'Покупка мелкого инвентаря и мелочей': { parent: 'Хозяйственные расходы', type: 'expense', rootKind: 'OPEX' },
+        'Резервный фонд': { parent: 'Прочее (OPEX)', type: 'expense', rootKind: 'OPEX' },
+        'Командировки': { parent: 'Прочее (OPEX)', type: 'expense', rootKind: 'OPEX' },
+        'НЕДОСДАЧА': { parent: 'Прочее (OPEX)', type: 'expense', rootKind: 'OPEX' },
+        'Поставщики': { parent: 'Себестоимость', type: 'expense', rootKind: 'COGS' },
+        'Налоги на зп': { parent: 'Налоги', type: 'expense', rootKind: 'TAX' },
+        'Налоги патент': { parent: 'Налоги', type: 'expense', rootKind: 'TAX' },
+        'Маркетинг': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+        'Реклама': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+        'СМС-рассылка': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+        'Фотограф': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+        'Дизайн макетов': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+        'Полиграфия/наружка': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+        'Организация мероприятий': { parent: 'Маркетинг', type: 'expense', rootKind: 'OPEX' },
+      }
+
+      async function ensureRootCategory(name: string, type: 'income'|'expense', rootKind?: string) {
+        let root = await prisma.category.findFirst({ where: { tenantId: tenant.id, parentId: null, name } })
+        if (!root) {
+          root = await prisma.category.create({ data: { tenantId: tenant.id, name, type, kind: rootKind || null, activity: type === 'income' ? 'OPERATING' : 'OPERATING', createdBy: userId } })
+        }
+        return root
+      }
+
+      async function ensureCategoryByFund(fundRaw: string) {
+        const nf = normalizeFund(fundRaw)
+        const existing = await prisma.category.findFirst({ where: { tenantId: tenant.id, fund: nf } })
+        if (existing) {
+          // убеждаемся, что активна и под правильным корнем согласно плану
+          const plan = planToCategory[nf]
+          if (plan) {
+            const parentName = plan.parent
+            const type = plan.type
+            const root = await ensureRootCategory(parentName, type, plan.rootKind)
+            if (existing.parentId !== root.id || !existing.active) {
+              return await prisma.category.update({ where: { id: existing.id }, data: { parentId: root.id, active: true } })
+            }
+          } else if (!existing.active) {
+            return await prisma.category.update({ where: { id: existing.id }, data: { active: true } })
+          }
+          return existing
+        }
+        const plan = planToCategory[nf]
+        const parentName = plan?.parent || 'Прочее (OPEX)'
+        const type = plan?.type || 'expense'
+        const root = await ensureRootCategory(parentName, type, plan?.rootKind)
+        const created = await prisma.category.create({
+          data: {
+            tenantId: tenant.id,
+            name: nf === 'ВЫРУЧКА' ? 'Выручка' : nf,
+            type: root.type,
+            kind: null,
+            activity: root.activity,
+            parentId: root.id,
+            fund: nf,
+            createdBy: userId
+          }
+        })
+        return created
+      }
+
+      function inferCounterpartyKind(rootName: string, fund: string, currentName: string | null): string {
+        const f = normalizeFund(fund)
+        const rn = (rootName || '').toLowerCase()
+        if (f.includes('Эквайринг') || f.includes('Комиссия банка') || (currentName || '').toLowerCase().includes('сбер')) return 'bank'
+        if (rn.includes('себестоимость')) return 'supplier'
+        if (rn.includes('налоги')) return 'tax'
+        if (rn.includes('персонал') || f.startsWith('ЗП') || f.includes('Заработная плата')) return 'personnel'
+        return 'service'
+      }
+
       // Обрабатываем обычные расходы
       for (const row of expenseRows) {
         
@@ -659,28 +822,23 @@ export function createPaymentsRouter(prisma: PrismaClient) {
           }
         }
         
-        // Находим категорию по фонду
+        // Находим/создаём категорию (статью) по фонду
         let category = null
         if (row.fund) {
-          category = await prisma.category.findFirst({
-            where: { tenantId: tenant.id, fund: row.fund }
-          })
+          category = await prisma.category.findFirst({ where: { tenantId: tenant.id, fund: row.fund } })
+          if (!category) {
+            try {
+              category = await ensureCategoryByFund(row.fund)
+            } catch {
+              // fallback на пометку как неимпортированное
+            }
+          }
         }
-        
-        // Если категория не найдена, отмечаем и пропускаем
+        // Если так и не нашли/создали
         if (!category) {
           skipped++
           const originalData = row.raw ? JSON.parse(row.raw) : {}
-          await prisma.gsCashflowRow.update({
-            where: { id: row.id },
-            data: { 
-              raw: JSON.stringify({ 
-                ...originalData, 
-                notImported: true, 
-                notImportedReason: 'category_not_found' 
-              }) 
-            }
-          })
+          await prisma.gsCashflowRow.update({ where: { id: row.id }, data: { raw: JSON.stringify({ ...originalData, notImported: true, notImportedReason: 'category_not_found' }) } })
           continue
         }
         
@@ -695,10 +853,26 @@ export function createPaymentsRouter(prisma: PrismaClient) {
               data: {
                 tenantId: tenant.id,
                 name: row.supplier,
-                kind: 'vendor',
+                kind: inferCounterpartyKind(await (async () => {
+                  const root = await prisma.category.findUnique({ where: { id: category.parentId as string } })
+                  return root?.name || ''
+                })(), row.fund || '', row.supplier),
                 createdBy: userId
               }
             })
+          }
+          else {
+            // Пересчёт и повышение приоритета типа контрагента
+            const root = await prisma.category.findUnique({ where: { id: category.parentId as string } })
+            const newKind = inferCounterpartyKind(root?.name || '', row.fund || '', vendor.name)
+            const oldKind = vendor.kind || ''
+            const priority: Record<string, number> = { bank: 5, tax: 4, personnel: 3, supplier: 2, service: 1, other: 0 }
+            const oldP = priority[oldKind] ?? -1
+            const newP = priority[newKind] ?? -1
+            // Продвигаем, если новый тип приоритетнее или старый некорректный/пустой
+            if (newKind && (oldKind === '' || oldKind === 'vendor' || oldKind === 'company' || oldKind === 'person' || oldKind === 'other' || newP > oldP || (newKind === 'supplier' && oldKind === 'service'))) {
+              vendor = await prisma.counterparty.update({ where: { id: vendor.id }, data: { kind: newKind } })
+            }
           }
         }
         
@@ -717,6 +891,9 @@ export function createPaymentsRouter(prisma: PrismaClient) {
                 createdBy: userId
               }
             })
+          }
+          else if (vendor.kind !== 'bank') {
+            vendor = await prisma.counterparty.update({ where: { id: vendor.id }, data: { kind: 'bank' } })
           }
         }
         
@@ -757,6 +934,26 @@ export function createPaymentsRouter(prisma: PrismaClient) {
           
           createdPayments++
         }
+      }
+
+      // Финальная нормализация: все контрагенты, у которых есть оплаченные документы
+      // по статьям под корнем "Себестоимость" или категория "Поставщики" → kind='supplier'
+      const supplierVendorIds: any[] = await (prisma as any).$queryRawUnsafe(
+        `SELECT DISTINCT ed.vendorId AS id
+         FROM ExpenseDoc ed
+         JOIN Category c ON c.id = ed.categoryId
+         LEFT JOIN Category r ON r.id = c.parentId
+         WHERE ed.tenantId = ? AND ed.vendorId IS NOT NULL AND ed.status IN ('partial','paid')
+           AND (
+             c.name = 'Поставщики' OR
+             (r.kind = 'COGS') OR
+             (r.name = 'Себестоимость')
+           )`,
+        tenant.id
+      )
+      if (supplierVendorIds && supplierVendorIds.length > 0) {
+        const ids = supplierVendorIds.map((r: any) => String(r.id))
+        await prisma.counterparty.updateMany({ where: { id: { in: ids } }, data: { kind: 'supplier' } })
       }
       
       res.json({ 
