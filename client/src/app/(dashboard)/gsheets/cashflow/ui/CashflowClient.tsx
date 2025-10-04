@@ -38,7 +38,7 @@ export default function CashflowClient() {
     const u = new URL(`${API_BASE}/api/gsheets/cashflow/meta`)
     u.searchParams.set('spreadsheetId', spreadsheetId)
     u.searchParams.set('sheet', sheet)
-    const r = await fetch(u.toString(), { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+    const r = await fetch(u.toString(), { cache: 'no-store', credentials: 'include' })
     const j = await r.json()
     setMeta(j)
     if (!dateFrom && j?.minDate) setDateFrom(j.minDate.slice(0,10))
@@ -61,7 +61,7 @@ export default function CashflowClient() {
       if (notImported) u.searchParams.set('notImported', notImported)
       u.searchParams.set('page', String(page))
       u.searchParams.set('limit', String(limit))
-      const r = await fetch(u.toString(), { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const r = await fetch(u.toString(), { cache: 'no-store', credentials: 'include' })
       const j = await r.json()
       setRows(Array.isArray(j?.rows) ? j.rows : [])
       setTotal(Number(j?.total || 0))
@@ -80,9 +80,9 @@ export default function CashflowClient() {
       const clearResponse = await fetch(`${API_BASE}/api/gsheets/cashflow/clear`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-role': 'ADMIN'
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           spreadsheetId,
           gid: '0' // Используем gid=0
@@ -99,8 +99,8 @@ export default function CashflowClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-role': 'ADMIN'
         },
+        credentials: 'include',
         body: JSON.stringify({
           spreadsheetId,
           gid: '0', // Используем gid=0 (лист с 7071 строками)
@@ -135,8 +135,8 @@ export default function CashflowClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-role': 'ADMIN'
-        }
+        },
+        credentials: 'include'
       })
       
       if (!clearResponse.ok) {
@@ -149,8 +149,8 @@ export default function CashflowClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-role': 'ADMIN'
         },
+        credentials: 'include',
         body: JSON.stringify({
           spreadsheetId,
           gid: '0'
@@ -182,8 +182,8 @@ export default function CashflowClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-role': 'ADMIN'
         },
+        credentials: 'include',
         body: JSON.stringify({
           spreadsheetId,
           gid: '0'
