@@ -19,7 +19,7 @@ export default async function EmployeesPage() {
   }
   return (
     <div className="p-6">
-      <EmployeesClient initialPositions={positionsJson.data} initialEmployees={employeesJson.data} />
+      <EmployeesClient initialPositions={positionsJson.data || []} initialEmployees={employeesJson.data || []} />
     </div>
   )
 }

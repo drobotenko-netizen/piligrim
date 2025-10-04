@@ -80,6 +80,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     '/api/auth/otp/_ping',
     '/api/auth/otp/send',
     '/api/auth/otp/verify',
+    '/api/auth/otp/dev-login',
     '/api/auth/magic/callback',
     // short magic link
     '/api/auth/magic/s',

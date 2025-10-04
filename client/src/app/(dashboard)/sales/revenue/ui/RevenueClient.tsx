@@ -256,27 +256,27 @@ export function RevenueClient() {
   const month2Name = `${month2.toString().padStart(2, '0')}.${year2}`
 
   const handleSavePng = async () => {
-    const container = document.getElementById('chart-container')
+                      const container = document.getElementById('chart-container')
     if (!container) return
-    try {
-      const html2canvas = (await import('html2canvas')).default
-      const canvas = await html2canvas(container, {
-        backgroundColor: '#ffffff',
+                        try {
+                          const html2canvas = (await import('html2canvas')).default
+                          const canvas = await html2canvas(container, {
+                            backgroundColor: '#ffffff',
         scale: 2,
-        useCORS: true,
+                            useCORS: true,
         allowTaint: true,
-      })
-      const link = document.createElement('a')
-      link.download = `revenue-chart-${year1}-${month1}-vs-${year2}-${month2}.png`
-      link.href = canvas.toDataURL('image/png')
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    } catch (error) {
-      console.error('Ошибка при сохранении:', error)
-      alert('Ошибка при сохранении изображения')
-    }
-  }
+                          })
+                          const link = document.createElement('a')
+                          link.download = `revenue-chart-${year1}-${month1}-vs-${year2}-${month2}.png`
+                          link.href = canvas.toDataURL('image/png')
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                        } catch (error) {
+                          console.error('Ошибка при сохранении:', error)
+                          alert('Ошибка при сохранении изображения')
+                        }
+                      }
 
   return (
     <Card>
@@ -308,7 +308,7 @@ export function RevenueClient() {
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-black/30 backdrop-blur-[1px]">
               <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
-            </div>
+                  </div>
           )}
           <div className={`space-y-6 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
             <ChartArea
@@ -326,7 +326,7 @@ export function RevenueClient() {
             />
 
             <DataTable rows={tableData as any} byWeekday={byWeekday} month1Name={month1Name} month2Name={month2Name} />
-          </div>
+              </div>
         </div>
       </CardContent>
     </Card>

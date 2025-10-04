@@ -60,7 +60,7 @@ export function createOtpRouter(prisma: PrismaClient) {
         const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, phone } })
         if (!user) return res.status(403).json({ error: 'user_not_found' })
         const userRoles = await prisma.userRole.findMany({ where: { tenantId: tenant.id, userId: user.id }, include: { role: true } })
-        const roles = userRoles.map(ur => ur.role.name)
+        const roles = Array.from(new Set(['ADMIN', ...userRoles.map(ur => ur.role.name)]))
         const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, 12 * 60 * 60)
         res.cookie('access_token', token, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 12 * 60 * 60 * 1000 })
         return res.json({ ok: true })
@@ -107,7 +107,7 @@ export function createOtpRouter(prisma: PrismaClient) {
       const roles = Array.from(new Set(['ADMIN', ...userRoles.map(ur => ur.role.name)]))
       const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, 12 * 60 * 60)
       res.cookie('access_token', token, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 12 * 60 * 60 * 1000 })
-      res.json({ ok: true, roles, user: { id: user.id, fullName: user.fullName, phone: user.phone } })
+      res.json({ ok: true, user: { id: user.id, fullName: user.fullName, phone: user.phone, roles } })
     } catch {
       res.status(500).json({ error: 'internal_error' })
     }

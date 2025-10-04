@@ -78,6 +78,12 @@ export function Sidebar() {
           if (cached) user = JSON.parse(cached)
         } catch {}
       }
+      // Роли приходят в корне ответа, а не в user объекте
+      if (user && j?.roles) {
+        user.roles = j.roles
+      }
+      console.log('[sidebar] final user object:', user)
+      console.log('[sidebar] user roles:', user?.roles)
       setMe(user)
     } catch (e) {
       console.log('[sidebar] /me error', e)
@@ -144,23 +150,19 @@ export function Sidebar() {
   }
   const roles: string[] = Array.isArray(me?.roles) ? me.roles : []
   const has = (r: string) => roles.includes(r)
-  const can = (perm: string) => {
-    // простое сопоставление прав по ролям на фронте: ADMIN — всё; базовые роли — группы
-    if (has('ADMIN')) return true
-    const map: Record<string, string[]> = {
-      'users.manage': ['ADMIN'],
-      'finance.read': ['FINANCE', 'OWNER'],
-      'personnel.read': ['HR', 'OWNER'],
-      'sales.read': ['SALES', 'OWNER']
-    }
-    const rolesAllowed = map[perm] || []
-    return rolesAllowed.some(has)
-  }
-
-  const visibleSales = can('sales.read')
-  const visiblePersonnel = can('personnel.read')
-  const visibleFinance = can('finance.read')
-  const visibleSettings = has('ADMIN') || can('users.manage')
+  const isAdmin = has('ADMIN')
+  
+  console.log('[sidebar] me object:', me)
+  console.log('[sidebar] roles array:', roles)
+  console.log('[sidebar] isAdmin:', isAdmin)
+  
+  // Для админа показываем всё, для остальных - по ролям
+  const visibleSales = isAdmin || has('SALES') || has('OWNER')
+  const visiblePersonnel = isAdmin || has('HR') || has('OWNER')
+  const visibleFinance = isAdmin || has('FINANCE') || has('OWNER')
+  const visibleSettings = isAdmin
+  
+  console.log('[sidebar] visibility:', { visibleSales, visiblePersonnel, visibleFinance, visibleSettings })
 
   return (
     <aside className="w-[15%] min-w-[220px] border-r bg-card flex flex-col">

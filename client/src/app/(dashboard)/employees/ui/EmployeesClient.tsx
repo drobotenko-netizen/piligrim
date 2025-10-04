@@ -14,8 +14,8 @@ type Position = { id: string; name: string; kind?: string | null; department?: s
 type Employee = { id: string; fullName: string; active: boolean; positionId?: string | null; position?: { name: string; kind?: string | null; department?: string | null } | null }
 
 export default function EmployeesClient({ initialPositions, initialEmployees }: { initialPositions: Position[]; initialEmployees: Employee[] }) {
-  const [positions, setPositions] = useState<Position[]>(initialPositions)
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
+  const [positions, setPositions] = useState<Position[]>(initialPositions || [])
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
   const [form, setForm] = useState<{ fullName: string; positionId: string }>({ fullName: '', positionId: 'none' })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
