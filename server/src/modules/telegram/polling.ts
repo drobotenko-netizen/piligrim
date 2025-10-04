@@ -49,9 +49,16 @@ export async function startTelegramPolling(prisma: PrismaClient) {
             await sendMessage(chatId, 'Привет! Отправьте код привязки, который дал администратор.')
             continue
           }
-          // Find user by userId (which is used as binding code)
-          console.log(`[tg-polling] Looking for user with id: "${code}"`)
-          const user = await prisma.user.findUnique({ where: { id: code } })
+          // Try one-time TelegramBindRequest first
+          const req = await prisma.telegramBindRequest.findUnique({ where: { code } })
+          let user = null as any
+          if (req && (!req.expiresAt || req.expiresAt > new Date()) && !req.usedAt) {
+            user = await prisma.user.findUnique({ where: { id: req.userId } })
+          }
+          if (!user) {
+            console.log(`[tg-polling] Fallback: Looking for user by id: "${code}"`)
+            user = await prisma.user.findUnique({ where: { id: code } })
+          }
           console.log(`[tg-polling] Found user:`, user ? `${user.fullName} (active: ${user.active})` : 'null')
           if (!user || !user.active) {
             console.log(`[tg-polling] User not found or inactive, sending error message`)
@@ -73,6 +80,10 @@ export async function startTelegramPolling(prisma: PrismaClient) {
                 chatId: chatId
               }
             })
+            // Mark code as used
+            if (req) {
+              await prisma.telegramBindRequest.update({ where: { code }, data: { usedAt: new Date() } })
+            }
             console.log(`[tg-polling] Telegram binding created/updated successfully`)
           } catch (error) {
             console.error(`[tg-polling] Error creating Telegram binding:`, error)

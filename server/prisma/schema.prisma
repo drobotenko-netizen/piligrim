@@ -593,6 +593,8 @@ model IikoReceipt {
   @@unique([orderNum, date])
   @@index([date])
   @@index([isDeleted])
+  @@index([isReturn])
+  @@index([date, isDeleted, isReturn])
   @@index([orderNum, date])
   @@index([sessionNumber])
   @@index([cashRegNumber])
@@ -616,6 +618,8 @@ model IikoReceiptItem {
 
   @@id([receiptId, lineNo])
   @@index([dishCategory]) // для быстрой фильтрации по категориям
+  @@index([dishId])
+  @@index([dishCategory, dishId])
 }
 
 // Нормализованное хранилище всех колонок OLAP SALES (чек/позиция) в формате ключ-значение

@@ -10,8 +10,33 @@ export function createCounterpartiesRouter(prisma: PrismaClient) {
   router.get('/', async (req, res) => {
     if (!prisma.counterparty) return res.json({ items: [] })
     const tenant = await getTenant(prisma, req as any)
-    const data = await prisma.counterparty.findMany({ where: { tenantId: tenant.id }, orderBy: { name: 'asc' } })
+    const type = String(req.query.type || '').trim()
+    const where: any = { tenantId: tenant.id }
+    if (type && type.toLowerCase() !== 'all') {
+      where.kind = type
+    }
+    const data = await prisma.counterparty.findMany({ where, orderBy: { name: 'asc' } })
     res.json({ items: data })
+  })
+
+  // Список доступных типов контрагентов (только с ненулевым количеством)
+  router.get('/types', async (req, res) => {
+    if (!prisma.counterparty) return res.json({ items: [] })
+    const tenant = await getTenant(prisma, req as any)
+    try {
+      const grouped = await (prisma as any).counterparty.groupBy({
+        by: ['kind'],
+        where: { tenantId: tenant.id },
+        _count: { _all: true },
+        orderBy: { _count: { _all: 'desc' } }
+      })
+      const items = grouped
+        .filter((g: any) => !!g.kind && (g._count?._all || 0) > 0)
+        .map((g: any) => ({ kind: String(g.kind), count: Number(g._count?._all || 0) }))
+      res.json({ items })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
   })
 
   router.post('/', requireRole(['ADMIN','ACCOUNTANT']), async (req, res) => {

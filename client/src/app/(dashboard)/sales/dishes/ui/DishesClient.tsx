@@ -76,7 +76,9 @@ function groupByMonth(data: any[]): any[] {
 
 export function DishesClient() {
   const now = new Date()
-  const [dateFrom, setDateFrom] = useState('2025-01-01')
+  const threeMonthsAgo = new Date(now)
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const [dateFrom, setDateFrom] = useState(threeMonthsAgo.toISOString().slice(0, 10))
   const [dateTo, setDateTo] = useState(now.toISOString().slice(0, 10))
   
   const [selectedDish, setSelectedDish] = useState<string>('all')
@@ -92,7 +94,8 @@ export function DishesClient() {
   // Загрузка категорий блюд
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/iiko/local/sales/dish-categories`, { credentials: 'include' })
+      const params = new URLSearchParams({ from: dateFrom, to: dateTo })
+      const res = await fetch(`${API_BASE}/api/iiko/local/sales/dish-categories?${params.toString()}`, { credentials: 'include' })
       const json = await res.json()
       setCategories(json.categories || [])
     } catch (e) {
@@ -103,9 +106,9 @@ export function DishesClient() {
   // Загрузка списка блюд
   const loadDishes = async () => {
     try {
-      const url = selectedCategory === 'all' 
-        ? `${API_BASE}/api/iiko/local/sales/dishes`
-        : `${API_BASE}/api/iiko/local/sales/dishes?category=${encodeURIComponent(selectedCategory)}`
+      const params = new URLSearchParams({ from: dateFrom, to: dateTo, limit: String(300) })
+      if (selectedCategory !== 'all') params.set('category', selectedCategory)
+      const url = `${API_BASE}/api/iiko/local/sales/dishes?${params.toString()}`
       
       const res = await fetch(url, { credentials: 'include' })
       const json = await res.json()
@@ -174,7 +177,7 @@ export function DishesClient() {
 
   useEffect(() => {
     loadDishes()
-  }, [selectedCategory])
+  }, [selectedCategory, dateFrom, dateTo])
 
   useEffect(() => {
     console.log('useEffect triggered for loadData:', { dateFrom, dateTo, selectedDish, selectedCategory })
@@ -461,10 +464,13 @@ export function DishesClient() {
             </Tabs>
           </div>
 
-      {loading ? (
-        <div className="p-8 text-center text-muted-foreground">Загрузка данных...</div>
-      ) : (
-        <>
+      <div className="relative">
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-black/30 backdrop-blur-[1px]">
+            <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+          </div>
+        )}
+        <div className={`space-y-6 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
           {/* Карточки с итогами */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="rounded-lg border p-4">
@@ -625,8 +631,8 @@ export function DishesClient() {
                 </div>
             </CardContent>
           </Card>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   )
 }

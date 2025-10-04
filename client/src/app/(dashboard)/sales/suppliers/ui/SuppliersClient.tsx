@@ -104,6 +104,17 @@ export function SuppliersClient() {
   const [totalRevenueByPeriod, setTotalRevenueByPeriod] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [chartTab, setChartTab] = useState<'revenue' | 'share'>('revenue')
+  const [availableTypes, setAvailableTypes] = useState<Array<{ kind: string; count: number }>>([])
+  const [payments, setPayments] = useState<Array<{ id: string; date: string; amount: number; vendor: string; description?: string | null }>>([])
+  const KIND_LABELS: Record<string, string> = {
+    supplier: 'Поставщик',
+    service: 'Услуги',
+    personnel: 'Персонал',
+    bank: 'Банк',
+    tax: 'Налоги',
+    transfer: 'Переводы',
+    other: 'Прочее'
+  }
 
   // Загрузка списка контрагентов
   const loadCounterparties = async () => {
@@ -116,7 +127,7 @@ export function SuppliersClient() {
       console.log('Loaded counterparties:', { type: counterpartyType, count: list.length })
       setCounterparties(list)
       // Автоматически выбираем первого
-      if (list.length > 0) {
+      if (list.length > 0 && selectedCounterparty !== 'all') {
         setSelectedCounterparty(list[0].id)
       }
     } catch (e) {
@@ -124,10 +135,39 @@ export function SuppliersClient() {
     }
   }
 
-  // Загрузка данных по поставщику
+  // Загрузка доступных типов с ненулевым количеством
+  const loadCounterpartyTypes = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/counterparties/types`, { credentials: 'include' })
+      const json = await res.json()
+      let items = (json.items || []) as Array<{ kind: string; count: number }>
+      // Fallback: если бэкенд вернул пусто (все kind = null), посчитаем из списка контрагентов
+      if (!items.length) {
+        try {
+          const resAll = await fetch(`${API_BASE}/api/counterparties?type=all`, { credentials: 'include' })
+          const jAll = await resAll.json()
+          const list = (jAll.counterparties || jAll.items || []) as Array<{ kind?: string | null }>
+          const map = new Map<string, number>()
+          for (const cp of list) {
+            const k = (cp.kind || '').trim()
+            if (!k) continue
+            map.set(k, (map.get(k) || 0) + 1)
+          }
+          items = Array.from(map.entries()).map(([kind, count]) => ({ kind, count }))
+        } catch {}
+      }
+      setAvailableTypes(items)
+      // Если текущий тип отсутствует, переключим на первый доступный
+      if (counterpartyType !== 'all' && !items.find(x => x.kind === counterpartyType)) {
+        if (items.length > 0) setCounterpartyType(items[0].kind)
+      }
+    } catch (e) {
+      console.error('Error loading counterparty types:', e)
+    }
+  }
+
+  // Загрузка данных по поставщику или по всем
   const loadData = async () => {
-    if (selectedCounterparty === 'all') return
-    
     console.log('Loading data for counterparty:', selectedCounterparty)
     setLoading(true)
     try {
@@ -141,70 +181,112 @@ export function SuppliersClient() {
       const lastYearTo = new Date(toDate)
       lastYearTo.setFullYear(lastYearTo.getFullYear() - 1)
       
-      const [resCurrent, resLastYear, resTotalRevenue] = await Promise.all([
-        fetch(`${API_BASE}/api/payments?counterpartyId=${selectedCounterparty}&from=${dateFrom}&to=${dateTo}`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/payments?counterpartyId=${selectedCounterparty}&from=${lastYearFrom.toISOString().slice(0, 10)}&to=${lastYearTo.toISOString().slice(0, 10)}`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/payments?from=${dateFrom}&to=${dateTo}`, { credentials: 'include' })
+      const curUrl = selectedCounterparty === 'all'
+        ? `${API_BASE}/api/payments?from=${dateFrom}&to=${dateTo}${counterpartyType && counterpartyType !== 'all' ? `&type=${encodeURIComponent(counterpartyType)}` : ''}`
+        : `${API_BASE}/api/payments?counterpartyId=${selectedCounterparty}&from=${dateFrom}&to=${dateTo}`
+      const prevUrl = selectedCounterparty === 'all'
+        ? `${API_BASE}/api/payments?from=${lastYearFrom.toISOString().slice(0, 10)}&to=${lastYearTo.toISOString().slice(0, 10)}${counterpartyType && counterpartyType !== 'all' ? `&type=${encodeURIComponent(counterpartyType)}` : ''}`
+        : `${API_BASE}/api/payments?counterpartyId=${selectedCounterparty}&from=${lastYearFrom.toISOString().slice(0, 10)}&to=${lastYearTo.toISOString().slice(0, 10)}`
+      const [resCurrent, resLastYear] = await Promise.all([
+        fetch(curUrl, { credentials: 'include' }),
+        fetch(prevUrl, { credentials: 'include' })
       ])
       
       const jsonCurrent = await resCurrent.json()
       const jsonLastYear = await resLastYear.json()
-      const jsonTotalRevenue = await resTotalRevenue.json()
+      // Все платежи текущего периода (для таблицы)
+      const paymentsList = (selectedCounterparty === 'all'
+        ? (jsonCurrent.items || [])
+        : (jsonCurrent.payments || [])
+      ).map((p: any) => ({
+        id: p.id,
+        date: typeof p.date === 'string' ? p.date.slice(0, 10) : new Date(p.date).toISOString().slice(0, 10),
+        amount: (p.amount || 0) / 100,
+        vendor: p.vendor?.name || p.vendor || p.expenseDoc?.vendor?.name || '',
+        description: p.description || p.memo || null
+      }))
+      setPayments(paymentsList)
+
       
       console.log('Current data:', jsonCurrent)
       console.log('Last year data:', jsonLastYear)
-      console.log('Total revenue data:', jsonTotalRevenue)
+      console.log('Counterparty type:', counterpartyType)
       console.log('Last year period:', lastYearFrom.toISOString().slice(0, 10), 'to', lastYearTo.toISOString().slice(0, 10))
       
-      // Рассчитываем общую выручку
-      const totalRevenueAmount = jsonTotalRevenue.items?.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0) || 0
-      setTotalRevenue(totalRevenueAmount / 100) // Конвертируем из копеек в рубли
-      
-      // Группируем общую выручку по периодам для расчета процентов
-      const revenueByPeriod = jsonTotalRevenue.items?.reduce((acc: any, item: any) => {
-        const date = new Date(item.date)
-        let key: string
-        
-        if (groupBy === 'days') {
-          key = date.toISOString().slice(0, 10)
-        } else if (groupBy === 'weeks') {
-          const weekStart = new Date(date)
-          weekStart.setDate(date.getDate() - date.getDay())
-          key = weekStart.toISOString().slice(0, 10)
-        } else { // months
-          // Используем тот же формат, что и в chartData: MM.YY
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const year = String(date.getFullYear()).slice(-2)
-          key = `${month}.${year}`
-        }
-        
-        if (!acc[key]) {
-          acc[key] = { period: key, amount: 0 }
-        }
-        acc[key].amount += (item.amount || 0) / 100 // Конвертируем из копеек в рубли
-        return acc
-      }, {}) || {}
-      
-      setTotalRevenueByPeriod(Object.values(revenueByPeriod))
+      // Загружаем выручку кафе по iiko и формируем суммы по периодам
+      const revenueMap: Record<string, number> = {}
+      const fromY = parseInt(dateFrom.slice(0, 4))
+      const fromM = parseInt(dateFrom.slice(5, 7))
+      const toY = parseInt(dateTo.slice(0, 4))
+      const toM = parseInt(dateTo.slice(5, 7))
+      const months: Array<{ y: number; m: number }> = []
+      for (let y = fromY; y <= toY; y++) {
+        const startM = y === fromY ? fromM : 1
+        const endM = y === toY ? toM : 12
+        for (let m = startM; m <= endM; m++) months.push({ y, m })
+      }
+      // Последовательно (не так много месяцев)
+      for (const { y, m } of months) {
+        try {
+          const r = await fetch(`${API_BASE}/api/iiko/local/sales/revenue/month?year=${y}&month=${m}`, { credentials: 'include' })
+          const jr = await r.json()
+          const rows = jr.revenue || []
+          rows.forEach((row: any) => {
+            const d = row.date || row.day || row.ymd || row.Date || ''
+            const ymd = typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10)
+            revenueMap[ymd] = (revenueMap[ymd] || 0) + (Number(row.net || 0))
+          })
+        } catch {}
+      }
+      // Заполняем totalRevenue и totalRevenueByPeriod согласно groupBy
+      const totalRevenueRub = Object.values(revenueMap).reduce((a, b) => a + b, 0)
+      setTotalRevenue(Math.round(totalRevenueRub))
+      if (groupBy === 'days') {
+        const byDay = Object.entries(revenueMap).reduce((acc: any, [ymd, net]) => {
+          const key = ymd
+          acc[key] = (acc[key] || 0) + (Number(net) || 0)
+          return acc
+        }, {})
+        setTotalRevenueByPeriod(Object.entries(byDay).map(([period, amount]) => ({ period, amount })) )
+      } else if (groupBy === 'weeks') {
+        const agg = new Map<string, number>()
+        Object.keys(revenueMap).forEach((ymd) => {
+          const d = new Date(ymd)
+          const week = getWeekNumber(d)
+          const key = `Неделя ${week}`
+          agg.set(key, (agg.get(key) || 0) + (revenueMap[ymd] || 0))
+        })
+        setTotalRevenueByPeriod(Array.from(agg.entries()).map(([period, amount]) => ({ period, amount })))
+      } else {
+        const agg = new Map<string, number>()
+        Object.keys(revenueMap).forEach((ymd) => {
+          const d = new Date(ymd)
+          const key = `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(-2)}`
+          agg.set(key, (agg.get(key) || 0) + (revenueMap[ymd] || 0))
+        })
+        setTotalRevenueByPeriod(Array.from(agg.entries()).map(([period, amount]) => ({ period, amount })))
+      }
       
       // Группируем данные по дням
       const currentByDate = new Map<string, { date: string; amount: number; count: number }>()
       const lastYearByDate = new Map<string, { date: string; amount: number; count: number }>()
       
       // Обрабатываем текущие данные
-      jsonCurrent.payments?.forEach((payment: any) => {
-        const date = payment.date.slice(0, 10)
+      const curArray = selectedCounterparty === 'all' ? (jsonCurrent.items || []) : (jsonCurrent.payments || [])
+      curArray.forEach((payment: any) => {
+        const date = (typeof payment.date === 'string' ? payment.date : new Date(payment.date).toISOString()).slice(0, 10)
         const existing = currentByDate.get(date) || { date, amount: 0, count: 0 }
-        existing.amount += (payment.amount || 0) / 100 // Конвертируем из копеек в рубли
+        existing.amount += (payment.amount || 0) / 100
         existing.count += 1
         currentByDate.set(date, existing)
       })
       
       // Обрабатываем данные прошлого года
-      jsonLastYear.payments?.forEach((payment: any) => {
-        const date = payment.date.slice(0, 10)
+      const prevArray = selectedCounterparty === 'all' ? (jsonLastYear.items || []) : (jsonLastYear.payments || [])
+      prevArray.forEach((payment: any) => {
+        const date = (typeof payment.date === 'string' ? payment.date : new Date(payment.date).toISOString()).slice(0, 10)
         const existing = lastYearByDate.get(date) || { date, amount: 0, count: 0 }
-        existing.amount += (payment.amount || 0) / 100 // Конвертируем из копеек в рубли
+        existing.amount += (payment.amount || 0) / 100
         existing.count += 1
         lastYearByDate.set(date, existing)
       })
@@ -220,12 +302,13 @@ export function SuppliersClient() {
   }
 
   useEffect(() => {
+    loadCounterpartyTypes()
     loadCounterparties()
   }, [counterpartyType])
 
   useEffect(() => {
     loadData()
-  }, [dateFrom, dateTo, selectedCounterparty, groupBy])
+  }, [dateFrom, dateTo, selectedCounterparty, groupBy, counterpartyType])
 
   // Объединяем данные для графика с учетом группировки
   const chartData = useMemo(() => {
@@ -390,19 +473,21 @@ export function SuppliersClient() {
 
               {/* Тип контрагента */}
               <div className="flex items-center gap-2">
-                 <Select value={counterpartyType} onValueChange={setCounterpartyType}>
+                 <Select value={counterpartyType} onValueChange={(v) => { setCounterpartyType(v); setSelectedCounterparty('all') }}>
                    <SelectTrigger className="w-[220px]">
                      <SelectValue placeholder="Тип контрагента" />
                    </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="supplier">Поставщик</SelectItem>
-                     <SelectItem value="service">Услуги</SelectItem>
-                     <SelectItem value="personnel">Персонал</SelectItem>
-                     <SelectItem value="bank">Банк</SelectItem>
-                     <SelectItem value="tax">Налоги</SelectItem>
-                     <SelectItem value="transfer">Переводы</SelectItem>
-                     <SelectItem value="other">Прочее</SelectItem>
-                     <SelectItem value="all">Все</SelectItem>
+                  <SelectContent>
+                   <SelectItem value="all">Все</SelectItem>
+                   {availableTypes.map(t => {
+                      const key = (t.kind || '').trim()
+                      const label = KIND_LABELS[key] || key || '(без типа)'
+                      return (
+                        <SelectItem key={key} value={key}>
+                          {label}
+                        </SelectItem>
+                      )
+                    })}
                    </SelectContent>
                  </Select>
                </div>
@@ -414,6 +499,7 @@ export function SuppliersClient() {
                      <SelectValue placeholder="Выберите контрагента" />
                    </SelectTrigger>
                    <SelectContent className="max-h-[400px]">
+                     <SelectItem value="all">Все</SelectItem>
                      {counterparties.map(cp => (
                        <SelectItem key={cp.id} value={cp.id}>
                          {cp.name}
@@ -488,80 +574,86 @@ export function SuppliersClient() {
                 </TabsList>
               </Tabs>
             </div>
-            {loading ? (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">Загрузка...</div>
-            ) : (
-              chartTab === 'revenue' ? (
-                dataCurrent.length === 0 ? (
-                  <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
-                    <div className="text-lg mb-2">Нет данных за выбранный период</div>
-                    <div className="text-sm">Попробуйте изменить период или контрагента</div>
-                  </div>
+            <div className="relative">
+              {loading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-black/30 backdrop-blur-[1px]">
+                  <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+                </div>
+              )}
+              <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+                {chartTab === 'revenue' ? (
+                  dataCurrent.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+                      <div className="text-lg mb-2">Нет данных за выбранный период</div>
+                      <div className="text-sm">Попробуйте изменить период или контрагента</div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="x" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value) => formatNumber(value)} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value: any, _name: string, props: any) => {
+                          const key = props?.dataKey || props?.name
+                          return [formatCurrency(value), key === 'amountCurrent' ? 'Текущий период' : 'Год назад']
+                        }}
+                      />
+                        <Line type="monotone" dataKey="amountCurrent" stroke="#f97316" strokeWidth={2} name="Текущий период" dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} />
+                        <Line type="monotone" dataKey="amountLastYear" stroke="#6b7280" strokeWidth={2} name="Прошлый год" dot={{ fill: '#6b7280', strokeWidth: 2, r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )
                 ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="x" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(value) => formatNumber(value)} tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value: any, name: string) => [formatCurrency(value), name === 'amountCurrent' ? 'Текущий период' : 'Прошлый год']} />
-                      <Line type="monotone" dataKey="amountCurrent" stroke="#f97316" strokeWidth={2} name="Текущий период" dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} />
-                      <Line type="monotone" dataKey="amountLastYear" stroke="#6b7280" strokeWidth={2} name="Прошлый год" dot={{ fill: '#6b7280', strokeWidth: 2, r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )
-              ) : (
-                totalRevenue === 0 || dataCurrent.length === 0 ? (
-                  <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
-                    <div className="text-lg mb-2">Нет данных</div>
-                    <div className="text-sm">Не удалось загрузить общую выручку или нет данных периода</div>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={percentageChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="x" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'Доля в выручке']} />
-                      <Line type="monotone" dataKey="percentage" stroke="#f97316" strokeWidth={2} name="Доля в выручке" dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )
-              )
-            )}
+                  totalRevenue === 0 || dataCurrent.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+                      <div className="text-lg mb-2">Нет данных</div>
+                      <div className="text-sm">Не удалось загрузить общую выручку или нет данных периода</div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={percentageChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="x" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} tick={{ fontSize: 12 }} />
+                        <Tooltip formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'Доля в выручке']} />
+                        <Line type="monotone" dataKey="percentage" stroke="#f97316" strokeWidth={2} name="Доля в выручке" dot={{ fill: '#f97316', strokeWidth: 2, r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Детализация */}
+        {/* Таблица всех платежей текущего периода */}
         <Card>
           <CardContent className="p-4">
-            <h3 className="text-lg font-semibold mb-4">Детализация платежей</h3>
             <div className="overflow-x-auto">
               <Table>
                 <THead>
                   <TR>
-                    <TH>Дата</TH>
-                    <TH>Сумма (текущий период)</TH>
-                    <TH>Сумма (прошлый год)</TH>
-                    <TH>Изменение</TH>
+                    <TH className="w-48">Дата</TH>
+                    <TH>Контрагент</TH>
+                    <TH>Описание</TH>
+                    <TH className="text-right w-32">Сумма</TH>
                   </TR>
                 </THead>
                 <TBody>
-                  {chartData.map((item, index) => {
-                    const change = item.amountLastYear > 0 
-                      ? ((item.amountCurrent - item.amountLastYear) / item.amountLastYear * 100)
-                      : item.amountCurrent > 0 ? 100 : 0
-                    
-                    return (
-                      <TR key={index}>
-                        <TD>{item.x}</TD>
-                        <TD>{formatCurrency(item.amountCurrent)}</TD>
-                        <TD>{formatCurrency(item.amountLastYear)}</TD>
-                        <TD className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
-                          {change > 0 ? '+' : ''}{change.toFixed(1)}%
-                        </TD>
-                      </TR>
-                    )
-                  })}
+                  {payments.map((p) => (
+                    <TR key={p.id}>
+                      <TD className="whitespace-nowrap">{p.date}</TD>
+                      <TD>{p.vendor}</TD>
+                      <TD>{p.description || ''}</TD>
+                      <TD className="text-right">{formatCurrency(p.amount)}</TD>
+                    </TR>
+                  ))}
+                  {!payments.length && (
+                    <TR>
+                      <TD colSpan={4} className="text-center text-muted-foreground py-6">Нет платежей за период</TD>
+                    </TR>
+                  )}
                 </TBody>
               </Table>
             </div>

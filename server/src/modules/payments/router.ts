@@ -12,6 +12,7 @@ export function createPaymentsRouter(prisma: PrismaClient) {
     try {
       const tenant = await getTenant(prisma, req as any)
       const { from, to, accountId, counterpartyId } = req.query as any
+      const counterpartyType = String((req.query as any).type || (req.query as any).counterpartyType || '').trim()
       
       const where: any = { tenantId: tenant.id }
       if (accountId) where.accountId = String(accountId)
@@ -41,6 +42,12 @@ export function createPaymentsRouter(prisma: PrismaClient) {
               }
             }
           }
+        ]
+      } else if (counterpartyType) {
+        // Фильтрация по типу контрагента для агрегата "Все"
+        where.OR = [
+          { expenseDoc: { vendor: { kind: counterpartyType } } },
+          { allocations: { some: { expenseDoc: { vendor: { kind: counterpartyType } } } } }
         ]
       }
 

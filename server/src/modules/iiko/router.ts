@@ -528,31 +528,28 @@ export function createIikoRouter() {
   router.get('/local/sales/dish-categories', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+    const from = req.query.from ? String(req.query.from) : null
+    const to = req.query.to ? String(req.query.to) : null
     
     try {
+      const whereReceipt: any = {
+        AND: [
+          { OR: [{ isDeleted: false }, { isDeleted: null }] },
+          { OR: [{ isReturn: false }, { isReturn: null }] }
+        ]
+      }
+      if (from && to) {
+        const start = new Date(from)
+        const end = new Date(to)
+        end.setDate(end.getDate() + 1)
+        whereReceipt.date = { gte: start, lt: end }
+      }
       const categories = await prisma.iikoReceiptItem.findMany({
         where: {
           dishCategory: { not: null },
-          receipt: {
-            AND: [
-              {
-                OR: [
-                  { isDeleted: false },
-                  { isDeleted: null }
-                ]
-              },
-              {
-                OR: [
-                  { isReturn: false },
-                  { isReturn: null }
-                ]
-              }
-            ]
-          }
+          receipt: whereReceipt
         },
-        select: {
-          dishCategory: true
-        },
+        select: { dishCategory: true },
         distinct: ['dishCategory']
       })
       
@@ -573,73 +570,51 @@ export function createIikoRouter() {
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     
     const categoryFilter = req.query.category ? String(req.query.category) : null
+    const from = req.query.from ? String(req.query.from) : null
+    const to = req.query.to ? String(req.query.to) : null
+    const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 1000))
+    const offset = Math.max(0, Number(req.query.offset) || 0)
     
     try {
-      const whereClause: any = {
-        receipt: {
-          AND: [
-            {
-              OR: [
-                { isDeleted: false },
-                { isDeleted: null }
-              ]
-            },
-            {
-              OR: [
-                { isReturn: false },
-                { isReturn: null }
-              ]
-            }
-          ]
-        },
+      const whereReceipt: any = {
+        AND: [
+          { OR: [{ isDeleted: false }, { isDeleted: null }] },
+          { OR: [{ isReturn: false }, { isReturn: null }] }
+        ]
+      }
+      if (from && to) {
+        const start = new Date(from)
+        const end = new Date(to)
+        end.setDate(end.getDate() + 1)
+        whereReceipt.date = { gte: start, lt: end }
+      }
+
+      const whereItems: any = {
         dishId: { not: null },
-        dishName: { not: null }
+        dishName: { not: null },
+        receipt: whereReceipt
       }
-      
-      if (categoryFilter) {
-        whereClause.dishCategory = categoryFilter
-      }
-      
-      const items = await prisma.iikoReceiptItem.findMany({
-        where: whereClause,
-        select: {
-          dishId: true,
-          dishName: true,
-          dishCategory: true,
-          qty: true,
-          net: true
-        }
+      if (categoryFilter) whereItems.dishCategory = categoryFilter
+
+      // Агрегация в БД
+      const grouped = await (prisma as any).iikoReceiptItem.groupBy({
+        by: ['dishId','dishName','dishCategory'],
+        where: whereItems,
+        _sum: { qty: true, net: true },
+        orderBy: { _sum: { net: 'desc' } },
+        take: limit,
+        skip: offset
       })
-      
-      console.log(`Found ${items.length} receipt items`)
-      
-      // Группируем по блюдам
-      const dishMap = new Map<string, { dishId: string; dishName: string; dishCategory: string | null; totalQty: number; totalRevenue: number }>()
-      
-      items.forEach((item: { dishId: string | null; dishName: string | null; dishCategory: string | null; qty: number | null; net: number | null }) => {
-        if (!item.dishId || !item.dishName) return
-        
-        const key = item.dishId
-        const existing = dishMap.get(key) || { 
-          dishId: key, 
-          dishName: item.dishName,
-          dishCategory: item.dishCategory || null,
-          totalQty: 0, 
-          totalRevenue: 0 
-        }
-        
-        existing.totalQty += item.qty || 0
-        existing.totalRevenue += item.net || 0
-        
-        dishMap.set(key, existing)
-      })
-      
-      console.log(`Grouped into ${dishMap.size} unique dishes`)
-      
-      // Сортируем по выручке
-      const dishes = Array.from(dishMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue)
-      
-      res.json({ dishes })
+
+      const dishes = grouped.map((g: any) => ({
+        dishId: g.dishId,
+        dishName: g.dishName,
+        dishCategory: g.dishCategory,
+        totalQty: Number(g._sum?.qty || 0),
+        totalRevenue: Number(g._sum?.net || 0)
+      }))
+
+      res.json({ dishes, count: dishes.length, limit, offset })
     } catch (e: any) {
       console.error('Error in /local/sales/dishes:', e)
       res.status(500).json({ error: String(e?.message || e) })
@@ -2102,58 +2077,27 @@ export function createIikoRouter() {
       const end = new Date(to)
       end.setDate(end.getDate() + 1) // Включаем последний день
       
-      const items = await prisma.iikoReceiptItem.findMany({
+      // Суммируем по чекам (быстрее, чем по позициям)
+      const receipts = await prisma.iikoReceipt.findMany({
         where: {
-          receipt: {
-            date: { gte: start, lt: end },
-            AND: [
-              {
-                OR: [
-                  { isDeleted: false },
-                  { isDeleted: null }
-                ]
-              },
-              {
-                OR: [
-                  { isReturn: false },
-                  { isReturn: null }
-                ]
-              }
-            ]
-          }
+          date: { gte: start, lt: end },
+          AND: [
+            { OR: [{ isDeleted: false }, { isDeleted: null }] },
+            { OR: [{ isReturn: false }, { isReturn: null }] }
+          ]
         },
-        select: {
-          qty: true,
-          net: true,
-          cost: true,
-          receipt: {
-            select: {
-              date: true
-            }
-          }
-        },
-        orderBy: {
-          receipt: {
-            date: 'asc'
-          }
-        }
+        select: { date: true, net: true, cost: true }
       })
-      
-      // Группируем по дням
       const byDay = new Map<string, { date: string; qty: number; revenue: number; cost: number }>()
-      
-      items.forEach((item: any) => {
-        const d = new Date(item.receipt.date)
+      for (const r of receipts) {
+        const d = new Date(r.date)
         const ymd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10)
-        
-        const existing = byDay.get(ymd) || { date: ymd, qty: 0, revenue: 0, cost: 0 }
-        existing.qty += item.qty || 0
-        existing.revenue += item.net || 0
-        existing.cost += item.cost || 0
-        
-        byDay.set(ymd, existing)
-      })
-      
+        const e = byDay.get(ymd) || { date: ymd, qty: 0, revenue: 0, cost: 0 }
+        e.revenue += Number(r.net || 0)
+        e.cost += Number(r.cost || 0)
+        e.qty += 1
+        byDay.set(ymd, e)
+      }
       const daily = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
       
       res.json({ from, to, daily })

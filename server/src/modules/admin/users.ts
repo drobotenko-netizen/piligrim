@@ -88,9 +88,19 @@ export function createAdminUsersRouter(prisma: PrismaClient) {
       const id = String(req.params.id)
       const user = await prisma.user.findFirst({ where: { id, tenantId: tenant.id } })
       if (!user) return res.status(404).json({ error: 'user_not_found' })
-      
-      // For simplicity, using userId as binding code for now
-      const bindingCode = user.id
+
+      // Prefer one-time binding code with TTL
+      const code = crypto.randomBytes(12).toString('hex')
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h TTL
+      await prisma.telegramBindRequest.create({
+        data: {
+          tenantId: tenant.id,
+          userId: user.id,
+          code,
+          expiresAt
+        }
+      })
+      const bindingCode = code
       const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'piligrim_app_bot'
       const deepLink = `https://t.me/${botUsername}?start=${bindingCode}`
       

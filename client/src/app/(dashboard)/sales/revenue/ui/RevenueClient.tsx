@@ -304,10 +304,13 @@ export function RevenueClient() {
           displayMode={displayMode}
         />
 
-        {loading ? (
-          <div className="p-8 text-center text-muted-foreground">Загрузка данных...</div>
-        ) : (
-          <>
+        <div className="relative">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-black/30 backdrop-blur-[1px]">
+              <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+            </div>
+          )}
+          <div className={`space-y-6 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
             <ChartArea
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -323,8 +326,8 @@ export function RevenueClient() {
             />
 
             <DataTable rows={tableData as any} byWeekday={byWeekday} month1Name={month1Name} month2Name={month2Name} />
-          </>
-        )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
