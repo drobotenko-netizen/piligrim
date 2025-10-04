@@ -41,7 +41,8 @@ export function createMagicRouter(prisma: PrismaClient) {
       const payload: MagicPayload = { jti: tokenId.id, sub: user.id, ten: tenant.id, redirect }
       const token = jwt.sign(payload, MAGIC_LINK_SECRET, { algorithm: 'HS256', expiresIn: `${ttlMinutes}m` })
       const url = `${SERVER_PUBLIC_URL}/api/auth/magic/callback?token=${encodeURIComponent(token)}`
-      return res.json({ url, tokenId: tokenId.id, expiresAt })
+      const shortUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/s/${encodeURIComponent(tokenId.id)}`
+      return res.json({ url, shortUrl, tokenId: tokenId.id, expiresAt })
     } catch (e) {
       return res.status(500).json({ error: 'internal_error' })
     }
@@ -84,6 +85,36 @@ export function createMagicRouter(prisma: PrismaClient) {
       const access = signAccessToken({ sub: userId, ten: tenantId, roles }, 30 * 24 * 60 * 60)
       res.cookie('access_token', access, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 30 * 24 * 60 * 60 * 1000 })
       const target = `${FRONTEND_BASE_URL}${redirect.startsWith('/') ? '' : '/'}${redirect}`
+      return res.redirect(target)
+    } catch (e) {
+      return res.status(500).send('Internal error')
+    }
+  })
+
+  // Public: short magic link by token id
+  router.get('/s/:id', async (req: any, res) => {
+    try {
+      const jti = String(req.params.id || '').trim()
+      if (!jti) return res.status(400).send('Bad request')
+      const dbToken = await prisma.magicLinkToken.findUnique({ where: { id: jti } })
+      if (!dbToken) return res.status(400).send('Token not found')
+
+      // Ignore previews
+      const ua = String(req.headers['user-agent'] || '')
+      const isPreview = /(TelegramBot|WhatsApp|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|SkypeUriPreview|Discordbot|Google-InspectionTool|curl|wget|Pingdom|Bingbot)/i.test(ua)
+      if (isPreview) return res.status(204).end()
+
+      if (dbToken.usedAt) return res.status(400).send('Token already used')
+      if (dbToken.expiresAt.getTime() < Date.now()) return res.status(400).send('Token expired')
+
+      // Mark used
+      await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
+
+      // Create session cookie
+      const roles = (await prisma.userRole.findMany({ where: { tenantId: dbToken.tenantId, userId: dbToken.userId }, include: { role: true } })).map(r => r.role.name)
+      const access = signAccessToken({ sub: dbToken.userId, ten: dbToken.tenantId, roles }, 30 * 24 * 60 * 60)
+      res.cookie('access_token', access, { httpOnly: true, sameSite: 'lax', secure: !!process.env.NODE_ENV && process.env.NODE_ENV !== 'development', maxAge: 30 * 24 * 60 * 60 * 1000 })
+      const target = `${FRONTEND_BASE_URL}${(dbToken.redirect || '/sales/revenue').startsWith('/') ? '' : '/'}${dbToken.redirect || '/sales/revenue'}`
       return res.redirect(target)
     } catch (e) {
       return res.status(500).send('Internal error')

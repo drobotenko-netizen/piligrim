@@ -142,12 +142,33 @@ export function Sidebar() {
     setOpenIiko(section === 'iiko')
     setOpenImport(section === 'import')
   }
+  const roles: string[] = Array.isArray(me?.roles) ? me.roles : []
+  const has = (r: string) => roles.includes(r)
+  const can = (perm: string) => {
+    // простое сопоставление прав по ролям на фронте: ADMIN — всё; базовые роли — группы
+    if (has('ADMIN')) return true
+    const map: Record<string, string[]> = {
+      'users.manage': ['ADMIN'],
+      'finance.read': ['FINANCE', 'OWNER'],
+      'personnel.read': ['HR', 'OWNER'],
+      'sales.read': ['SALES', 'OWNER']
+    }
+    const rolesAllowed = map[perm] || []
+    return rolesAllowed.some(has)
+  }
+
+  const visibleSales = can('sales.read')
+  const visiblePersonnel = can('personnel.read')
+  const visibleFinance = can('finance.read')
+  const visibleSettings = has('ADMIN') || can('users.manage')
+
   return (
     <aside className="w-[15%] min-w-[220px] border-r bg-card flex flex-col">
       <div className="p-4 flex items-center justify-start">
         <img src="/logo.png" alt="logo" className="h-12 w-auto" />
       </div>
       <nav className="p-2 space-y-2 flex-1">
+        {visibleSales && (
         <div>
           <button
             type="button"
@@ -172,7 +193,9 @@ export function Sidebar() {
             })}
           </div>
         </div>
+        )}
 
+        {visiblePersonnel && (
         <div>
           <button
             type="button"
@@ -197,7 +220,9 @@ export function Sidebar() {
             })}
           </div>
         </div>
+        )}
 
+        {visibleFinance && (
         <div>
           <button
             type="button"
@@ -222,6 +247,7 @@ export function Sidebar() {
             })}
           </div>
         </div>
+        )}
 
         <div>
           <button
@@ -273,6 +299,7 @@ export function Sidebar() {
           </div>
         </div>
 
+        {visibleSettings && (
         <div>
           <button
             type="button"
@@ -297,6 +324,7 @@ export function Sidebar() {
             })}
           </div>
         </div>
+        )}
       </nav>
       <div className="px-3 py-3 flex items-center justify-between min-h-[56px]">
         <div className="truncate leading-tight ml-1" title={me?.fullName || ''}>

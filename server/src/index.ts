@@ -72,6 +72,28 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }, () => next())
 })
 
+// Global API guard: deny by default for /api, allowlist for public endpoints
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.path.startsWith('/api')) return next()
+  const publicAllowlist = [
+    '/api/health',
+    '/api/auth/otp/_ping',
+    '/api/auth/otp/send',
+    '/api/auth/otp/verify',
+    '/api/auth/magic/callback',
+    // short magic link
+    '/api/auth/magic/s',
+    // telegram webhook may be public
+    '/api/telegram/webhook'
+  ]
+  // allowlist exact or prefix match for short route
+  const isPublic = publicAllowlist.some(p => req.path === p || (p.endsWith('/s') && req.path.startsWith(p + '/')))
+  if (isPublic) return next()
+  const authed = (req as any).auth && (req as any).auth.userId
+  if (!authed) return res.status(401).json({ error: 'unauthorized' })
+  return next()
+})
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
 app.use('/api/positions', createPositionsRouter(prisma))
