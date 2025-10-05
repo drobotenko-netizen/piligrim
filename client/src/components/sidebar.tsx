@@ -158,7 +158,7 @@ export function Sidebar() {
   
   // Для админа показываем всё, для остальных - по ролям
   const visibleSales = isAdmin || has('SALES') || has('OWNER')
-  const visiblePersonnel = isAdmin || has('HR') || has('OWNER')
+  const visiblePersonnel = isAdmin || has('HR') || has('OWNER') || has('CASHIER')
   const visibleFinance = isAdmin || has('FINANCE') || has('OWNER')
   const visibleSettings = isAdmin
   
