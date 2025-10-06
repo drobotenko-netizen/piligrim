@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
   // Для всех остальных путей проверяем авторизацию
   // Получаем куки из запроса
   const cookies = request.cookies
-  const authCookie = cookies.get('auth-token') || cookies.get('session') || cookies.get('jwt')
+  const authCookie = cookies.get('access_token') || cookies.get('auth-token') || cookies.get('session') || cookies.get('jwt')
   
   // Если нет токена авторизации, перенаправляем на страницу входа
   if (!authCookie) {
