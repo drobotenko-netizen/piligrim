@@ -912,11 +912,11 @@ export function createIikoRouter() {
       // Преобразуем в массив и добавляем аналитику
       const result = Array.from(customers.values()).map(customer => {
         // Сортируем заказы по дате
-        const sortedOrders = customer.orders.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        const sortedOrders = customer.orders.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
         
         // Считаем количество недель с заказами
         const weeksWithOrders = new Set<string>()
-        sortedOrders.forEach(order => {
+        sortedOrders.forEach((order: any) => {
           const date = new Date(order.date)
           const year = date.getUTCFullYear()
           const week = getWeekNumber(date)
@@ -1880,7 +1880,7 @@ export function createIikoRouter() {
               const recipeData = await client.getRecipePrepared({ date: dateStr, productId: dish.dishId })
               const items = recipeData?.preparedCharts?.[0]?.items || []
               const ingredientIds = items.map((it: any) => String(it?.productId || '')).filter(Boolean)
-              ingredientIds.forEach(id => allIngredients.add(id))
+              ingredientIds.forEach((id: any) => allIngredients.add(id))
             } catch (e) {
               console.error(`Error loading ingredients for dish ${dish.dishName}:`, e)
             }
