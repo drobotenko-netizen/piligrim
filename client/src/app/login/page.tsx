@@ -19,21 +19,25 @@ function LoginForm() {
 
   // Handle magic link error messages
   useEffect(() => {
-    const errorParam = searchParams.get('error')
-    if (errorParam) {
-      switch (errorParam) {
-        case 'token_used':
-          setError('Ссылка для входа уже была использована. Получите новую ссылку через команду /login в Telegram.')
-          break
-        case 'token_expired':
-          setError('Ссылка для входа истекла. Получите новую ссылку через команду /login в Telegram.')
-          break
-        case 'token_not_found':
-          setError('Ссылка для входа недействительна. Получите новую ссылку через команду /login в Telegram.')
-          break
-        default:
-          setError('Ошибка при входе. Попробуйте получить новую ссылку через команду /login в Telegram.')
+    try {
+      const errorParam = searchParams.get('error')
+      if (errorParam) {
+        switch (errorParam) {
+          case 'token_used':
+            setError('Ссылка для входа уже была использована. Получите новую ссылку через команду /login в Telegram.')
+            break
+          case 'token_expired':
+            setError('Ссылка для входа истекла. Получите новую ссылку через команду /login в Telegram.')
+            break
+          case 'token_not_found':
+            setError('Ссылка для входа недействительна. Получите новую ссылку через команду /login в Telegram.')
+            break
+          default:
+            setError('Ошибка при входе. Попробуйте получить новую ссылку через команду /login в Telegram.')
+        }
       }
+    } catch (e) {
+      console.log('Error reading search params:', e)
     }
   }, [searchParams])
 
@@ -157,18 +161,8 @@ function LoginForm() {
 }
 
 export default function LoginOtpPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <div className="text-sm text-gray-600">Загрузка...</div>
-        </div>
-      </div>
-    }>
-      <LoginForm />
-    </Suspense>
-  )
+  // Простая версия без Suspense для быстрого исправления
+  return <LoginForm />
 }
 
 
