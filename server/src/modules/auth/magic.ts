@@ -65,7 +65,7 @@ export function createMagicRouter(prisma: PrismaClient) {
       const dbToken = await prisma.magicLinkToken.findUnique({ where: { id: jti } })
       if (!dbToken || dbToken.userId !== userId || dbToken.tenantId !== tenantId) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
-        return res.redirect(`${frontendUrl}/login?error=token_not_found`)
+        return res.redirect(`${frontendUrl}/?error=token_not_found`)
       }
       // Игнорируем преглядыватели (preview) — не помечаем токен использованным
       const ua = String(req.headers['user-agent'] || '')
@@ -82,7 +82,7 @@ export function createMagicRouter(prisma: PrismaClient) {
       // }
       if (dbToken.expiresAt.getTime() < Date.now()) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
-        return res.redirect(`${frontendUrl}/login?error=token_expired`)
+        return res.redirect(`${frontendUrl}/?error=token_expired`)
       }
 
       // Убираем пометку как использованный - ссылка работает до истечения времени
@@ -108,7 +108,7 @@ export function createMagicRouter(prisma: PrismaClient) {
       const dbToken = await prisma.magicLinkToken.findUnique({ where: { id: jti } })
       if (!dbToken) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
-        return res.redirect(`${frontendUrl}/login?error=token_not_found`)
+        return res.redirect(`${frontendUrl}/?error=token_not_found`)
       }
 
       // Ignore previews
@@ -126,7 +126,7 @@ export function createMagicRouter(prisma: PrismaClient) {
       // }
       if (dbToken.expiresAt.getTime() < Date.now()) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
-        return res.redirect(`${frontendUrl}/login?error=token_expired`)
+        return res.redirect(`${frontendUrl}/?error=token_expired`)
       }
 
       // Убираем пометку как использованный - ссылка работает до истечения времени

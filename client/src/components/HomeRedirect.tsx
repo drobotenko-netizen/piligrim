@@ -8,8 +8,18 @@ import { getFirstAvailableMenuItem } from '@/lib/menu-utils'
 export function HomeRedirect() {
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Check for error in URL params
+    const urlParams = new URLSearchParams(window.location.search)
+    const errorParam = urlParams.get('error')
+    if (errorParam) {
+      setError(errorParam)
+      setIsRedirecting(false)
+      return
+    }
+
     async function redirectToFirstAvailable() {
       try {
         const API_BASE = getApiBase()
@@ -83,6 +93,26 @@ export function HomeRedirect() {
         </div>
         
         <div className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center justify-center mb-2">
+                <svg className="w-6 h-6 text-red-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <span className="font-semibold text-red-800">Ошибка авторизации</span>
+              </div>
+              <p className="text-sm text-red-700">
+                {error === 'token_not_found' && 'Ссылка для входа недействительна или истекла'}
+                {error === 'token_expired' && 'Ссылка для входа истекла'}
+                {error === 'token_used' && 'Ссылка для входа уже использована'}
+                {!['token_not_found', 'token_expired', 'token_used'].includes(error) && `Ошибка: ${error}`}
+              </p>
+              <p className="text-xs text-red-600 mt-2">
+                Получите новую ссылку через Telegram бота
+              </p>
+            </div>
+          )}
+          
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-center mb-2">
               <svg className="w-6 h-6 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
