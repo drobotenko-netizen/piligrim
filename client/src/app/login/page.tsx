@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -8,12 +9,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function LoginOtpPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const searchParams = useSearchParams()
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [authId, setAuthId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [channel, setChannel] = useState<'sms'|'telegram'>('sms')
+
+  // Handle magic link error messages
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      switch (errorParam) {
+        case 'token_used':
+          setError('Ссылка для входа уже была использована. Получите новую ссылку через команду /login в Telegram.')
+          break
+        case 'token_expired':
+          setError('Ссылка для входа истекла. Получите новую ссылку через команду /login в Telegram.')
+          break
+        case 'token_not_found':
+          setError('Ссылка для входа недействительна. Получите новую ссылку через команду /login в Telegram.')
+          break
+        default:
+          setError('Ошибка при входе. Попробуйте получить новую ссылку через команду /login в Telegram.')
+      }
+    }
+  }, [searchParams])
 
   async function sendCode() {
     setLoading(true); setError(null)
@@ -113,7 +135,20 @@ export default function LoginOtpPage() {
                 Dev‑вход без SMS
               </Button>
             )}
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            {error && (
+              <div className="space-y-2">
+                <div className="text-sm text-red-600">{error}</div>
+                {error.includes('Telegram') && (
+                  <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded border">
+                    💡 <strong>Как получить новую ссылку:</strong><br />
+                    1. Откройте Telegram<br />
+                    2. Найдите бота @your_bot_name<br />
+                    3. Отправьте команду /login<br />
+                    4. Перейдите по новой ссылке
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
