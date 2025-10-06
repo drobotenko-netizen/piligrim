@@ -85,7 +85,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     // short magic link
     '/api/auth/magic/s',
     // telegram webhook may be public
-    '/api/telegram/webhook'
+    '/api/telegram/webhook',
+    // temporary endpoint for setting up iiko permissions
+    '/api/iiko/setup-permissions'
   ]
   // allowlist exact or prefix match for short route
   const isPublic = publicAllowlist.some(p => req.path === p || (p.endsWith('/s') && req.path.startsWith(p + '/')))
