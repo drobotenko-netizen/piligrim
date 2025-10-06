@@ -75,17 +75,18 @@ export function createMagicRouter(prisma: PrismaClient) {
         return res.status(204).end()
       }
 
-      if (dbToken.usedAt) {
-        const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
-        return res.redirect(`${frontendUrl}/login?error=token_used`)
-      }
+      // Убираем проверку на использованность - ссылка работает 15 минут
+      // if (dbToken.usedAt) {
+      //   const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
+      //   return res.redirect(`${frontendUrl}/login?error=token_used`)
+      // }
       if (dbToken.expiresAt.getTime() < Date.now()) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
         return res.redirect(`${frontendUrl}/login?error=token_expired`)
       }
 
-      // Mark used
-      await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
+      // Убираем пометку как использованный - ссылка работает до истечения времени
+      // await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
 
       // Create session cookie
       const roles = (await prisma.userRole.findMany({ where: { tenantId, userId }, include: { role: true } })).map(r => r.role.name)
@@ -118,17 +119,18 @@ export function createMagicRouter(prisma: PrismaClient) {
         return res.status(204).end()
       }
 
-      if (dbToken.usedAt) {
-        const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
-        return res.redirect(`${frontendUrl}/login?error=token_used`)
-      }
+      // Убираем проверку на использованность - ссылка работает 15 минут
+      // if (dbToken.usedAt) {
+      //   const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
+      //   return res.redirect(`${frontendUrl}/login?error=token_used`)
+      // }
       if (dbToken.expiresAt.getTime() < Date.now()) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
         return res.redirect(`${frontendUrl}/login?error=token_expired`)
       }
 
-      // Mark used
-      await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
+      // Убираем пометку как использованный - ссылка работает до истечения времени
+      // await prisma.magicLinkToken.update({ where: { id: jti }, data: { usedAt: new Date(), usedIp: req.ip || '', usedUa: req.headers['user-agent'] || '' } })
 
       // Create session cookie
       const roles = (await prisma.userRole.findMany({ where: { tenantId: dbToken.tenantId, userId: dbToken.userId }, include: { role: true } })).map(r => r.role.name)
