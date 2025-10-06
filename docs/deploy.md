@@ -1,4 +1,4 @@
-# Git-деплой Piligrim (SSH + Docker Compose)
+# Деплой Piligrim (Git-based)
 
 Ниже схема деплоя на Linux‑сервер (например, ВМ в Яндекс Облаке) через bare‑репозиторий и git hook `post-receive`, который собирает образы и поднимает стек Caddy+web+api.
 
@@ -57,7 +57,30 @@ docker network create proxy || true
 
 ## 2) Настройка окружения
 
-- На сервере создайте `server/.env` (см. `docs/env.md`).
+- На сервере создайте `/srv/piligrim/app/server/.env` с переменными:
+  ```bash
+  # --- Auth / CORS
+  ALLOWED_ORIGINS=http://localhost:3000,https://piligrim.5-star-roi.ru
+  AUTH_JWT_SECRET=please-change-this
+  MAGIC_LINK_SECRET=please-change-this-too
+  SERVER_PUBLIC_URL=https://piligrim.5-star-roi.ru
+  FRONTEND_BASE_URL=https://piligrim.5-star-roi.ru
+
+  # --- Telegram
+  TELEGRAM_BOT_TOKEN=8466721340:AAGaA3Y1nozm5YLTP_F2ChpyCQdDktyF6_0
+  TELEGRAM_BOT_USERNAME=piligrim_app_bot
+  TELEGRAM_WEBHOOK_SECRET=5c1744514338e6d62239b059ca607931
+  TELEGRAM_POLLING=1
+
+  # --- Messaggio OTP
+  MESSAGGIO_API_KEY=0198aca3-882a-7718-955a-87116ce7201c
+  MESSAGGIO_BASE_URL=https://otp.messaggio.com/api/v1
+
+  # --- IIKO
+  IIKO_HOST=piligrim-arsenev-co.iiko.it
+  IIKO_LOGIN=drobotenko
+  IIKO_PASS=Cxd8hj97yGH
+  ```
 - Проверьте домены в `infra/Caddyfile` и откройте 80/443.
 - Убедитесь, что у пользователя есть права на запуск Docker.
 
