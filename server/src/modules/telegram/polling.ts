@@ -109,12 +109,12 @@ export async function startTelegramPolling(prisma: PrismaClient) {
           
           try {
             // Invalidate any previous active tokens for this user
-            await prisma.magicLinkToken.updateMany({
+            await (prisma as any).magicLinkToken.updateMany({
               where: { userId: binding.userId, usedAt: null, expiresAt: { gt: new Date() } },
               data: { usedAt: new Date() }
             })
 
-            const tokenId = await prisma.magicLinkToken.create({
+            const tokenId = await (prisma as any).magicLinkToken.create({
               data: { tenantId: binding.tenantId, userId: binding.userId, redirect: '/', expiresAt }
             })
 
