@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -20,7 +21,7 @@ export default function AdjustmentsClient({ initialY, initialM, initialEmployees
   const [items, setItems] = useState<Item[]>(initialItems || [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState<{ employeeId: string; kind: 'bonus'|'fine'|'deduction'; amountRub: string; dateIso: string; reason?: string }>({ employeeId: '', kind: 'bonus', amountRub: '', dateIso: `${initialY}-${String(initialM).padStart(2,'0')}-01` })
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
   const [formDept, setFormDept] = useState<'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('HALL')
   const [employeeQuery, setEmployeeQuery] = useState('')

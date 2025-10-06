@@ -1,7 +1,8 @@
 import AdjustmentsClient from './ui/AdjustmentsClient'
+import { getApiBase } from "@/lib/api"
 
 export default async function AdjustmentsPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const now = new Date()
   const y = now.getUTCFullYear()
   const m = now.getUTCMonth() + 1

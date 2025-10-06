@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
@@ -17,7 +18,7 @@ export default function TimesheetsClient({ initialY, initialM, initialEmployees,
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
   const [entries, setEntries] = useState<Entry[]>(initialEntries || [])
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
@@ -13,7 +14,7 @@ export default function CounterpartiesClient({ initialItems }: { initialItems: a
   const [items, setItems] = useState<any[]>(initialItems)
   const [form, setForm] = useState<{ name: string; kind?: string }>({ name: '', kind: 'company' })
   const [kindTab, setKindTab] = useState<'all'|'company'|'person'|'bank'|'other'>('all')
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [types, setTypes] = useState<Array<{ id: string; name: string; label: string; active: boolean }>>([])
 
   async function refresh() {

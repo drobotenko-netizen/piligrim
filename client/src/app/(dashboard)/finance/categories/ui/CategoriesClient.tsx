@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -177,7 +178,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const [expandMode, setExpandMode] = useState<'EXPANDED'|'COLLAPSED'>('EXPANDED')
   const [payrollEnsured, setPayrollEnsured] = useState(false)
   const [payrollEnsuring, setPayrollEnsuring] = useState(false)
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const ENABLE_AUTO_PAYROLL_FIX = process.env.NEXT_PUBLIC_ENABLE_AUTO_PAYROLL_FIX === '1'
 
   // Набор раскрытых узлов

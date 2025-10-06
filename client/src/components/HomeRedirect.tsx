@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { useRouter } from 'next/navigation'
 import { getFirstAvailableMenuItem } from '@/lib/menu-utils'
 

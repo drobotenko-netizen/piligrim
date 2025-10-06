@@ -1,13 +1,14 @@
 "use client"
 
 import { useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function LoginOtpPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [authId, setAuthId] = useState<string | null>(null)

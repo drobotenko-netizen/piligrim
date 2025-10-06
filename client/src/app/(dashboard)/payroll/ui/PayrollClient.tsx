@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -10,7 +11,7 @@ export default function PayrollClient({ initialY, initialM, initialItems }: { in
   const [y, setY] = useState(initialY)
   const [m, setM] = useState(initialM)
   const [items, setItems] = useState<any[]>(initialItems || [])
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [dept, setDept] = useState<'ALL'|'KITCHEN'|'HALL'|'BAR'|'OPERATORS'|'OFFICE'>('ALL')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
@@ -12,7 +13,7 @@ export default function AccountsClient({ initialAccounts }: { initialAccounts: a
   const [accounts, setAccounts] = useState<any[]>(initialAccounts)
   const [form, setForm] = useState<{ name: string; kind: 'cash'|'bank' }>({ name: '', kind: 'cash' })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   async function refresh() {
     const res = await fetch(`${API_BASE}/api/accounts`)

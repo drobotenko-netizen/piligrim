@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, Fragment } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -26,7 +27,7 @@ export default function CashflowClient({ initialYFrom, initialMFrom, initialYTo,
   const [months, setMonths] = useState<Array<{ year: number; month: number; key: string; label: string }>>(initialMonths)
   const [total, setTotal] = useState<number>(initialTotal)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
 

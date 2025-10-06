@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -37,7 +38,7 @@ export default function BalancesClient() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) {
     return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽'

@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Button } from '@/components/ui/button'
 import { Paperclip } from 'lucide-react'
 
@@ -11,7 +12,7 @@ function ymd(d: Date) {
 }
 
 export default function CashflowClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const spreadsheetId = '1vEuHUs31i9DVxLebJ9AxHiOYXCJxQR094NhY8u3IPi8'
   const sheet = 'ДДС месяц'
 

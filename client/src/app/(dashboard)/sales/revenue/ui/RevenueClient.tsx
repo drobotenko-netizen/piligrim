@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState, useMemo } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import HeaderControls from './HeaderControls'
 import SummaryStats from './SummaryStats'
@@ -379,4 +380,3 @@ export function RevenueClient() {
       </CardContent>
     </Card>
   )
-}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal } from 'lucide-react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+const API_BASE = getApiBase()
 
 export default function ExpenseDocsClient() {
   const [docs, setDocs] = useState<any[]>([])

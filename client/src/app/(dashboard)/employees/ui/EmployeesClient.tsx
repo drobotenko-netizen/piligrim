@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
@@ -22,7 +23,7 @@ export default function EmployeesClient({ initialPositions, initialEmployees }: 
   const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE')
   const [newPos, setNewPos] = useState<{ name: string }>({ name: '' })
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   async function refresh() {
     const [p, e] = await Promise.all([

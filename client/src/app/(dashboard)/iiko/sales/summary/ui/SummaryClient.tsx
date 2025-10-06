@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
@@ -26,7 +27,7 @@ function formatNumber(value: number | null): string {
 }
 
 export default function SummaryClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const now = new Date()
   const [year, setYear] = useState(now.getUTCFullYear())
   const [month, setMonth] = useState(now.getUTCMonth() + 1)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -23,7 +24,7 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
   const [filters, setFilters] = useState<{ accountId?: string; categoryId?: string; activity?: string; counterpartyId?: string }>({})
   const [form, setForm] = useState<any>({ paymentDate: new Date().toISOString().slice(0,10), accrualYear: String(initialY), accrualMonth: String(initialM), accountId: '', categoryId: '', counterpartyId: '', amountRub: '', note: '' })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   const flatCategories = useMemo(() => {
     const acc: any[] = []

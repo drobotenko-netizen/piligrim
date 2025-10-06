@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -9,7 +10,7 @@ function dtToYMD(d: Date) {
 }
 
 export default function ConsumptionClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [from, setFrom] = useState(dtToYMD(new Date()))
   const [to, setTo] = useState(dtToYMD(new Date()))
   const [rows, setRows] = useState<any[]>([])

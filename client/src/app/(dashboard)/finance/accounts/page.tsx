@@ -1,9 +1,10 @@
 import AccountsClient from './ui/AccountsClient'
+import { getApiBase } from "@/lib/api"
 
 export const dynamic = 'force-dynamic'
 
 export default async function AccountsPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let initialAccounts: any[] = []
   try {
     const res = await fetch(`${API_BASE}/api/accounts`, { cache: 'no-store' })

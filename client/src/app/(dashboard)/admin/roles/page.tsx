@@ -1,9 +1,10 @@
 import RolesClient from '@/app/admin/roles/ui/RolesClient'
+import { getApiBase } from "@/lib/api"
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminRolesPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let roles: any[] = []
   let permissions: any[] = []
   try {

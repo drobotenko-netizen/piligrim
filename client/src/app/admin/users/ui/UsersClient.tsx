@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export default function UsersClient({ initialItems }: { initialItems: any[] }) {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [items, setItems] = useState<any[]>(initialItems)
   const [roleTab, setRoleTab] = useState<string>('ALL')
   const [activeTab, setActiveTab] = useState<'ACTIVE'|'INACTIVE'>('ACTIVE')

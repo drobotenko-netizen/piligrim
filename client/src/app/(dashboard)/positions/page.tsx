@@ -1,8 +1,9 @@
 import PositionsClient from './ui/PositionsClient'
+import { getApiBase } from "@/lib/api"
 // import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export default async function PositionsPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let json: any = { data: [] }
   try {
     const res = await fetch(`${API_BASE}/api/positions`, { cache: 'no-store', credentials: 'include' })

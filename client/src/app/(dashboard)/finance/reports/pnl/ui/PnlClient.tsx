@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo, Fragment } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -21,7 +22,7 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   const [mTo, setMTo] = useState(initialMTo)
   const [data, setData] = useState<any>(null)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
   

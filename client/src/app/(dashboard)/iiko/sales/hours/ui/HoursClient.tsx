@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { getApiBase } from "@/lib/api"
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts'
 
@@ -13,7 +14,7 @@ function dtToYMD(d: Date) {
 type ViewMode = 'day' | 'week' | 'month'
 
 export default function HoursClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [from, setFrom] = useState<string>('2025-09-01')
   const [to, setTo] = useState<string>('2025-09-30')
   const [view, setView] = useState<ViewMode>('day')
