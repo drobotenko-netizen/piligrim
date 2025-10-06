@@ -28,11 +28,8 @@ export function createMagicRouter(prisma: PrismaClient) {
       const ttlMinutes = Number(req.body?.ttlMinutes || 15)
       const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000)
 
-      // Invalidate any previous active tokens for this user (strict one-time links)
-      await prisma.magicLinkToken.updateMany({
-        where: { tenantId: tenant.id, userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
-        data: { usedAt: new Date() }
-      })
+      // Allow multiple active tokens for better UX (each token is still one-time use)
+      // Removed automatic invalidation of previous tokens
 
       const tokenId = await prisma.magicLinkToken.create({
         data: { tenantId: tenant.id, userId: user.id, redirect, expiresAt }
