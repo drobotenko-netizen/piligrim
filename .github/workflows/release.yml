@@ -61,7 +61,7 @@ jobs:
           source: |
             infra/Caddyfile
             docker-compose.prod.yml
-          target: /opt/apps/piligrim-upload
+          target: /tmp/piligrim-deploy
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -76,19 +76,19 @@ jobs:
             export IMAGE_API=${{ env.IMAGE_API }}:${{ github.ref_name }}
 
             # Prepare directories
-            sudo mkdir -p /opt/apps/piligrim
+            sudo mkdir -p /srv/piligrim/app
             sudo mkdir -p /opt/infra/caddy
 
             # Move uploaded files
-            if [ -f /opt/apps/piligrim-upload/docker-compose.prod.yml ]; then
-              sudo mv /opt/apps/piligrim-upload/docker-compose.prod.yml /opt/apps/piligrim/docker-compose.prod.yml
+            if [ -f /tmp/piligrim-deploy/docker-compose.prod.yml ]; then
+              sudo mv /tmp/piligrim-deploy/docker-compose.prod.yml /srv/piligrim/app/docker-compose.prod.yml
             fi
-            if [ -f /opt/apps/piligrim-upload/infra/Caddyfile ]; then
-              sudo mv /opt/apps/piligrim-upload/infra/Caddyfile /opt/infra/caddy/Caddyfile
+            if [ -f /tmp/piligrim-deploy/infra/Caddyfile ]; then
+              sudo mv /tmp/piligrim-deploy/infra/Caddyfile /opt/infra/caddy/Caddyfile
             fi
 
-            # Docker login to GHCR for pulls
-            echo ${{ secrets.GHCR_READ_TOKEN }} | sudo docker login ghcr.io -u ${{ secrets.GHCR_READ_USER }} --password-stdin
+            # Docker login to GHCR for pulls (using GITHUB_TOKEN as fallback)
+            echo ${{ secrets.GITHUB_TOKEN }} | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Ensure shared proxy network exists and caddy attached
             sudo docker network create proxy || true
@@ -99,11 +99,27 @@ jobs:
               sudo docker network connect proxy caddy || true
             fi
 
-            # Pull & run application with new images
-            cd /opt/apps/piligrim
-            IMAGE_WEB=$IMAGE_WEB IMAGE_API=$IMAGE_API sudo -E docker compose -f docker-compose.prod.yml pull || true
-            IMAGE_WEB=$IMAGE_WEB IMAGE_API=$IMAGE_API sudo -E docker compose -f docker-compose.prod.yml up -d
+            # Stop old containers if they exist
+            sudo docker stop api web || true
+            sudo docker rm api web || true
+
+            # Pull new images
+            sudo docker pull $IMAGE_WEB
+            sudo docker pull $IMAGE_API
+
+            # Run new containers with correct names and network
+            sudo docker run -d --name api --network infra_default --restart unless-stopped \
+              -e PORT=4000 -e NODE_ENV=production -e DATABASE_URL=file:/data/dev.db \
+              -v piligrim_api_data:/data $IMAGE_API
+
+            sudo docker run -d --name web --network infra_default --restart unless-stopped \
+              -e NODE_ENV=production -e PORT=3000 -e NEXT_PUBLIC_API_BASE=https://piligrim.5-star-roi.ru $IMAGE_WEB
+
+            # Connect to proxy network for Caddy routing
+            sudo docker network connect proxy api || true
+            sudo docker network connect proxy web || true
 
             # Health check
-            curl -fsSL https://piligrim.5-star-roi.ru/ -o /dev/null
+            sleep 5
+            curl -fsSL https://piligrim.5-star-roi.ru/api/health -o /dev/null
             
