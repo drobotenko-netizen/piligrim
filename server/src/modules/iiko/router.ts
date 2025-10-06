@@ -13,8 +13,55 @@ export function createIikoRouter() {
   const router = Router()
   const client = new IikoClient()
 
+  // Check iiko permissions middleware
+  const checkIikoPermission = async (req: any, res: any, next: any) => {
+    try {
+      const prisma = req.app.get('prisma')
+      const userId = req.auth?.userId
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'unauthorized' })
+      }
+
+      // Check if user has iiko.read permission
+      const userPermissions = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          roles: {
+            include: {
+              role: {
+                include: {
+                  rolePerms: {
+                    include: {
+                      permission: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+
+      const hasIikoPermission = userPermissions?.roles.some(userRole => 
+        userRole.role.rolePerms.some(rolePerm => 
+          rolePerm.permission.name === 'iiko.read'
+        )
+      )
+
+      if (!hasIikoPermission) {
+        return res.status(403).json({ error: 'access denied - iiko permission required' })
+      }
+
+      next()
+    } catch (error) {
+      console.error('Error checking iiko permissions:', error)
+      return res.status(500).json({ error: 'internal server error' })
+    }
+  }
+
   // mount local subrouter (access prisma via app)
-  router.use('/local', (req, _res, next) => { (req as any).prisma = (req as any).prisma || req.app.get('prisma'); next() }, createIikoLocalRouter({ buildDayRangeIso }))
+  router.use('/local', (req, _res, next) => { (req as any).prisma = (req as any).prisma || req.app.get('prisma'); next() }, checkIikoPermission, createIikoLocalRouter({ buildDayRangeIso }))
 
   // mount receipts subrouter (access prisma via app)
   router.use('/local', (req, _res, next) => { (req as any).prisma = (req as any).prisma || req.app.get('prisma'); next() }, createIikoReceiptsRouter({ buildDayRangeIso, client }))
