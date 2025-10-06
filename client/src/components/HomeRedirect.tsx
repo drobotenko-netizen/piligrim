@@ -12,7 +12,17 @@ export function HomeRedirect() {
     async function redirectToFirstAvailable() {
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-        const response = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
+        console.log('[HomeRedirect] Making request to:', `${API_BASE}/api/auth/otp/me`)
+        
+        const response = await fetch(`${API_BASE}/api/auth/otp/me`, { 
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        })
+        
+        console.log('[HomeRedirect] Response status:', response.status)
+        console.log('[HomeRedirect] Response headers:', Object.fromEntries(response.headers.entries()))
         
         // Если не авторизован, перенаправляем на страницу входа
         if (!response.ok || response.status === 401) {
@@ -22,6 +32,7 @@ export function HomeRedirect() {
         }
         
         const data = await response.json()
+        console.log('[HomeRedirect] Response data:', data)
         
         // Проверяем, что пользователь действительно авторизован
         if (!data?.user) {
