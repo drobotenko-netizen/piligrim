@@ -1,3 +1,6 @@
-import { redirect } from 'next/navigation'
-export default function HomePage() { redirect('/employees') }
+import { HomeRedirect } from '@/components/HomeRedirect'
+
+export default function HomePage() {
+  return <HomeRedirect />
+}
 

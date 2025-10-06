@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Users, CalendarCheck2, Banknote, FileSpreadsheet, Settings, ChevronDown, Wallet, ListTree, ArrowLeftRight, Contact, FileText, Shield, Tags, TrendingUp, UserCheck, Calculator, ChefHat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
+import { getMenuVisibility } from '@/lib/menu-utils'
 
 const personnelItems = [
   { href: '/timesheets', label: 'Табели', icon: CalendarCheck2 },
@@ -149,20 +150,15 @@ export function Sidebar() {
     setOpenImport(section === 'import')
   }
   const roles: string[] = Array.isArray(me?.roles) ? me.roles : []
-  const has = (r: string) => roles.includes(r)
-  const isAdmin = has('ADMIN')
   
   console.log('[sidebar] me object:', me)
   console.log('[sidebar] roles array:', roles)
-  console.log('[sidebar] isAdmin:', isAdmin)
   
-  // Для админа показываем всё, для остальных - по ролям
-  const visibleSales = isAdmin || has('SALES') || has('OWNER')
-  const visiblePersonnel = isAdmin || has('HR') || has('OWNER') || has('CASHIER')
-  const visibleFinance = isAdmin || has('FINANCE') || has('OWNER')
-  const visibleSettings = isAdmin
+  // Используем утилитарную функцию для определения видимости
+  const visibility = getMenuVisibility(roles)
+  const { visibleSales, visiblePersonnel, visibleFinance, visibleSettings } = visibility
   
-  console.log('[sidebar] visibility:', { visibleSales, visiblePersonnel, visibleFinance, visibleSettings })
+  console.log('[sidebar] visibility:', visibility)
 
   return (
     <aside className="w-[15%] min-w-[220px] border-r bg-card flex flex-col">
