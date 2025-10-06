@@ -380,3 +380,4 @@ export function RevenueClient() {
       </CardContent>
     </Card>
   )
+}
