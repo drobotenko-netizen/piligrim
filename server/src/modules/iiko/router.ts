@@ -887,6 +887,102 @@ export function createIikoRouter() {
     return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
   }
 
+  // POST /iiko/setup-permissions - setup iiko permissions (admin only)
+  router.post('/setup-permissions', async (req, res) => {
+    try {
+      const prisma = (req as any).prisma || req.app.get('prisma')
+      if (!prisma) return res.status(503).json({ error: 'prisma not available' })
+
+      console.log('🔧 Setting up iiko permissions...')
+
+      // Add iiko.read permission
+      const iikoReadPerm = await prisma.permission.upsert({
+        where: { name: 'iiko.read' },
+        update: {},
+        create: {
+          id: 'iiko_read_perm',
+          name: 'iiko.read',
+          description: 'Доступ к чтению данных iiko'
+        }
+      })
+      console.log('✅ Added iiko.read permission:', iikoReadPerm.id)
+
+      // Add iiko.write permission
+      const iikoWritePerm = await prisma.permission.upsert({
+        where: { name: 'iiko.write' },
+        update: {},
+        create: {
+          id: 'iiko_write_perm',
+          name: 'iiko.write',
+          description: 'Доступ к записи данных iiko'
+        }
+      })
+      console.log('✅ Added iiko.write permission:', iikoWritePerm.id)
+
+      // Get ADMIN role
+      const adminRole = await prisma.role.findUnique({
+        where: { name: 'ADMIN' }
+      })
+
+      if (!adminRole) {
+        return res.status(500).json({ error: 'ADMIN role not found' })
+      }
+
+      console.log('✅ Found ADMIN role:', adminRole.id)
+
+      // Add iiko.read permission to ADMIN role
+      const iikoReadRolePerm = await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: adminRole.id,
+            permissionId: iikoReadPerm.id
+          }
+        },
+        update: {},
+        create: {
+          id: 'iiko_read_role_perm',
+          roleId: adminRole.id,
+          permissionId: iikoReadPerm.id
+        }
+      })
+      console.log('✅ Added iiko.read permission to ADMIN role:', iikoReadRolePerm.id)
+
+      // Add iiko.write permission to ADMIN role
+      const iikoWriteRolePerm = await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: adminRole.id,
+            permissionId: iikoWritePerm.id
+          }
+        },
+        update: {},
+        create: {
+          id: 'iiko_write_role_perm',
+          roleId: adminRole.id,
+          permissionId: iikoWritePerm.id
+        }
+      })
+      console.log('✅ Added iiko.write permission to ADMIN role:', iikoWriteRolePerm.id)
+
+      res.json({ 
+        ok: true, 
+        message: 'iiko permissions setup successfully',
+        permissions: {
+          read: iikoReadPerm.id,
+          write: iikoWritePerm.id
+        },
+        rolePermissions: {
+          read: iikoReadRolePerm.id,
+          write: iikoWriteRolePerm.id
+        }
+      })
+
+    } catch (error: any) {
+      console.error('❌ Error setting up iiko permissions:', error)
+      res.status(500).json({ error: String(error?.message || error) })
+    }
+  })
+
   router.get('/local/sales/customers', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
