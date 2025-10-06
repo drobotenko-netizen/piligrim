@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 'use client'
 
 import { useState } from 'react'
@@ -24,7 +25,7 @@ export default function PositionsClient({ initialPositions }: { initialPositions
   const [form, setForm] = useState<{ name: string; kind: string; department?: string; revenuePercentBps?: string; salaryAmount?: string; baseHourRate?: string }>({ name: '', kind: 'SHIFTS_PLUS_REVENUE', department: 'HALL' })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [rates, setRates] = useState<any[]>([])
   const [rateForm, setRateForm] = useState<{ year: string; month: string; baseHourRate?: string; revenuePercentBps?: string; salaryAmount?: string }>({ year: String(new Date().getUTCFullYear()), month: String(new Date().getUTCMonth()+1) })
   const [viewY, setViewY] = useState(new Date().getUTCFullYear())

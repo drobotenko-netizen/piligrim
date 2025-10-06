@@ -1,10 +1,11 @@
+import { getApiBase } from '../../lib/api'
 import CashflowClient from './ui/CashflowClient'
 // import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CashflowReportPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const now = new Date()
   const currentYear = now.getUTCFullYear()
   const currentMonth = now.getUTCMonth() + 1

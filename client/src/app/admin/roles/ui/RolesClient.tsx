@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 'use client'
 
 import { useState } from 'react'
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 
 export default function RolesClient({ initialRoles, allPermissions }: { initialRoles: any[]; allPermissions: any[] }) {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [roles, setRoles] = useState<any[]>(initialRoles)
   const [newRole, setNewRole] = useState('')
 

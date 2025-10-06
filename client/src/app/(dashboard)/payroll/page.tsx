@@ -1,9 +1,10 @@
+import { getApiBase } from '../../lib/api'
 import PayrollClient from './ui/PayrollClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PayrollPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const now = new Date()
   const y = now.getUTCFullYear()
   const m = now.getUTCMonth() + 1

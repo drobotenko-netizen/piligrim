@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 import { useEffect, useMemo, useState } from 'react'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -12,7 +13,7 @@ function dtToYMD(d: Date) {
 type Ingredient = { id: string; name: string; amount?: number | null; unit?: string | null }
 
 export default function RecipesClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [date, setDate] = useState(() => {
     // Используем вчерашний день или последний день декабря 2024, если есть данные
     const today = new Date()

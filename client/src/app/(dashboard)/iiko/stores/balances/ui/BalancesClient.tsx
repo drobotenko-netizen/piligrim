@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 import { useEffect, useState, useMemo } from 'react'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -10,7 +11,7 @@ function dtToIso(d: Date) {
 }
 
 export default function BalancesClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [timestamp, setTimestamp] = useState('2024-12-15T12:00:00.000') // Используем дату с данными
   const [tableData, setTableData] = useState<any>(null) // Готовая таблица с сервера
   const [loading, setLoading] = useState(false)

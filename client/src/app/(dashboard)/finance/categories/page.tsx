@@ -1,9 +1,10 @@
+import { getApiBase } from '../../lib/api'
 import CategoriesClient from './ui/CategoriesClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CategoriesPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let initialCategories: any[] = []
   try {
     const res = await fetch(`${API_BASE}/api/categories`, { cache: 'no-store' })

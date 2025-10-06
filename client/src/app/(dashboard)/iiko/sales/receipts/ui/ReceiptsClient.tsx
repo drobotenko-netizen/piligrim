@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 import { useEffect, useMemo, useState } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,7 +12,7 @@ function dtToYMD(d: Date) {
 }
 
 export default function ReceiptsClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   
   // Получаем параметры из URL
   const [date, setDate] = useState(() => {

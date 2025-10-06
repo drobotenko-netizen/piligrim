@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 
 import { useEffect, useState } from 'react'
@@ -6,7 +7,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+const API_BASE = getApiBase()
 
 export default function ShiftsClient() {
   const [shifts, setShifts] = useState<any[]>([])

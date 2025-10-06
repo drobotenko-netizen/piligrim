@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getRussianHolidaysIsoSet } from '@/lib/holidays-ru'
+import { getRussianHolidaysIsoSet } from '@/lib/holidays-ru'; import { getApiBase } from '../../lib/api'
 
 type Employee = { id: string; fullName: string; position?: { department?: string | null } | null }
 type Entry = { id: string; employeeId: string; workDate: string; minutes: number; status: string }
@@ -17,7 +17,7 @@ export default function TimesheetsClient({ initialY, initialM, initialEmployees,
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
   const [entries, setEntries] = useState<Entry[]>(initialEntries || [])
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 

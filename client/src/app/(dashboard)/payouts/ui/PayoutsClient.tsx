@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
@@ -24,7 +25,7 @@ export default function PayoutsClient({ initialY, initialM, initialEmployees, in
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState<{ employeeId: string; dateIso: string; year: string; month: string; accountId?: string | null; amountRub: string; note?: string }>({ employeeId: '', dateIso: `${initialY}-${String(initialM).padStart(2,'0')}-01`, year: String(initialY), month: String(initialM), accountId: '', amountRub: '' })
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   async function reload() {
     try {

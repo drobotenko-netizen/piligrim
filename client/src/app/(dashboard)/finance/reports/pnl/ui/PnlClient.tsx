@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 
 import { useEffect, useState, useMemo, Fragment } from 'react'
@@ -21,7 +22,7 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   const [mTo, setMTo] = useState(initialMTo)
   const [data, setData] = useState<any>(null)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
   

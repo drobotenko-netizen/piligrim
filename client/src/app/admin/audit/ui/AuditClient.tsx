@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function AuditClient({ initialItems }: { initialItems: any[] }) {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [items, setItems] = useState<any[]>(initialItems)
   const [year, setYear] = useState<string>('all')
   const [month, setMonth] = useState<string>('all')

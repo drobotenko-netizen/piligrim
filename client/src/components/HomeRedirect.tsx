@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getFirstAvailableMenuItem } from '@/lib/menu-utils'
+import { getApiBase } from '@/lib/api'
 
 export function HomeRedirect() {
   const router = useRouter()
@@ -11,7 +12,7 @@ export function HomeRedirect() {
   useEffect(() => {
     async function redirectToFirstAvailable() {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')
+        const API_BASE = getApiBase()
         console.log('[HomeRedirect] Making request to:', `${API_BASE}/api/auth/otp/me`)
         
         const response = await fetch(`${API_BASE}/api/auth/otp/me`, { 

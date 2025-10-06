@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 
 import { useEffect, useMemo, useState, Fragment } from 'react'
@@ -26,7 +27,7 @@ export default function CashflowClient({ initialYFrom, initialMFrom, initialYTo,
   const [months, setMonths] = useState<Array<{ year: number; month: number; key: string; label: string }>>(initialMonths)
   const [total, setTotal] = useState<number>(initialTotal)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
 

@@ -1,9 +1,10 @@
+import { getApiBase } from '../../lib/api'
 import AuditClient from '@/app/admin/audit/ui/AuditClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAuditPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let items: any[] = []
   try {
     const r = await fetch(`${API_BASE}/api/admin/audit`, { cache: 'no-store', credentials: 'include' as any })

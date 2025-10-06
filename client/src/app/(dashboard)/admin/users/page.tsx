@@ -1,9 +1,10 @@
+import { getApiBase } from '../../lib/api'
 import UsersClient from '@/app/admin/users/ui/UsersClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminUsersPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let initialItems: any[] = []
   try {
     const res = await fetch(`${API_BASE}/api/admin/users`, { cache: 'no-store', credentials: 'include' as any })

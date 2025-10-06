@@ -6,8 +6,9 @@ import SummaryStats from './SummaryStats'
 import ChartArea from './ChartArea'
 import DataTable from './DataTable'
 import { ChartPoint, formatDate, getWeekday } from './utils'
+import { getApiBase } from '@/lib/api'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')
+const API_BASE = getApiBase()
 
 export function RevenueClient() {
   const [year1, setYear1] = useState(2025)

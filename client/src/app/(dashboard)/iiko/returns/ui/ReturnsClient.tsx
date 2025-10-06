@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 import { useEffect, useState } from 'react'
 
@@ -15,7 +16,7 @@ function dtToYMD(d: Date) {
 }
 
 export default function ReturnsClient() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [from, setFrom] = useState(dtToYMD(startOfMonth()))
   const [to, setTo] = useState(dtToYMD(endOfMonth()))
   const [group, setGroup] = useState<'waiter' | 'register'>('waiter')

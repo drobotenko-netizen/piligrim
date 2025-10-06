@@ -1,10 +1,11 @@
+import { getApiBase } from '../../lib/api'
 import EmployeesClient from './ui/EmployeesClient'
 // import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export const dynamic = 'force-dynamic'
 
 export default async function EmployeesPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   let positionsJson: any = { data: [] }
   let employeesJson: any = { data: [] }
   try {

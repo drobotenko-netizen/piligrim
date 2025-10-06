@@ -5,6 +5,7 @@ import { Users, CalendarCheck2, Banknote, FileSpreadsheet, Settings, ChevronDown
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { getMenuVisibility } from '@/lib/menu-utils'
+import { getApiBase } from '@/lib/api'
 
 const personnelItems = [
   { href: '/timesheets', label: 'Табели', icon: CalendarCheck2 },
@@ -67,7 +68,7 @@ export function Sidebar() {
 
   async function fetchMe() {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')
+      const API_BASE = getApiBase()
       console.log('[sidebar] fetching /me …')
       const r = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
       const j = await r.json()
@@ -134,7 +135,7 @@ export function Sidebar() {
 
   async function logout() {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')
+      const API_BASE = getApiBase()
       await fetch(`${API_BASE}/api/auth/otp/logout`, { method: 'POST', credentials: 'include' })
       setMe(null)
       if (typeof window !== 'undefined') window.location.href = '/login'

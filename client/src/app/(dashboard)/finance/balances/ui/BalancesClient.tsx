@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 
 import { useEffect, useState } from 'react'
@@ -37,7 +38,7 @@ export default function BalancesClient() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) {
     return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽'

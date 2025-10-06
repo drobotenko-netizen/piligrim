@@ -1,3 +1,4 @@
+import { getApiBase } from '../../lib/api'
 "use client"
 
 import { useState } from 'react'
@@ -9,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function CounterpartyTypesClient({ initialItems }: { initialItems: any[] }) {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const API_BASE = getApiBase()
   const [items, setItems] = useState<any[]>(initialItems)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<{ label: string }>({ label: '' })
