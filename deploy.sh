@@ -62,6 +62,11 @@ docker rm api web 2>/dev/null || true
 echo "🚀 Запускаем новые контейнеры..."
 docker run -d --name api --network infra_default --restart unless-stopped \\
   -e PORT=4000 -e NODE_ENV=production -e DATABASE_URL=file:/data/dev.db \\
+  -e SERVER_PUBLIC_URL=https://piligrim.5-star-roi.ru \\
+  -e FRONTEND_BASE_URL=https://piligrim.5-star-roi.ru \\
+  -e TELEGRAM_BOT_TOKEN=8466721340:AAGaA3Y1nozm5YLTP_F2ChpyCQdDktyF6_0 \\
+  -e TELEGRAM_BOT_USERNAME=piligrim_app_bot \\
+  -e TELEGRAM_POLLING=1 \\
   -v piligrim_api_data:/data ghcr.io/drobotenko-netizen/piligrim/piligrim-api:$VERSION
 
 docker run -d --name web --network infra_default --restart unless-stopped \\
