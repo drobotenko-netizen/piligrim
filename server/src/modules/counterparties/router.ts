@@ -27,8 +27,7 @@ export function createCounterpartiesRouter(prisma: PrismaClient) {
       const grouped = await (prisma as any).counterparty.groupBy({
         by: ['kind'],
         where: { tenantId: tenant.id },
-        _count: { _all: true },
-        orderBy: { _count: { _all: 'desc' } }
+        _count: { _all: true }
       })
       const items = grouped
         .filter((g: any) => !!g.kind && (g._count?._all || 0) > 0)
