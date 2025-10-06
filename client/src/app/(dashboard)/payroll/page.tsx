@@ -9,7 +9,7 @@ export default async function PayrollPage() {
   const m = now.getUTCMonth() + 1
   let initialItems: any[] = []
   try {
-    const res = await fetch(`${API_BASE}/api/payroll?y=${y}&m=${m}`, { cache: 'no-store' })
+    const res = await fetch(`${API_BASE}/api/payroll?y=${y}&m=${m}`, { cache: 'no-store', credentials: 'include' })
     const json = await res.json()
     initialItems = json.items || []
   } catch (e) {

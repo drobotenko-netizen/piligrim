@@ -71,7 +71,7 @@ export default function BalancesClient() {
       const response = await fetch(`${API_BASE}/api/balances?dateFrom=${dateFrom}&dateTo=${dateTo}`, {
         credentials: 'include',
         headers: {
-          'x-role': 'ADMIN'
+          'Content-Type': 'application/json'
         }
       })
       

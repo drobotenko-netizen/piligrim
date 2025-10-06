@@ -9,8 +9,8 @@ export default async function AdjustmentsPage() {
   let items: any = { items: [] }
   try {
     const [empsRes, itemsRes] = await Promise.all([
-      fetch(`${API_BASE}/api/employees`, { cache: 'no-store' }),
-      fetch(`${API_BASE}/api/adjustments?y=${y}&m=${m}`, { cache: 'no-store' })
+      fetch(`${API_BASE}/api/employees`, { cache: 'no-store', credentials: 'include' }),
+      fetch(`${API_BASE}/api/adjustments?y=${y}&m=${m}`, { cache: 'no-store', credentials: 'include' })
     ])
     emps = await empsRes.json()
     items = await itemsRes.json()
@@ -19,7 +19,7 @@ export default async function AdjustmentsPage() {
   }
   return (
     <div className="p-6">
-      <AdjustmentsClient initialY={y} initialM={m} initialEmployees={emps.data} initialItems={items.items} />
+      <AdjustmentsClient initialY={y} initialM={m} initialEmployees={emps.data || []} initialItems={items.items || []} />
     </div>
   )
 }

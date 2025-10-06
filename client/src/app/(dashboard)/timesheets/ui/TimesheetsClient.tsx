@@ -11,11 +11,11 @@ import { getRussianHolidaysIsoSet } from '@/lib/holidays-ru'
 type Employee = { id: string; fullName: string; position?: { department?: string | null } | null }
 type Entry = { id: string; employeeId: string; workDate: string; minutes: number; status: string }
 
-export default function TimesheetsClient({ initialY, initialM, initialEmployees, initialEntries }: { initialY: number; initialM: number; initialEmployees: Employee[]; initialEntries: Entry[] }) {
+export default function TimesheetsClient({ initialY, initialM, initialEmployees, initialEntries }: { initialY: number; initialM: number; initialEmployees?: Employee[]; initialEntries?: Entry[] }) {
   const [y, setY] = useState(initialY)
   const [m, setM] = useState(initialM)
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
-  const [entries, setEntries] = useState<Entry[]>(initialEntries)
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
+  const [entries, setEntries] = useState<Entry[]>(initialEntries || [])
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
@@ -37,8 +37,8 @@ export default function TimesheetsClient({ initialY, initialM, initialEmployees,
   async function reload() {
     const res = await fetch(`${API_BASE}/api/timesheets?y=${y}&m=${m}`, { credentials: 'include' })
     const json = await res.json()
-    setEmployees(json.employees)
-    setEntries(json.entries)
+    setEmployees(json.employees || [])
+    setEntries(json.entries || [])
   }
 
   // Автообновление при смене месяца/года и при первом рендере

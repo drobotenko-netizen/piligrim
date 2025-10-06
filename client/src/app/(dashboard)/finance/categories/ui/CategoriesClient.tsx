@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { fetchWithRole } from '@/lib/utils'
+// import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 type TreeProps = {
   nodes: any[]
@@ -211,14 +211,14 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   }
 
   async function refresh() {
-    const res = await fetchWithRole(`${API_BASE}/api/categories`)
+    const res = await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, { credentials: 'include' })
     const json = await res.json()
     setCategories(json.items || [])
   }
 
   async function loadFunds() {
     try {
-      const res = await fetchWithRole(`${API_BASE}/api/categories/funds`, { cache: 'no-store' })
+      const res = await fetch(`${API_BASE}/api/categories/funds`, { cache: 'no-store', credentials: 'include' })
       const json = await res.json()
       setAvailableFunds(json.funds || [])
     } catch (e) {
@@ -268,7 +268,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
   async function remove() {
     if (!selected) return
-    const res = await fetchWithRole(`${API_BASE}/api/categories/${selected.id}`, { method: 'DELETE' })
+    const res = await fetch(`${API_BASE}/api/categories/${selected.id}`, { method: 'DELETE', credentials: 'include', credentials: 'include' })
     if (res.ok) {
       setSelected(null)
       setEditingId(null)
@@ -290,7 +290,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
   async function confirmTransfer() {
     if (!selected || !transferTarget) return
-    await fetchWithRole(`${API_BASE}/api/categories/${selected.id}`, {
+    await fetch(`${API_BASE}/api/categories/${selected.id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ moveToCategoryId: transferTarget })
@@ -331,7 +331,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     try {
     // Берём всегда свежие данные из API, не из локального state
     const fetchFresh = async () => {
-      const r = await fetchWithRole(`${API_BASE}/api/categories`)
+      const r = await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, { credentials: 'include' })
       const j = await r.json()
       return (j.items || []) as any[]
     }
@@ -341,7 +341,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     // Убедимся, что есть «Операционные расходы»
     let freshOpex = findSubtreeByName(operatingTree, 'Операционные расходы')
     if (!freshOpex) {
-      await fetchWithRole(`${API_BASE}/api/categories`, {
+      await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Операционные расходы', type: 'expense', activity: 'OPERATING', parentId: null })
@@ -355,7 +355,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     // Найти/создать «Заработная плата» под Операционными расходами
     let payrollCat = findDirectChildByName(freshOpex, 'Заработная плата')
     if (!payrollCat) {
-      await fetchWithRole(`${API_BASE}/api/categories`, {
+      await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Заработная плата', type: 'expense', activity: 'OPERATING', parentId: freshOpex.id })
@@ -374,14 +374,14 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       if (node.id === canonicalId) continue
       // Перенос дочерних статей в каноническую
       for (const ch of node.children || []) {
-        await fetchWithRole(`${API_BASE}/api/categories/${ch.id}`, {
+        await fetch(`${API_BASE}/api/categories/${ch.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ parentId: canonicalId })
         })
       }
       // Удаляем дубль с переносом транзакций
-      await fetchWithRole(`${API_BASE}/api/categories/${node.id}`, {
+      await fetch(`${API_BASE}/api/categories/${node.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moveToCategoryId: canonicalId })
@@ -408,14 +408,14 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       for (const dup of arr.slice(1)) {
         // Перенос возможных детей дубликата (на всякий случай)
         for (const g of dup.children || []) {
-          await fetchWithRole(`${API_BASE}/api/categories/${g.id}`, {
+          await fetch(`${API_BASE}/api/categories/${g.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parentId: keep.id })
           })
         }
         // Удаление дубликата с переносом транзакций
-        await fetchWithRole(`${API_BASE}/api/categories/${dup.id}`, {
+        await fetch(`${API_BASE}/api/categories/${dup.id}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ moveToCategoryId: keep.id })
@@ -435,7 +435,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     const existingNames = new Set((payrollCat.children || []).map((c: any) => c.name))
     for (const name of blocks) {
       if (!existingNames.has(name)) {
-        await fetchWithRole(`${API_BASE}/api/categories`, {
+        await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, type: 'expense', activity: 'OPERATING', parentId: payrollCat.id })
@@ -493,7 +493,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       if (existing) continue
 
       try {
-        await fetchWithRole(`${API_BASE}/api/categories`, {
+        await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -603,7 +603,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       type = 'expense'
     }
     if (existing) return existing.id
-    const res = await fetchWithRole(`${API_BASE}/api/categories`, {
+    const res = await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, type, activity: 'OPERATING', parentId: null })
@@ -654,7 +654,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     // Kind для категорий (когда нет fund)
     const kind = !fund && kindChoice !== 'none' ? kindChoice : null
 
-        await fetchWithRole(`${API_BASE}/api/categories`, {
+        await fetch(`${API_BASE}/api/categories`, { credentials: 'include' }, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: nameInput.trim(), type, activity, parentId, fund, kind })
@@ -671,7 +671,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       const kind = kindChoice === 'none' ? null : kindChoice
       const parentId = catChoice === 'create' ? null : catChoice
       
-      await fetchWithRole(`${API_BASE}/api/categories/${editingId}`, {
+      await fetch(`${API_BASE}/api/categories/${editingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: nameInput.trim(), fund, kind, activity: activityChoice, parentId })

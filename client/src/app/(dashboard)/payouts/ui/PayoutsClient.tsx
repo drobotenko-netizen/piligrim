@@ -15,12 +15,12 @@ type Employee = { id: string; fullName: string; position?: { department?: string
 type Account = { id: string; name: string; kind?: string }
 type Item = { id: string; employeeId: string; date: string; year: number; month: number; method: string; accountId?: string | null; amount: number; note?: string }
 
-export default function PayoutsClient({ initialY, initialM, initialEmployees, initialAccounts, initialItems }: { initialY: number; initialM: number; initialEmployees: Employee[]; initialAccounts: Account[]; initialItems: Item[] }) {
+export default function PayoutsClient({ initialY, initialM, initialEmployees, initialAccounts, initialItems }: { initialY: number; initialM: number; initialEmployees?: Employee[]; initialAccounts?: Account[]; initialItems?: Item[] }) {
   const [y, setY] = useState(initialY)
   const [m, setM] = useState(initialM)
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
-  const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
-  const [items, setItems] = useState<Item[]>(initialItems)
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
+  const [accounts, setAccounts] = useState<Account[]>(initialAccounts || [])
+  const [items, setItems] = useState<Item[]>(initialItems || [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState<{ employeeId: string; dateIso: string; year: string; month: string; accountId?: string | null; amountRub: string; note?: string }>({ employeeId: '', dateIso: `${initialY}-${String(initialM).padStart(2,'0')}-01`, year: String(initialY), month: String(initialM), accountId: '', amountRub: '' })
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
@@ -28,7 +28,7 @@ export default function PayoutsClient({ initialY, initialM, initialEmployees, in
 
   async function reload() {
     try {
-      const res = await fetch(`${API_BASE}/api/payouts?y=${y}&m=${m}`)
+      const res = await fetch(`${API_BASE}/api/payouts?y=${y}&m=${m}`, { credentials: 'include' })
       const json = await res.json()
       setItems(Array.isArray(json.items) ? json.items : [])
     } catch { setItems([]) }
@@ -41,7 +41,7 @@ export default function PayoutsClient({ initialY, initialM, initialEmployees, in
     (async () => {
       if (accounts.length === 0) {
         try {
-          const r = await fetch(`${API_BASE}/api/accounts`)
+          const r = await fetch(`${API_BASE}/api/accounts`, { credentials: 'include' })
           const j = await r.json()
           setAccounts(j.items || j.data || [])
         } catch {}

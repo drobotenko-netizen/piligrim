@@ -10,7 +10,7 @@ export async function fetchWithRole(input: string, init: RequestInit = {}) {
   const isDev = process.env.NODE_ENV !== 'production'
   const headers = new Headers(init.headers || {})
   if (isDev && !headers.has('x-role')) {
-    headers.set('x-role', 'ADMIN')
+    // credentials: 'include' будет добавлен в fetch вызове
   }
   const maxAttempts = 3
   const baseDelayMs = 300

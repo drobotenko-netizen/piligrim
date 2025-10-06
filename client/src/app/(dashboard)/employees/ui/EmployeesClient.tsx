@@ -26,8 +26,8 @@ export default function EmployeesClient({ initialPositions, initialEmployees }: 
 
   async function refresh() {
     const [p, e] = await Promise.all([
-      fetch(`${API_BASE}/api/positions`).then(r => r.json()),
-      fetch(`${API_BASE}/api/employees`).then(r => r.json())
+      fetch(`${API_BASE}/api/positions`, { credentials: 'include' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/employees`, { credentials: 'include' }).then(r => r.json())
     ])
     setPositions(p.data)
     setEmployees(e.data)
@@ -37,13 +37,13 @@ export default function EmployeesClient({ initialPositions, initialEmployees }: 
     if (!form.fullName.trim()) return
     if (!editingId) {
       const payload = { fullName: form.fullName, positionId: form.positionId === 'none' ? null : form.positionId }
-      await fetch(`${API_BASE}/api/employees`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      await fetch(`${API_BASE}/api/employees`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'include' })
       setForm({ fullName: '', positionId: 'none' })
       await refresh()
       return
     }
     const patch: any = { fullName: form.fullName, positionId: form.positionId === 'none' ? null : form.positionId }
-    await fetch(`${API_BASE}/api/employees/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+    await fetch(`${API_BASE}/api/employees/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch), credentials: 'include' })
     await refresh()
   }
 
@@ -59,13 +59,13 @@ export default function EmployeesClient({ initialPositions, initialEmployees }: 
 
   async function addPosition() {
     if (!newPos.name.trim()) return
-    await fetch(`${API_BASE}/api/positions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newPos.name }) })
+    await fetch(`${API_BASE}/api/positions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newPos.name }), credentials: 'include' })
     setNewPos({ name: '' })
     await refresh()
   }
 
   async function updateEmployee(id: string, patch: any) {
-    await fetch(`${API_BASE}/api/employees/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+    await fetch(`${API_BASE}/api/employees/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch), credentials: 'include' })
     await refresh()
   }
 

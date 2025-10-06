@@ -6,10 +6,10 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-export default function PayrollClient({ initialY, initialM, initialItems }: { initialY: number; initialM: number; initialItems: any[] }) {
+export default function PayrollClient({ initialY, initialM, initialItems }: { initialY: number; initialM: number; initialItems?: any[] }) {
   const [y, setY] = useState(initialY)
   const [m, setM] = useState(initialM)
-  const [items, setItems] = useState<any[]>(initialItems)
+  const [items, setItems] = useState<any[]>(initialItems || [])
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
   const [dept, setDept] = useState<'ALL'|'KITCHEN'|'HALL'|'BAR'|'OPERATORS'|'OFFICE'>('ALL')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -18,7 +18,7 @@ export default function PayrollClient({ initialY, initialM, initialItems }: { in
 
   async function reload() {
     try {
-      const res = await fetch(`${API_BASE}/api/payroll?y=${y}&m=${m}`)
+      const res = await fetch(`${API_BASE}/api/payroll?y=${y}&m=${m}`, { credentials: 'include' })
       const json = await res.json()
       setItems(json.items || [])
     } catch {

@@ -1,5 +1,5 @@
 import CashflowClient from './ui/CashflowClient'
-import { fetchWithRole } from '@/lib/utils'
+// import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ export default async function CashflowReportPage() {
   
   let initial: any = { items: [], total: 0, months: [] }
   try {
-    const res = await fetchWithRole(`${API_BASE}/api/reports/cashflow?yFrom=${yFrom}&mFrom=${mFrom}&yTo=${yTo}&mTo=${mTo}`, { cache: 'no-store' })
+    const res = await fetch(`${API_BASE}/api/reports/cashflow?yFrom=${yFrom}&mFrom=${mFrom}&yTo=${yTo}&mTo=${mTo}`, { cache: 'no-store', credentials: 'include' })
     initial = await res.json()
   } catch (e) {
     console.error('Failed to fetch cashflow report', e)

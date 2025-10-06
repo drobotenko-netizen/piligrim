@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useMemo, useState } from 'react'
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -12,34 +13,62 @@ type Ingredient = { id: string; name: string; amount?: number | null; unit?: str
 
 export default function RecipesClient() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-  const [date, setDate] = useState(dtToYMD(new Date()))
+  const [date, setDate] = useState(() => {
+    // Используем вчерашний день или последний день декабря 2024, если есть данные
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    return dtToYMD(yesterday)
+  })
   const [products, setProducts] = useState<Array<{ id: string; name: string }>>([])
+  const [allProducts, setAllProducts] = useState<Array<{ id: string; name: string }>>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [prodMap, setProdMap] = useState<Record<string, string>>({})
   const [unitMap, setUnitMap] = useState<Record<string, string>>({})
   const [productId, setProductId] = useState('')
   const [prepared, setPrepared] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
+  async function loadCategories() {
+    try {
+      const params = new URLSearchParams({ from: date, to: date })
+      const res = await fetch(`${API_BASE}/api/iiko/local/sales/dish-categories?${params.toString()}`, { credentials: 'include' })
+      const json = await res.json()
+      setCategories(json.categories || [])
+    } catch (e) {
+      console.error('Error loading categories:', e)
+    }
+  }
+
+  async function loadDishes() {
+    try {
+      const params = new URLSearchParams({ from: date, to: date, limit: '300' })
+      if (selectedCategory !== 'all') params.set('category', selectedCategory)
+      const url = `${API_BASE}/api/iiko/local/sales/dishes?${params.toString()}`
+      
+      const res = await fetch(url, { credentials: 'include' })
+      const json = await res.json()
+      const dishes = json.dishes || []
+      
+      // Преобразуем в формат { id, name, category }
+      const dishProducts = dishes.map((d: any) => ({
+        id: d.dishId,
+        name: d.dishName,
+        category: d.dishCategory
+      }))
+      setAllProducts(dishProducts)
+    } catch (e) {
+      console.error('Error loading dishes:', e)
+    }
+  }
+
   async function loadProducts() {
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/entities/products`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const r = await fetch(`${API_BASE}/api/iiko/entities/products`, { cache: 'no-store', credentials: 'include' })
       const j = await r.json()
       const items = Array.isArray(j?.items) ? j.items : []
-      // Предпочтительно фильтруем по типу (iiko ProductType): оставляем только блюда (DISH)
-      const filtered = items.filter((p: any) => {
-        const t = String(p?.type || p?.productType || '').toUpperCase()
-        if (t) return t === 'DISH'
-        // Фоллбек по названию, если тип отсутствует
-        const name = String(p?.name || '').trim().toLowerCase()
-        if (!name) return false
-        if (name.startsWith('!')) return false
-        if (name.startsWith('-')) return false
-        if (name.includes('ингр')) return false
-        if (name.includes('(инг')) return false
-        return true
-      })
-      setProducts(filtered)
-      if (filtered[0]) setProductId(filtered[0].id)
+      
       // Создадим map id->name для отображения ингредиентов по id
       const map: Record<string, string> = {}
       const umap: Record<string, string> = {}
@@ -56,14 +85,29 @@ export default function RecipesClient() {
     if (!productId) return
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/recipes/prepared?date=${date}&productId=${productId}`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const r = await fetch(`${API_BASE}/api/iiko/recipes/prepared?date=${date}&productId=${productId}`, { cache: 'no-store', credentials: 'include' })
       const j = await r.json()
       setPrepared(j)
     } catch { setPrepared(null) }
     setLoading(false)
   }
 
-  useEffect(() => { loadProducts() }, [])
+  // Обновляем список продуктов при изменении категории
+  useEffect(() => {
+    setProducts(allProducts)
+    if (allProducts[0] && !allProducts.find(p => p.id === productId)) {
+      setProductId(allProducts[0].id)
+    }
+  }, [allProducts, productId])
+
+  useEffect(() => { 
+    loadProducts()
+    loadCategories()
+  }, [])
+
+  useEffect(() => {
+    loadDishes()
+  }, [selectedCategory, date])
 
   const ingredientsIds = useMemo(() => {
     const items = prepared?.preparedCharts?.[0]?.items || []
@@ -79,7 +123,7 @@ export default function RecipesClient() {
       try {
         const params = new URLSearchParams({ date })
         for (const id of ingredientsIds) params.append('id', String(id))
-        const r = await fetch(`${API_BASE}/api/iiko/recipes/units?${params.toString()}`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+        const r = await fetch(`${API_BASE}/api/iiko/recipes/units?${params.toString()}`, { cache: 'no-store', credentials: 'include' })
         const j = await r.json()
         setTxUnits(j?.units || {})
       } catch { setTxUnits({}) }
@@ -99,27 +143,31 @@ export default function RecipesClient() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-end gap-2">
-        <div>
-          <div className="text-xs text-muted-foreground">Дата</div>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Блюдо</div>
-          <select value={productId} onChange={e => setProductId(e.target.value)} className="border rounded px-2 py-1 text-sm min-w-[280px]">
-            {products.slice(0, 500).map(p => (
-              <option key={p.id} value={p.id}>{p.name || p.id}</option>
+      <div className="flex items-center gap-2">
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1 text-sm h-9" />
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-48 h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все категории</SelectItem>
+            {categories.map(category => (
+              <SelectItem key={category} value={category}>{category}</SelectItem>
             ))}
-          </select>
-        </div>
-        <button onClick={loadRecipe} className="border rounded px-3 py-1 text-sm">Показать</button>
+          </SelectContent>
+        </Select>
+        <select value={productId} onChange={e => setProductId(e.target.value)} className="border rounded px-2 py-1 text-sm min-w-[280px] h-9">
+          {products.slice(0, 500).map(p => (
+            <option key={p.id} value={p.id}>{p.name || p.id}</option>
+          ))}
+        </select>
+        <button onClick={loadRecipe} className="border rounded px-3 py-1 text-sm h-9">Показать</button>
       </div>
 
       {loading && <div className="text-sm">Загрузка…</div>}
 
       {!!ingredients.length && (
         <div className="rounded-lg border p-2">
-          <div className="text-sm font-medium mb-2">Ингредиенты</div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground">

@@ -19,8 +19,8 @@ const KIND_LABEL: Record<string, string> = {
   SALARY_PLUS_TASKS: 'Оклад + задачи'
 }
 
-export default function PositionsClient({ initialPositions }: { initialPositions: Position[] }) {
-  const [positions, setPositions] = useState<Position[]>(initialPositions)
+export default function PositionsClient({ initialPositions }: { initialPositions?: Position[] }) {
+  const [positions, setPositions] = useState<Position[]>(initialPositions || [])
   const [form, setForm] = useState<{ name: string; kind: string; department?: string; revenuePercentBps?: string; salaryAmount?: string; baseHourRate?: string }>({ name: '', kind: 'SHIFTS_PLUS_REVENUE', department: 'HALL' })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
@@ -46,15 +46,15 @@ export default function PositionsClient({ initialPositions }: { initialPositions
   }
 
   async function refresh() {
-    const res = await fetch(`${API_BASE}/api/positions`)
+    const res = await fetch(`${API_BASE}/api/positions`, { credentials: 'include' })
     const json = await res.json()
-    setPositions(json.data)
+    setPositions(json.data || [])
   }
 
   useEffect(() => {
     async function loadMonthRates() {
       try {
-        const r = await fetch(`${API_BASE}/api/positions/rates?y=${viewY}&m=${viewM}`).then(x => x.json())
+        const r = await fetch(`${API_BASE}/api/positions/rates?y=${viewY}&m=${viewM}`, { credentials: 'include' }).then(x => x.json())
         const map: Record<string, any> = {}
         ;(r.data || []).forEach((it: any) => { map[it.positionId] = it })
         setMonthRates(map)
@@ -73,13 +73,13 @@ export default function PositionsClient({ initialPositions }: { initialPositions
     if (form.kind === 'SALARY' || form.kind === 'SALARY_PLUS_TASKS') {
       payload.salaryAmount = parseRubToCents(form.salaryAmount)
     }
-    await fetch(`${API_BASE}/api/positions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    await fetch(`${API_BASE}/api/positions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'include' })
     setForm({ name: '', kind: 'SHIFTS_PLUS_REVENUE', department: 'HALL' })
     await refresh()
   }
 
   async function updatePosition(id: string, patch: any) {
-    await fetch(`${API_BASE}/api/positions/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+    await fetch(`${API_BASE}/api/positions/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch), credentials: 'include' })
     await refresh()
   }
 
@@ -94,7 +94,7 @@ export default function PositionsClient({ initialPositions }: { initialPositions
       salaryAmount: p.salaryAmount != null ? String((p.salaryAmount / 100).toFixed(2)) : ''
     })
     // загрузить периоды ставок
-    fetch(`${API_BASE}/api/positions/${p.id}/rates`).then(r => r.json()).then(json => setRates(json.data || [])).catch(() => setRates([]))
+    fetch(`${API_BASE}/api/positions/${p.id}/rates`, { credentials: 'include' }).then(r => r.json()).then(json => setRates(json.data || [])).catch(() => setRates([]))
   }
 
   async function save() {
@@ -138,8 +138,8 @@ export default function PositionsClient({ initialPositions }: { initialPositions
       payload.baseHourRate = null
       payload.revenuePercentBps = null
     }
-    await fetch(`${API_BASE}/api/positions/${editingId}/rates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    const json = await fetch(`${API_BASE}/api/positions/${editingId}/rates`).then(r => r.json())
+    await fetch(`${API_BASE}/api/positions/${editingId}/rates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'include' })
+    const json = await fetch(`${API_BASE}/api/positions/${editingId}/rates`, { credentials: 'include' }).then(r => r.json())
     setRates(json.data || [])
   }
 

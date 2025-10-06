@@ -23,7 +23,7 @@ export default function ImportClient() {
   async function loadStatus(y = year) {
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/import/status?year=${y}`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const r = await fetch(`${API_BASE}/api/iiko/local/import/status?year=${y}`, { cache: 'no-store', credentials: 'include' })
       const j = await r.json()
       setStatus(j)
     } catch { setStatus(null) }
@@ -47,7 +47,9 @@ export default function ImportClient() {
         const date = `${y}-${mm}-${dd}`
         try {
           const r = await fetch(`${API_BASE}/api/iiko/etl/receipts`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' },
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ date })
           })
           if (!r.ok) {
@@ -87,7 +89,8 @@ export default function ImportClient() {
         try {
           const r = await fetch(`${API_BASE}/api/iiko/etl/receipts`, {
             method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' },
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ date })
           })
           if (!r.ok) {

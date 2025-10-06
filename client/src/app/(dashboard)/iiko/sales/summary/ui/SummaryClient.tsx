@@ -37,7 +37,7 @@ export default function SummaryClient() {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/sales/summary/month?year=${year}&month=${month}`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const r = await fetch(`${API_BASE}/api/iiko/local/sales/summary/month?year=${year}&month=${month}`, { cache: 'no-store', credentials: 'include' })
       const j = await r.json()
       setRows(Array.isArray(j?.rows) ? j.rows : [])
     } catch {

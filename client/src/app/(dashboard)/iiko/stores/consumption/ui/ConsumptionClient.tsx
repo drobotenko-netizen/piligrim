@@ -19,8 +19,8 @@ export default function ConsumptionClient() {
     setLoading(true)
     try {
       const r = await fetch(`${API_BASE}/api/iiko/stores/consumption`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' },
-        body: JSON.stringify({ from, to }), cache: 'no-store'
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to }), cache: 'no-store', credentials: 'include'
       })
       const j = await r.json()
       setRows(Array.isArray(j?.rows) ? j.rows : [])

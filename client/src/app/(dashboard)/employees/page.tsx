@@ -1,5 +1,5 @@
 import EmployeesClient from './ui/EmployeesClient'
-import { fetchWithRole } from '@/lib/utils'
+// import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,8 +9,8 @@ export default async function EmployeesPage() {
   let employeesJson: any = { data: [] }
   try {
     const [positionsRes, employeesRes] = await Promise.all([
-      fetchWithRole(`${API_BASE}/api/positions`, { cache: 'no-store' }),
-      fetchWithRole(`${API_BASE}/api/employees`, { cache: 'no-store' })
+      fetch(`${API_BASE}/api/positions`, { cache: 'no-store', credentials: 'include' }),
+      fetch(`${API_BASE}/api/employees`, { cache: 'no-store', credentials: 'include' })
     ])
     positionsJson = await positionsRes.json()
     employeesJson = await employeesRes.json()

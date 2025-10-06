@@ -21,11 +21,31 @@ export function RevenueClient() {
   const [byWeekday, setByWeekday] = useState(false)
   const [activeTab, setActiveTab] = useState('revenue')
   const [displayMode, setDisplayMode] = useState<'sales' | 'receipts'>('sales')
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  // Функция для проверки аутентификации
+  const checkAuth = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
+      const data = await response.json()
+      const isAuth = !!(data?.user)
+      setIsAuthenticated(isAuth)
+      return isAuth
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      setIsAuthenticated(false)
+      return false
+    }
+  }
 
   // Функция для автоматической установки дат
   const setDefaultDates = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/iiko/local/sales/available-months`)
+      const response = await fetch(`${API_BASE}/api/iiko/local/sales/available-months`, { credentials: 'include' })
+      if (!response.ok) {
+        console.log('Available months request failed:', response.status)
+        return
+      }
       const data = await response.json()
       
       if (data.months && data.months.length > 0) {
@@ -65,6 +85,11 @@ export function RevenueClient() {
   }
 
   const loadData = async () => {
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping data load')
+      return
+    }
+    
     setLoading(true)
     console.log('Loading data for:', { year1, month1, year2, month2, activeTab })
     try {
@@ -93,8 +118,8 @@ export function RevenueClient() {
       }
       
       const [res1, res2] = await Promise.all([
-        fetch(endpoint1),
-        fetch(endpoint2)
+        fetch(endpoint1, { credentials: 'include' }),
+        fetch(endpoint2, { credentials: 'include' })
       ])
       
       console.log('API responses:', { res1: res1.status, res2: res2.status })
@@ -113,14 +138,23 @@ export function RevenueClient() {
     }
   }
 
-  // Автоматически устанавливаем даты при загрузке компонента
+  // Проверяем аутентификацию при загрузке компонента
   useEffect(() => {
-    setDefaultDates()
+    checkAuth()
   }, [])
 
+  // Автоматически устанавливаем даты после аутентификации
   useEffect(() => {
-    loadData()
-  }, [year1, month1, year2, month2, activeTab])
+    if (isAuthenticated) {
+      setDefaultDates()
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData()
+    }
+  }, [year1, month1, year2, month2, activeTab, isAuthenticated])
 
   // Объединяем данные для графика
   const chartData = useMemo<ChartPoint[]>(() => {
@@ -277,6 +311,20 @@ export function RevenueClient() {
                           alert('Ошибка при сохранении изображения')
                         }
                       }
+
+  // Показываем индикатор загрузки, если не аутентифицированы
+  if (!isAuthenticated) {
+    return (
+      <Card>
+        <CardContent className="p-4 space-y-6">
+          <div className="flex items-center justify-center h-32">
+            <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+            <span className="ml-3 text-muted-foreground">Проверка аутентификации...</span>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>

@@ -1,10 +1,10 @@
-import { fetchWithRole } from '@/lib/utils'
+// import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export default async function IikoAuthTestPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
   let json: any = {}
   try {
-    const r = await fetchWithRole(`${API_BASE}/api/iiko/auth/test`, { cache: 'no-store' })
+    const r = await fetch(`${API_BASE}/api/iiko/auth/test`, { cache: 'no-store', credentials: 'include' })
     json = await r.json()
   } catch {}
   return (

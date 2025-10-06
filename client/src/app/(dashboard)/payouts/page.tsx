@@ -12,9 +12,9 @@ export default async function PayoutsPage() {
   let initialItems: any[] = []
   try {
     const [emps, accs, items] = await Promise.all([
-      fetch(`${API_BASE}/api/employees`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${API_BASE}/api/accounts`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${API_BASE}/api/payouts?y=${y}&m=${m}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/employees`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/accounts`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/payouts?y=${y}&m=${m}`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()),
     ])
     initialEmployees = emps.data || []
     initialAccounts = accs.items || accs.data || []

@@ -1,5 +1,5 @@
 import TransactionsClient from './ui/TransactionsClient'
-import { fetchWithRole } from '@/lib/utils'
+// import { fetchWithRole } from '@/lib/utils' // Устарело, используем credentials: 'include'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +16,9 @@ export default async function TransactionsPage() {
   let initialItems: any[] = []
   try {
     const [accs, cats, txs] = await Promise.all([
-      fetchWithRole(`${API_BASE}/api/accounts`, { cache: 'no-store' }).then(r => r.json()),
-      fetchWithRole(`${API_BASE}/api/categories`, { cache: 'no-store' }).then(r => r.json()),
-      fetchWithRole(`${API_BASE}/api/transactions?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/accounts`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/categories`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()),
+      fetch(`${API_BASE}/api/transactions?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()),
     ])
     initialAccounts = accs.items || []
     initialCategories = cats.items || []

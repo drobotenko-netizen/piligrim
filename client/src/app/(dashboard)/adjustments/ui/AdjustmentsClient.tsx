@@ -13,11 +13,11 @@ import { MoreHorizontal } from 'lucide-react'
 type Employee = { id: string; fullName: string; position?: { department?: string | null } | null }
 type Item = { id: string; employeeId: string; date: string; kind: 'bonus' | 'fine' | 'deduction'; amount: number; reason?: string }
 
-export default function AdjustmentsClient({ initialY, initialM, initialEmployees, initialItems }: { initialY: number; initialM: number; initialEmployees: Employee[]; initialItems: Item[] }) {
+export default function AdjustmentsClient({ initialY, initialM, initialEmployees, initialItems }: { initialY: number; initialM: number; initialEmployees?: Employee[]; initialItems?: Item[] }) {
   const [y, setY] = useState(initialY)
   const [m, setM] = useState(initialM)
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
-  const [items, setItems] = useState<Item[]>(initialItems)
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
+  const [items, setItems] = useState<Item[]>(initialItems || [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState<{ employeeId: string; kind: 'bonus'|'fine'|'deduction'; amountRub: string; dateIso: string; reason?: string }>({ employeeId: '', kind: 'bonus', amountRub: '', dateIso: `${initialY}-${String(initialM).padStart(2,'0')}-01` })
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
@@ -35,7 +35,7 @@ export default function AdjustmentsClient({ initialY, initialM, initialEmployees
 
   async function reload() {
     try {
-      const res = await fetch(`${API_BASE}/api/adjustments?y=${y}&m=${m}`)
+      const res = await fetch(`${API_BASE}/api/adjustments?y=${y}&m=${m}`, { credentials: 'include' })
       const json = await res.json()
       setItems(Array.isArray(json.items) ? json.items : [])
     } catch (e) {
@@ -50,7 +50,7 @@ export default function AdjustmentsClient({ initialY, initialM, initialEmployees
   useEffect(() => {
     async function reloadEmployees() {
       try {
-        const res = await fetch(`${API_BASE}/api/employees`)
+        const res = await fetch(`${API_BASE}/api/employees`, { credentials: 'include' })
         const json = await res.json()
         if (Array.isArray(json.data) && json.data.length) setEmployees(json.data)
       } catch {}
@@ -77,7 +77,7 @@ export default function AdjustmentsClient({ initialY, initialM, initialEmployees
     const parsed = parseFloat(form.amountRub.replace(',', '.'))
     if (!Number.isFinite(parsed)) return
     const amount = Math.round(parsed * 100)
-    const res = await fetch(`${API_BASE}/api/adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employeeId: form.employeeId, date: form.dateIso, kind: form.kind, amount, reason: form.reason }) })
+    const res = await fetch(`${API_BASE}/api/adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employeeId: form.employeeId, date: form.dateIso, kind: form.kind, amount, reason: form.reason }), credentials: 'include' })
     if (!res.ok) {
       try { console.error('Failed to create adjustment', await res.text()) } catch {}
       return
@@ -92,7 +92,7 @@ export default function AdjustmentsClient({ initialY, initialM, initialEmployees
     const parsed = parseFloat(form.amountRub.replace(',', '.'))
     if (!Number.isFinite(parsed)) return
     const amount = Math.round(parsed * 100)
-    const res = await fetch(`${API_BASE}/api/adjustments/${selectedId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employeeId: form.employeeId, date: form.dateIso, kind: form.kind, amount, reason: form.reason }) })
+    const res = await fetch(`${API_BASE}/api/adjustments/${selectedId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employeeId: form.employeeId, date: form.dateIso, kind: form.kind, amount, reason: form.reason }), credentials: 'include' })
     if (!res.ok) {
       try { console.error('Failed to update adjustment', await res.text()) } catch {}
       return
@@ -101,7 +101,7 @@ export default function AdjustmentsClient({ initialY, initialM, initialEmployees
   }
 
   async function remove(id: string) {
-    await fetch(`${API_BASE}/api/adjustments/${id}`, { method: 'DELETE' })
+    await fetch(`${API_BASE}/api/adjustments/${id}`, { method: 'DELETE', credentials: 'include' })
     await reload()
   }
 

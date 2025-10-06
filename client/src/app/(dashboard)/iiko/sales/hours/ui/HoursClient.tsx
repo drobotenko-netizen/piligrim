@@ -132,7 +132,7 @@ export default function HoursClient() {
       }
 
       // Новый быстрый эндпоинт матрицы
-      const fast = await fetch(`${API_BASE}/api/iiko/local/sales/hours/matrix?from=${from}&to=${to}`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const fast = await fetch(`${API_BASE}/api/iiko/local/sales/hours/matrix?from=${from}&to=${to}`, { cache: 'no-store', credentials: 'include' })
       const jm = await fast.json()
       const colsResp: string[] = Array.isArray(jm?.cols) ? jm.cols : cols
 

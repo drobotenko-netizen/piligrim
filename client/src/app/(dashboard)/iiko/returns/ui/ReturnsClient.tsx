@@ -27,7 +27,7 @@ export default function ReturnsClient() {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/returns?from=${from}&to=${to}&group=${group}`, { cache: 'no-store', headers: { 'x-role': 'ADMIN' } })
+      const r = await fetch(`${API_BASE}/api/iiko/local/returns?from=${from}&to=${to}&group=${group}`, { cache: 'no-store', credentials: 'include' })
       const j = await r.json()
       setSummary(Array.isArray(j?.rows) ? j.rows : [])
       setDetails(Array.isArray(j?.details) ? j.details : [])

@@ -53,11 +53,32 @@ export function CustomersClient() {
   const [fromDate, setFromDate] = useState('2025-01-01')
   const [toDate, setToDate] = useState('2025-09-30')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  // Функция для проверки аутентификации
+  const checkAuth = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
+      const data = await response.json()
+      const isAuth = !!(data?.user)
+      setIsAuthenticated(isAuth)
+      return isAuth
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      setIsAuthenticated(false)
+      return false
+    }
+  }
 
   const loadCustomers = async () => {
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping customers load')
+      return
+    }
+    
     setLoading(true)
     try {
-      const response = await fetch(`${API_BASE}/api/iiko/local/sales/customers?from=${fromDate}&to=${toDate}`)
+      const response = await fetch(`${API_BASE}/api/iiko/local/sales/customers?from=${fromDate}&to=${toDate}`, { credentials: 'include' })
       const data = await response.json()
       setCustomers(data.customers || [])
     } catch (error) {
@@ -67,13 +88,30 @@ export function CustomersClient() {
     }
   }
 
+  // Проверяем аутентификацию при загрузке компонента
   useEffect(() => {
-    loadCustomers()
-  }, [fromDate, toDate])
+    checkAuth()
+  }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadCustomers()
+    }
+  }, [fromDate, toDate, isAuthenticated])
 
   const totalRevenue = customers.reduce((sum, customer) => sum + customer.totalAmount, 0)
   const totalOrders = customers.reduce((sum, customer) => sum + customer.totalOrders, 0)
   const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
+
+  // Показываем индикатор загрузки, если не аутентифицированы
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+        <span className="ml-3 text-muted-foreground">Проверка аутентификации...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6 h-full min-h-0">

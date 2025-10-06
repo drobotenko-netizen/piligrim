@@ -1802,6 +1802,195 @@ export function createIikoRouter() {
     }
   })
 
+  // POST /iiko/stores/balances-table { timestamp: 'YYYY-MM-DDTHH:mm:ss.SSS', from: 'YYYY-MM-DD', to: 'YYYY-MM-DD', category?: string, dishId?: string }
+  // Возвращает готовую таблицу с объединенными данными: остатки + расход
+  router.post('/stores/balances-table', async (req, res) => {
+    try {
+      const timestamp = String(req.body?.timestamp || '').trim()
+      const fromDate = String(req.body?.from || '').trim()
+      const toDate = String(req.body?.to || '').trim()
+      const category = String(req.body?.category || '').trim()
+      const dishId = String(req.body?.dishId || '').trim()
+      
+      if (!timestamp) return res.status(400).json({ error: 'timestamp required (yyyy-MM-ddTHH:mm:ss.SSS)' })
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+        return res.status(400).json({ error: 'from/to must be YYYY-MM-DD' })
+      }
+
+      // Определяем productIds на основе селектов
+      let productIds: string[] = []
+      
+      if (dishId && dishId !== 'all' && dishId !== 'category') {
+        // Конкретное блюдо - загружаем его ингредиенты
+        try {
+          const dateStr = timestamp.split('T')[0]
+          const recipeData = await client.getRecipePrepared({ date: dateStr, productId: dishId })
+          const items = recipeData?.preparedCharts?.[0]?.items || []
+          productIds = Array.from(new Set(items.map((it: any) => String(it?.productId || '')).filter(Boolean)))
+        } catch (e) {
+          console.error('Error loading dish ingredients:', e)
+        }
+      } else if (category && category !== 'all') {
+        // Категория - загружаем ингредиенты всех блюд в категории
+        try {
+          // Загружаем блюда категории напрямую из БД
+          const prisma = (req as any).prisma || req.app.get('prisma')
+          if (!prisma) throw new Error('prisma not available')
+          
+          const whereReceipt: any = {
+            AND: [
+              { OR: [{ isDeleted: false }, { isDeleted: null }] },
+              { OR: [{ isReturn: false }, { isReturn: null }] }
+            ]
+          }
+          
+          const start = new Date('2024-12-15')
+          const end = new Date('2024-12-15')
+          end.setDate(end.getDate() + 1)
+          whereReceipt.date = { gte: start, lt: end }
+
+          const whereItems: any = {
+            dishId: { not: null },
+            dishName: { not: null },
+            dishCategory: category,
+            receipt: whereReceipt
+          }
+
+          // Агрегация в БД
+          const grouped = await (prisma as any).iikoReceiptItem.groupBy({
+            by: ['dishId','dishName','dishCategory'],
+            where: whereItems,
+            _sum: { qty: true, net: true },
+            orderBy: { _sum: { net: 'desc' } },
+            take: 500
+          })
+
+          const dishList = grouped.map((g: any) => ({
+            dishId: g.dishId,
+            dishName: g.dishName,
+            dishCategory: g.dishCategory
+          }))
+          
+          // Загружаем ингредиенты для каждого блюда
+          const dateStr = timestamp.split('T')[0]
+          const allIngredients = new Set<string>()
+          
+          for (const dish of dishList) {
+            try {
+              const recipeData = await client.getRecipePrepared({ date: dateStr, productId: dish.dishId })
+              const items = recipeData?.preparedCharts?.[0]?.items || []
+              const ingredientIds = items.map((it: any) => String(it?.productId || '')).filter(Boolean)
+              ingredientIds.forEach(id => allIngredients.add(id))
+            } catch (e) {
+              console.error(`Error loading ingredients for dish ${dish.dishName}:`, e)
+            }
+          }
+          
+          productIds = Array.from(allIngredients)
+        } catch (e) {
+          console.error('Error loading category ingredients:', e)
+        }
+      }
+
+      // Загружаем остатки
+      const balancesData = await client.getStoreBalances({ 
+        timestampIso: timestamp, 
+        productIds: productIds.length ? productIds : undefined 
+      })
+
+      // Загружаем расход
+      const from = `${fromDate}T00:00:00.000`
+      const to = `${toDate}T00:00:00.000`
+      const consumptionFilters: any = {
+        'DateTime.Typed': { filterType: 'DateRange', periodType: 'CUSTOM', from, to },
+      }
+      if (productIds.length) consumptionFilters['Product.Id'] = { filterType: 'IncludeValues', values: productIds }
+
+      const consumptionBody = {
+        reportType: 'TRANSACTIONS',
+        buildSummary: false,
+        groupByRowFields: ['Product.Id'],
+        groupByColFields: [],
+        aggregateFields: ['Amount'],
+        filters: consumptionFilters
+      }
+      const consumptionRes: any = await client.postOlap(consumptionBody)
+      const consumptionRows = (Array.isArray(consumptionRes?.data) ? consumptionRes.data : [])
+      
+      // Создаем мапу расхода
+      const consumptionMap: {[key: string]: number} = {}
+      consumptionRows.forEach((r: any) => {
+        const productId = r?.['Product.Id']
+        const amount = Number(r?.Amount) || 0
+        if (productId && amount !== 0) {
+          consumptionMap[productId] = (consumptionMap[productId] || 0) + amount
+        }
+      })
+
+      // Загружаем продукты для названий и типов через HTTP
+      let prodMap: Record<string, { name: string; type: string }> = {}
+      
+      try {
+        // Используем прямой HTTP вызов к нашему API
+        const productsRes = await fetch(`${process.env.API_BASE || 'http://localhost:4000'}/api/iiko/entities/products`, {
+          headers: {
+            'Cookie': req.headers.cookie || ''
+          }
+        })
+        const productsData = await productsRes.json()
+        
+        for (const it of (productsData?.items || [])) {
+          prodMap[it.id] = { 
+            name: it.name, 
+            type: it.type || 'Неизвестно' 
+          }
+        }
+      } catch (e) {
+        console.error(`[balances-table] Error loading products:`, e)
+      }
+
+      // Загружаем склады для названий
+      const storesData = await client.listStores()
+      const storeMap: Record<string, string> = {}
+      for (const it of (storesData?.items || [])) storeMap[it.id] = it.name
+
+      // Создаем алиасы для складов без названий
+      const storeAlias: Record<string, string> = {}
+      let counter = 0
+      for (const r of balancesData) {
+        const id = String(r?.store || '')
+        if (!id || storeAlias[id]) continue
+        const name = storeMap[id]
+        if (name && name !== id) storeAlias[id] = name
+        else storeAlias[id] = `Склад ${++counter}`
+      }
+
+      // Объединяем данные в готовую таблицу
+      const tableRows = balancesData.map((row: any) => ({
+        number: 0, // Будет установлен на фронтенде
+        store: row.store,
+        storeName: storeAlias[row.store] || storeMap[row.store] || row.store,
+        product: row.product,
+        productName: prodMap[row.product]?.name || row.product,
+        productType: prodMap[row.product]?.type || 'Неизвестно',
+        sum: parseFloat(row.sum || 0),
+        amount: parseFloat(row.amount || 0),
+        consumption: consumptionMap[row.product] || 0
+      }))
+
+      res.json({ 
+        timestamp, 
+        from: fromDate, 
+        to: toDate, 
+        rows: tableRows,
+        totalSum: Math.round(tableRows.reduce((sum, r) => sum + r.sum, 0)),
+        totalConsumption: Math.round(tableRows.reduce((sum, r) => sum + r.consumption, 0))
+      })
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   // GET /iiko/recipes/tree?date=YYYY-MM-DD&productId=...&departmentId=...
   router.get('/recipes/tree', async (req, res) => {
     const date = String(req.query.date || '').trim()
