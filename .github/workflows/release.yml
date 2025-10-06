@@ -52,17 +52,6 @@ jobs:
             ${{ env.IMAGE_WEB }}:${{ github.ref_name }}
             ${{ env.IMAGE_WEB }}:latest
 
-      - name: Upload deploy files to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: |
-            infra/Caddyfile
-            docker-compose.prod.yml
-          target: /tmp/piligrim-deploy
-
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -75,17 +64,9 @@ jobs:
             export IMAGE_WEB=${{ env.IMAGE_WEB }}:${{ github.ref_name }}
             export IMAGE_API=${{ env.IMAGE_API }}:${{ github.ref_name }}
 
-            # Prepare directories
+            # Prepare directories (files should already exist from previous deployments)
             sudo mkdir -p /srv/piligrim/app
             sudo mkdir -p /opt/infra/caddy
-
-            # Move uploaded files
-            if [ -f /tmp/piligrim-deploy/docker-compose.prod.yml ]; then
-              sudo mv /tmp/piligrim-deploy/docker-compose.prod.yml /srv/piligrim/app/docker-compose.prod.yml
-            fi
-            if [ -f /tmp/piligrim-deploy/infra/Caddyfile ]; then
-              sudo mv /tmp/piligrim-deploy/infra/Caddyfile /opt/infra/caddy/Caddyfile
-            fi
 
             # Docker login to GHCR for pulls (using GITHUB_TOKEN as fallback)
             echo ${{ secrets.GITHUB_TOKEN }} | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
