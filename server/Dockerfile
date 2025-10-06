@@ -5,7 +5,7 @@ WORKDIR /app
 # Install app dependencies (include dev to have tooling)
 COPY package*.json ./
 # Use npm install to avoid strict lockfile requirement (no local lockfile)
-RUN npm install --omit=dev
+RUN npm install
 
 # Ensure OpenSSL 1.1 is available for Prisma engines on Debian bullseye
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
