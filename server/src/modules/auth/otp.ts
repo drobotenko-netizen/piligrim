@@ -136,5 +136,29 @@ export function createOtpRouter(prisma: PrismaClient) {
     res.json({ ok: true })
   })
 
+  // DEV: создать привязку Telegram напрямую (для тестирования)
+  router.post('/telegram-bind', async (req: any, res) => {
+    try {
+      const phone = String(req.body?.phone || '').trim()
+      const chatId = String(req.body?.chatId || '').trim()
+      if (!phone || !chatId) return res.status(400).json({ error: 'phone and chatId required' })
+      
+      const tenant = await getTenant(prisma, req as any)
+      const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, phone } })
+      if (!user) return res.status(404).json({ error: 'user_not_found' })
+      
+      // Создаем привязку
+      await prisma.telegramBinding.upsert({
+        where: { tenantId_chatId: { tenantId: tenant.id, chatId } },
+        update: { userId: user.id },
+        create: { tenantId: tenant.id, userId: user.id, chatId }
+      })
+      
+      return res.json({ ok: true, message: 'Telegram binding created' })
+    } catch (e) {
+      return res.status(500).json({ error: 'internal_error' })
+    }
+  })
+
   return router
 }
