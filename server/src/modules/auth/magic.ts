@@ -69,8 +69,11 @@ export function createMagicRouter(prisma: PrismaClient) {
       }
       // Игнорируем преглядыватели (preview) — не помечаем токен использованным
       const ua = String(req.headers['user-agent'] || '')
-      const isPreview = /(TelegramBot|WhatsApp|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|SkypeUriPreview|Discordbot|Google-InspectionTool|curl|wget|Pingdom|Bingbot|Telegram|Applebot)/i.test(ua)
-      if (isPreview) return res.status(204).end()
+      const isPreview = /(TelegramBot|WhatsApp|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|SkypeUriPreview|Discordbot|Google-InspectionTool|curl|wget|Pingdom|Bingbot|Telegram|Applebot|Bot|bot)/i.test(ua)
+      if (isPreview) {
+        console.log(`[magic] Preview request ignored for UA: ${ua}`)
+        return res.status(204).end()
+      }
 
       if (dbToken.usedAt) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
@@ -109,8 +112,11 @@ export function createMagicRouter(prisma: PrismaClient) {
 
       // Ignore previews
       const ua = String(req.headers['user-agent'] || '')
-      const isPreview = /(TelegramBot|WhatsApp|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|SkypeUriPreview|Discordbot|Google-InspectionTool|curl|wget|Pingdom|Bingbot|Telegram|Applebot)/i.test(ua)
-      if (isPreview) return res.status(204).end()
+      const isPreview = /(TelegramBot|WhatsApp|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|SkypeUriPreview|Discordbot|Google-InspectionTool|curl|wget|Pingdom|Bingbot|Telegram|Applebot|Bot|bot)/i.test(ua)
+      if (isPreview) {
+        console.log(`[magic] Preview request ignored for UA: ${ua}`)
+        return res.status(204).end()
+      }
 
       if (dbToken.usedAt) {
         const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
