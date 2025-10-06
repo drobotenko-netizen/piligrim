@@ -13,7 +13,22 @@ export function HomeRedirect() {
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
         const response = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
+        
+        // Если не авторизован, перенаправляем на страницу входа
+        if (!response.ok || response.status === 401) {
+          console.log('[HomeRedirect] User not authenticated, redirecting to login')
+          router.replace('/login')
+          return
+        }
+        
         const data = await response.json()
+        
+        // Проверяем, что пользователь действительно авторизован
+        if (!data?.user) {
+          console.log('[HomeRedirect] No user data, redirecting to login')
+          router.replace('/login')
+          return
+        }
         
         const roles = data?.roles || []
         const firstMenuItem = getFirstAvailableMenuItem(roles)
@@ -24,8 +39,8 @@ export function HomeRedirect() {
         router.replace(firstMenuItem)
       } catch (error) {
         console.error('[HomeRedirect] Error getting user data:', error)
-        // Fallback to employees if error
-        router.replace('/employees')
+        // При ошибке перенаправляем на страницу входа
+        router.replace('/login')
       } finally {
         setIsRedirecting(false)
       }

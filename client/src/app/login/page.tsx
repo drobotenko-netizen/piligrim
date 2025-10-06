@@ -48,7 +48,7 @@ export default function LoginOtpPage() {
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok || !j?.ok) throw new Error(j?.error || 'verify_failed')
-      window.location.href = '/employees'
+      window.location.href = '/'
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -63,7 +63,7 @@ export default function LoginOtpPage() {
       const j = await r.json()
       if (!r.ok) throw new Error(j?.error || 'login_failed')
       try { if (j.user) localStorage.setItem('me', JSON.stringify(j.user)) } catch {}
-      window.location.href = '/employees'
+      window.location.href = '/'
     } catch (e: any) {
       setError(e.message)
     } finally {
