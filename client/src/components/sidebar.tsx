@@ -67,7 +67,7 @@ export function Sidebar() {
 
   async function fetchMe() {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')
       console.log('[sidebar] fetching /me …')
       const r = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
       const j = await r.json()
@@ -134,7 +134,7 @@ export function Sidebar() {
 
   async function logout() {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')
       await fetch(`${API_BASE}/api/auth/otp/logout`, { method: 'POST', credentials: 'include' })
       setMe(null)
       if (typeof window !== 'undefined') window.location.href = '/login'
