@@ -1,45 +1,19 @@
 "use client"
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-function LoginForm() {
+export default function LoginOtpPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-  const searchParams = useSearchParams()
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [authId, setAuthId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [channel, setChannel] = useState<'sms'|'telegram'>('sms')
-
-  // Handle magic link error messages
-  useEffect(() => {
-    try {
-      const errorParam = searchParams.get('error')
-      if (errorParam) {
-        switch (errorParam) {
-          case 'token_used':
-            setError('Ссылка для входа уже была использована. Получите новую ссылку через команду /login в Telegram.')
-            break
-          case 'token_expired':
-            setError('Ссылка для входа истекла. Получите новую ссылку через команду /login в Telegram.')
-            break
-          case 'token_not_found':
-            setError('Ссылка для входа недействительна. Получите новую ссылку через команду /login в Telegram.')
-            break
-          default:
-            setError('Ошибка при входе. Попробуйте получить новую ссылку через команду /login в Telegram.')
-        }
-      }
-    } catch (e) {
-      console.log('Error reading search params:', e)
-    }
-  }, [searchParams])
 
   async function sendCode() {
     setLoading(true); setError(null)
@@ -160,9 +134,5 @@ function LoginForm() {
   )
 }
 
-export default function LoginOtpPage() {
-  // Простая версия без Suspense для быстрого исправления
-  return <LoginForm />
-}
 
 
