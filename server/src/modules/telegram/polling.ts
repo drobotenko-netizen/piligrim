@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import fetch from 'node-fetch'
+import jwt from 'jsonwebtoken'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 
@@ -102,18 +103,32 @@ export async function startTelegramPolling(prisma: PrismaClient) {
             await sendMessage(chatId, 'Эта команда доступна только для привязанных аккаунтов. Получите код привязки у администратора.')
             continue
           }
-          // issue via internal endpoint to get signed URL
+          // issue magic link directly
           const ttlMinutes = 15
-          const issueUrl = `${process.env.SERVER_PUBLIC_URL || 'http://localhost:4000'}/api/auth/magic/issue`
+          const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000)
+          
           try {
-          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/sales/revenue', ttlMinutes }) })
-          const issueJson: any = await issueRes.json().catch(() => ({}))
-            if (issueRes.ok && issueJson?.url) {
-              await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}`)
-            } else {
-              await sendMessage(chatId, 'Не удалось выдать ссылку, попробуйте позже.')
-            }
-          } catch {
+            // Invalidate any previous active tokens for this user
+            await prisma.magicLinkToken.updateMany({
+              where: { userId: binding.userId, usedAt: null, expiresAt: { gt: new Date() } },
+              data: { usedAt: new Date() }
+            })
+
+            const tokenId = await prisma.magicLinkToken.create({
+              data: { tenantId: binding.tenantId, userId: binding.userId, redirect: '/', expiresAt }
+            })
+
+            const MAGIC_LINK_SECRET = process.env.MAGIC_LINK_SECRET || 'dev-magic-secret'
+            const payload = { jti: tokenId.id, sub: binding.userId, ten: binding.tenantId, redirect: '/' }
+            const token = jwt.sign(payload, MAGIC_LINK_SECRET, { algorithm: 'HS256', expiresIn: `${ttlMinutes}m` })
+            
+            const SERVER_PUBLIC_URL = process.env.SERVER_PUBLIC_URL || 'http://localhost:4000'
+            const url = `${SERVER_PUBLIC_URL}/api/auth/magic/callback?token=${encodeURIComponent(token)}`
+            const shortUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/s/${encodeURIComponent(tokenId.id)}`
+            
+            await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${shortUrl}`)
+          } catch (error) {
+            console.error(`[tg-polling] Error creating magic link:`, error)
             await sendMessage(chatId, 'Ошибка при выдаче ссылки. Попробуйте позже.')
           }
           continue

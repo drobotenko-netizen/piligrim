@@ -121,6 +121,14 @@ async function main() {
   const adminRole = await (prisma as any).role.findUnique({ where: { name: 'ADMIN' } })
   await (prisma as any).userRole.upsert({ where: { tenantId_userId_roleId: { tenantId: tenant.id, userId: user.id, roleId: adminRole.id } }, update: {}, create: { tenantId: tenant.id, userId: user.id, roleId: adminRole.id } })
 
+  // Telegram binding for admin user
+  const telegramChatId = '379636473' // Chat ID Дениса Дроботенко
+  await (prisma as any).telegramBinding.upsert({ 
+    where: { tenantId_chatId: { tenantId: tenant.id, chatId: telegramChatId } }, 
+    update: { userId: user.id }, 
+    create: { tenantId: tenant.id, userId: user.id, chatId: telegramChatId } 
+  })
+
 
   // Period
   const now = new Date()
