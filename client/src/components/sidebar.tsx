@@ -138,7 +138,7 @@ export function Sidebar() {
       const API_BASE = getApiBase()
       await fetch(`${API_BASE}/api/auth/otp/logout`, { method: 'POST', credentials: 'include' })
       setMe(null)
-      if (typeof window !== 'undefined') window.location.href = '/login'
+      if (typeof window !== 'undefined') window.location.href = '/'
     } catch {}
   }
 

@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // Публичные пути, которые не требуют авторизации
-  const publicPaths = ['/login', '/api/auth']
+  const publicPaths = ['/api/auth']
   
   // Проверяем, является ли путь публичным
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
@@ -19,10 +19,10 @@ export function middleware(request: NextRequest) {
   const cookies = request.cookies
   const authCookie = cookies.get('access_token') || cookies.get('auth-token') || cookies.get('session') || cookies.get('jwt')
   
-  // Если нет токена авторизации, перенаправляем на страницу входа
+  // Если нет токена авторизации, перенаправляем на главную страницу
   if (!authCookie) {
-    const loginUrl = new URL('/login', request.url)
-    return NextResponse.redirect(loginUrl)
+    const homeUrl = new URL('/', request.url)
+    return NextResponse.redirect(homeUrl)
   }
   
   return NextResponse.next()
