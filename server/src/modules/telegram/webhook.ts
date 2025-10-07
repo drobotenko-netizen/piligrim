@@ -68,22 +68,26 @@ export function createTelegramWebhook(prisma: PrismaClient) {
           await sendMessage(chatId, 'Эта команда доступна только для привязанных аккаунтов. Получите код привязки у администратора.')
           return res.json({ ok: true })
         }
-        // Issue magic link
+        // Issue magic link directly (like in polling.ts)
         const ttlMinutes = 15
         const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000)
-        // Выдаём маг‑ссылку через внутренний endpoint (подпишет токен)
-        const issueUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/issue`
         try {
-          // Сначала инвалидируем возможные активные токены и создаём новый через /issue
-          const issueRes = await fetch(issueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-role': 'ADMIN' }, body: JSON.stringify({ userId: binding.userId, redirect: '/sales/revenue', ttlMinutes }) })
-          const issueJson: any = await issueRes.json().catch(() => ({}))
-          if (issueRes.ok && issueJson?.url) {
-            // Добавим hint про копирование если Telegram может сделать пререндера
-            await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${issueJson.url}\n\nЕсли видите Token already used — скопируйте ссылку и откройте в браузере вручную.`)
-          } else {
-            await sendMessage(chatId, 'Не удалось выдать ссылку, попробуйте позже.')
-          }
-        } catch {
+          // Create magic link token directly
+          const tokenId = await (prisma as any).magicLinkToken.create({
+            data: { tenantId: binding.tenantId, userId: binding.userId, redirect: '/sales/revenue', expiresAt }
+          })
+
+          const jwt = require('jsonwebtoken')
+          const MAGIC_LINK_SECRET = process.env.MAGIC_LINK_SECRET || 'dev-magic-secret'
+          const payload = { jti: tokenId.id, sub: binding.userId, ten: binding.tenantId, redirect: '/sales/revenue' }
+          const token = jwt.sign(payload, MAGIC_LINK_SECRET, { algorithm: 'HS256', expiresIn: `${ttlMinutes}m` })
+          
+          const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
+          const url = `${FRONTEND_BASE_URL}/?token=${encodeURIComponent(token)}`
+          
+          await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${url}\n\nЕсли видите Token already used — скопируйте ссылку и откройте в браузере вручную.`)
+        } catch (error) {
+          console.error(`[telegram-webhook] Error creating magic link:`, error)
           await sendMessage(chatId, 'Ошибка при выдаче ссылки. Попробуйте позже.')
         }
         return res.json({ ok: true })
