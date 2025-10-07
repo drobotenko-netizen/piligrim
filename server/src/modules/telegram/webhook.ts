@@ -33,6 +33,9 @@ export function createTelegramWebhook(prisma: PrismaClient) {
       const from: any = msg?.from
       if (!chatId) return res.json({ ok: true })
 
+      // Log all messages to find chat_id
+      console.log(`[telegram] Message from chatId: ${chatId}, text: "${text}", from:`, from)
+
       // Commands
       if (text.startsWith('/start')) {
         const parts = text.split(' ')
