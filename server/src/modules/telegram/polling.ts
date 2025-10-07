@@ -127,7 +127,7 @@ export async function startTelegramPolling(prisma: PrismaClient) {
             const url = `${FRONTEND_BASE_URL}/?token=${encodeURIComponent(token)}`
             const shortUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/s/${encodeURIComponent(tokenId.id)}`
             
-            await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${shortUrl}`)
+            await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${url}`)
           } catch (error) {
             console.error(`[tg-polling] Error creating magic link:`, error)
             await sendMessage(chatId, 'Ошибка при выдаче ссылки. Попробуйте позже.')
