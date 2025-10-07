@@ -111,6 +111,28 @@ export function createAdminUsersRouter(prisma: PrismaClient) {
     }
   })
 
+  // Check Telegram binding for a user
+  router.get('/:id/telegram-binding', requirePermission(prisma, 'users.manage'), async (req, res) => {
+    try {
+      const tenant = await getTenant(prisma, req as any)
+      const id = String(req.params.id)
+      const user = await prisma.user.findFirst({ where: { id, tenantId: tenant.id } })
+      if (!user) return res.status(404).json({ error: 'user_not_found' })
+
+      const binding = await (prisma as any).telegramBinding.findFirst({ 
+        where: { tenantId: tenant.id, userId: user.id } 
+      })
+      
+      return res.json({ 
+        hasBinding: !!binding,
+        binding: binding ? { chatId: binding.chatId } : null
+      })
+    } catch (e) {
+      console.error('Error checking telegram binding:', e)
+      return res.status(500).json({ error: 'internal_error' })
+    }
+  })
+
   return router
 }
 
