@@ -2,16 +2,15 @@
 
 Создайте файл `server/.env` со значениями:
 
-MESSAGGIO_API_KEY=0198aca3-882a-7718-955a-87116ce7201c
-MESSAGGIO_BASE_URL=https://otp.messaggio.com/api/v1
 ALLOWED_ORIGINS=http://localhost:3000
-AUTH_JWT_SECRET=please-change-this
-MAGIC_LINK_SECRET=please-change-this-too
+AUTH_JWT_SECRET=<генерировать-256-бит-секрет>
+MAGIC_LINK_SECRET=<генерировать-256-бит-секрет>
 SERVER_PUBLIC_URL=http://localhost:4000
 FRONTEND_BASE_URL=http://localhost:3000
-TELEGRAM_BOT_TOKEN=8466721340:AAGaA3Y1nozm5YLTP_F2ChpyCQdDktyF6_0
+TELEGRAM_BOT_TOKEN=<ваш-токен-бота>
 TELEGRAM_WEBHOOK_SECRET=<set-your-random-secret>
 TELEGRAM_POLLING=1
+
 Примечание по Telegram:
 - Для локальной разработки включите `TELEGRAM_POLLING=1` (long polling), вебхук не нужен.
 - Для продакшена можно настроить webhook и выключить polling.
@@ -23,11 +22,20 @@ IIKO_PASS=Cxd8hj97yGH
 
 Примечание: храните секреты вне Git. Для локальной разработки достаточно `.env` в папке `server`.
 
-### Настройка доставки OTP в Telegram через Messaggio
+### Настройка авторизации через Telegram бота
 
-1) В кабинете Messaggio включите сервис OTP и создайте шаблон сообщения для Telegram.
-2) Подключите и активируйте Telegram-канал доставки (укажите отправителя/бота согласно требованиям Messaggio).
-3) Убедитесь, что ваш номер телефона привязан к аккаунту Telegram и доступен для получения сообщений от подключённого бота/канала.
-4) Проверьте корректность `MESSAGGIO_API_KEY` и `MESSAGGIO_BASE_URL=https://otp.messaggio.com/api/v1`.
-5) На клиенте при отправке кода выбирайте канал «Telegram» — приложение передаст `channel='telegram'` в эндпоинт `/api/auth/otp/send`.
+1) Создайте Telegram бота через @BotFather и получите токен
+2) Установите `TELEGRAM_BOT_TOKEN` в переменные окружения
+3) Для локальной разработки включите `TELEGRAM_POLLING=1`
+4) Пользователи привязываются к боту через команду `/start <код_привязки>`
+5) После привязки пользователи могут получить ссылку для входа командой `/login`
+6) Ссылки действуют 15 минут и автоматически авторизуют пользователя в системе
+
+### Процесс авторизации
+
+1. Администратор создает пользователя в системе
+2. Администратор генерирует код привязки для пользователя
+3. Пользователь отправляет `/start <код_привязки>` боту
+4. Пользователь отправляет `/login` боту для получения ссылки входа
+5. Пользователь переходит по ссылке и автоматически авторизуется
 

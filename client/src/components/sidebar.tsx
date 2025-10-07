@@ -70,7 +70,7 @@ export function Sidebar() {
     try {
       const API_BASE = getApiBase()
       console.log('[sidebar] fetching /me …')
-      const r = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
+      const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
       const j = await r.json()
       console.log('[sidebar] /me response:', j)
       let user = j?.user || null
@@ -136,7 +136,7 @@ export function Sidebar() {
   async function logout() {
     try {
       const API_BASE = getApiBase()
-      await fetch(`${API_BASE}/api/auth/otp/logout`, { method: 'POST', credentials: 'include' })
+      await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' })
       setMe(null)
       if (typeof window !== 'undefined') window.location.href = '/'
     } catch {}

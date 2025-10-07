@@ -43,8 +43,8 @@ export function createIikoRouter() {
         }
       })
 
-      const hasIikoPermission = userPermissions?.roles.some(userRole => 
-        userRole.role.rolePerms.some(rolePerm => 
+      const hasIikoPermission = userPermissions?.roles.some((userRole: any) => 
+        userRole.role.rolePerms.some((rolePerm: any) => 
           rolePerm.permission.name === 'iiko.read'
         )
       )

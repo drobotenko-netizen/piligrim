@@ -1,14 +1,13 @@
 {
-  "name": "piligrim-root",
-  "private": true,
-  "version": "0.1.0",
+  "name": "piligrim-auth-test",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Test script for Piligrim authentication system",
+  "main": "test-auth-flow.js",
   "scripts": {
-    "start": "pkill -f 'node.*server' || true && lsof -ti:4000 | xargs kill -9 2>/dev/null || true && npm run dev",
-    "dev": "concurrently -n client,server -c blue,magenta \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
-    "install:all": "npm install --prefix client && npm install --prefix server"
+    "test-auth": "node test-auth-flow.js"
   },
-  "devDependencies": {
-    "concurrently": "8.2.2",
-    "puppeteer": "^22.15.0"
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }

@@ -15,7 +15,7 @@ import { createReportsRouter } from './modules/reports/router'
 import { createCounterpartiesRouter } from './modules/counterparties/router'
 import { createCounterpartyTypesRouter } from './modules/counterparty-types/router'
 import { Request, Response, NextFunction } from 'express'
-import { createOtpRouter } from './modules/auth/otp'
+import { createAuthRouter } from './modules/auth/auth'
 import cookieParser from 'cookie-parser'
 import { verifyAccessToken } from './utils/jwt'
 import { als } from './utils/als'
@@ -77,10 +77,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   if (!req.path.startsWith('/api')) return next()
   const publicAllowlist = [
     '/api/health',
-    '/api/auth/otp/_ping',
-    '/api/auth/otp/send',
-    '/api/auth/otp/verify',
-    '/api/auth/otp/dev-login',
+    '/api/auth/_ping',
+    '/api/auth/dev-login',
     '/api/auth/magic/callback',
     // short magic link
     '/api/auth/magic/s',
@@ -121,7 +119,7 @@ app.use('/api/shifts', createShiftsRouter(prisma))
 app.use('/api/expense-docs', createExpenseDocsRouter(prisma))
 app.use('/api/payments', createPaymentsRouter(prisma))
 app.use('/api/balances', balancesRouter)
-app.use('/api/auth/otp', createOtpRouter(prisma))
+app.use('/api/auth', createAuthRouter(prisma))
 app.use('/api/auth/magic', createMagicRouter(prisma))
 app.use('/api/telegram', createTelegramWebhook(prisma))
 app.use('/api/admin/users', createAdminUsersRouter(prisma))

@@ -59,7 +59,7 @@ export function CustomersClient() {
   // Функция для проверки аутентификации
   const checkAuth = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/auth/otp/me`, { credentials: 'include' })
+      const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
       const data = await response.json()
       const isAuth = !!(data?.user)
       setIsAuthenticated(isAuth)

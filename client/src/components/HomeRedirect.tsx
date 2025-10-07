@@ -23,9 +23,9 @@ export function HomeRedirect() {
     async function redirectToFirstAvailable() {
       try {
         const API_BASE = getApiBase()
-        console.log('[HomeRedirect] Making request to:', `${API_BASE}/api/auth/otp/me`)
+        console.log('[HomeRedirect] Making request to:', `${API_BASE}/api/auth/me`)
         
-        const response = await fetch(`${API_BASE}/api/auth/otp/me`, { 
+        const response = await fetch(`${API_BASE}/api/auth/me`, { 
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
