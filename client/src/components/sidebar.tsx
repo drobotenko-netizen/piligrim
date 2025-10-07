@@ -93,9 +93,9 @@ export function Sidebar() {
   }
 
   useEffect(() => {
+    // Загружаем данные пользователя только один раз при монтировании компонента
     fetchMe()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
+  }, [])
 
   // Авто-раскрытие нужной секции в зависимости от текущего пути
   useEffect(() => {
@@ -123,8 +123,24 @@ export function Sidebar() {
   }, [pathname])
 
   useEffect(() => {
-    const onFocus = () => fetchMe()
-    const onVisibility = () => { if (!document.hidden) fetchMe() }
+    // Проверяем авторизацию только при возвращении фокуса, но не чаще чем раз в 30 секунд
+    let lastCheck = 0
+    const onFocus = () => {
+      const now = Date.now()
+      if (now - lastCheck > 30000) { // 30 секунд
+        fetchMe()
+        lastCheck = now
+      }
+    }
+    const onVisibility = () => { 
+      if (!document.hidden) {
+        const now = Date.now()
+        if (now - lastCheck > 30000) { // 30 секунд
+          fetchMe()
+          lastCheck = now
+        }
+      }
+    }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
