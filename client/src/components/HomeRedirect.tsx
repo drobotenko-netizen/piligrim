@@ -106,6 +106,7 @@ export function HomeRedirect() {
         
         const data = await response.json()
         console.log('[HomeRedirect] Magic link verification successful:', data)
+        console.log('[HomeRedirect] Response headers:', Object.fromEntries(response.headers.entries()))
         
         // После успешной верификации перенаправляем на первую доступную страницу
         const roles = data?.roles || []
