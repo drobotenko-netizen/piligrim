@@ -123,7 +123,8 @@ export async function startTelegramPolling(prisma: PrismaClient) {
             const token = jwt.sign(payload, MAGIC_LINK_SECRET, { algorithm: 'HS256', expiresIn: `${ttlMinutes}m` })
             
             const SERVER_PUBLIC_URL = process.env.SERVER_PUBLIC_URL || 'http://localhost:4000'
-            const url = `${SERVER_PUBLIC_URL}/api/auth/magic/callback?token=${encodeURIComponent(token)}`
+            const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
+            const url = `${FRONTEND_BASE_URL}/?token=${encodeURIComponent(token)}`
             const shortUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/s/${encodeURIComponent(tokenId.id)}`
             
             await sendMessage(chatId, `Ссылка для входа (действует ${ttlMinutes} мин):\n${shortUrl}`)

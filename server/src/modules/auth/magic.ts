@@ -37,7 +37,8 @@ export function createMagicRouter(prisma: PrismaClient) {
 
       const payload: MagicPayload = { jti: tokenId.id, sub: user.id, ten: tenant.id, redirect }
       const token = jwt.sign(payload, MAGIC_LINK_SECRET, { algorithm: 'HS256', expiresIn: `${ttlMinutes}m` })
-      const url = `${SERVER_PUBLIC_URL}/api/auth/magic/callback?token=${encodeURIComponent(token)}`
+      const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
+      const url = `${frontendUrl}/?token=${encodeURIComponent(token)}`
       const shortUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/s/${encodeURIComponent(tokenId.id)}`
       return res.json({ url, shortUrl, tokenId: tokenId.id, expiresAt })
     } catch (e) {
