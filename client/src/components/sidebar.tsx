@@ -2,9 +2,9 @@
 import Link from 'next/link'
 import { getApiBase } from "@/lib/api"
 import { usePathname } from 'next/navigation'
-import { Users, CalendarCheck2, Banknote, FileSpreadsheet, Settings, ChevronDown, Wallet, ListTree, ArrowLeftRight, Contact, FileText, Shield, Tags, TrendingUp, UserCheck, Calculator, ChefHat } from 'lucide-react'
+import { Users, CalendarCheck2, Banknote, FileSpreadsheet, Settings, ChevronDown, Wallet, ListTree, ArrowLeftRight, Contact, FileText, Shield, Tags, TrendingUp, UserCheck, Calculator, ChefHat, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { getMenuVisibility } from '@/lib/menu-utils'
 
 const personnelItems = [
@@ -40,6 +40,7 @@ const settingsItems = [
 const salesItems = [
   { href: '/sales/revenue', label: 'Выручка', icon: TrendingUp },
   { href: '/sales/dishes', label: 'Блюда', icon: FileSpreadsheet },
+  { href: '/sales/purchasing', label: 'Закупки', icon: ShoppingCart },
   { href: '/sales/suppliers', label: 'Поставщики', icon: Contact },
   { href: '/sales/customers', label: 'Клиенты', icon: UserCheck },
   { href: '/analysis/checks-by-hour', label: 'Чеки по часам', icon: FileSpreadsheet },
@@ -66,13 +67,11 @@ export function Sidebar() {
   const [openIiko, setOpenIiko] = useState(false)
   const [openImport, setOpenImport] = useState(false)
 
-  async function fetchMe() {
+  const fetchMe = useCallback(async () => {
     try {
       const API_BASE = getApiBase()
-      console.log('[sidebar] fetching /me …')
       const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
       const j = await r.json()
-      console.log('[sidebar] /me response:', j)
       let user = j?.user || null
       if (!user) {
         try {
@@ -83,17 +82,36 @@ export function Sidebar() {
       // Роли приходят в корне ответа, а не в user объекте
       if (user && j?.roles) {
         user.roles = j.roles
+        // Кэшируем данные пользователя
+        try {
+          localStorage.setItem('me', JSON.stringify(user))
+        } catch {}
       }
-      console.log('[sidebar] final user object:', user)
-      console.log('[sidebar] user roles:', user?.roles)
       setMe(user)
     } catch (e) {
       console.log('[sidebar] /me error', e)
+      // При ошибке пытаемся загрузить из кэша
+      try {
+        const cached = localStorage.getItem('me')
+        if (cached) {
+          const user = JSON.parse(cached)
+          setMe(user)
+        }
+      } catch {}
     }
-  }
+  }, [])
 
   useEffect(() => {
-    // Загружаем данные пользователя только один раз при монтировании компонента
+    // Сначала пытаемся загрузить из кэша для быстрого отображения
+    try {
+      const cached = localStorage.getItem('me')
+      if (cached) {
+        const user = JSON.parse(cached)
+        setMe(user)
+      }
+    } catch {}
+    
+    // Затем загружаем актуальные данные
     fetchMe()
   }, [])
 
@@ -123,11 +141,11 @@ export function Sidebar() {
   }, [pathname])
 
   useEffect(() => {
-    // Проверяем авторизацию только при возвращении фокуса, но не чаще чем раз в 30 секунд
+    // Проверяем авторизацию только при возвращении фокуса, но не чаще чем раз в 60 секунд
     let lastCheck = 0
     const onFocus = () => {
       const now = Date.now()
-      if (now - lastCheck > 30000) { // 30 секунд
+      if (now - lastCheck > 60000) { // 60 секунд
         fetchMe()
         lastCheck = now
       }
@@ -135,7 +153,7 @@ export function Sidebar() {
     const onVisibility = () => { 
       if (!document.hidden) {
         const now = Date.now()
-        if (now - lastCheck > 30000) { // 30 секунд
+        if (now - lastCheck > 60000) { // 60 секунд
           fetchMe()
           lastCheck = now
         }
@@ -149,33 +167,32 @@ export function Sidebar() {
     }
   }, [])
 
-  async function logout() {
+  const logout = useCallback(async () => {
     try {
       const API_BASE = getApiBase()
       await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' })
       setMe(null)
+      // Очищаем кэш при выходе
+      try {
+        localStorage.removeItem('me')
+      } catch {}
       if (typeof window !== 'undefined') window.location.href = '/'
     } catch {}
-  }
+  }, [])
 
-  function toggleExclusive(section: 'personnel'|'finance'|'sales'|'settings'|'iiko'|'import') {
+  const toggleExclusive = useCallback((section: 'personnel'|'finance'|'sales'|'settings'|'iiko'|'import') => {
     setOpenPersonnel(section === 'personnel')
     setOpenFinance(section === 'finance')
     setOpenSales(section === 'sales')
     setOpenSettings(section === 'settings')
     setOpenIiko(section === 'iiko')
     setOpenImport(section === 'import')
-  }
-  const roles: string[] = Array.isArray(me?.roles) ? me.roles : []
-  
-  console.log('[sidebar] me object:', me)
-  console.log('[sidebar] roles array:', roles)
+  }, [])
+  const roles = useMemo(() => Array.isArray(me?.roles) ? me.roles : [], [me?.roles])
   
   // Используем утилитарную функцию для определения видимости
-  const visibility = getMenuVisibility(roles)
+  const visibility = useMemo(() => getMenuVisibility(roles), [roles])
   const { visibleSales, visiblePersonnel, visibleFinance, visibleSettings } = visibility
-  
-  console.log('[sidebar] visibility:', visibility)
 
   return (
     <aside className="w-[15%] min-w-[220px] border-r bg-card flex flex-col">

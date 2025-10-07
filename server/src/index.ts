@@ -22,6 +22,7 @@ import { als } from './utils/als'
 import { createAdminUsersRouter } from './modules/admin/users'
 import { createAdminRolesRouter } from './modules/admin/roles'
 import { createAdminAuditRouter } from './modules/admin/audit'
+import { createPurchasingRouter } from './modules/purchasing/router'
 import { installPrismaAuditMiddleware } from './utils/prisma-audit-mw'
 import { createIikoRouter } from './modules/iiko/router'
 import { createGSheetsRouter, createGSheetsImportRouter } from './modules/gsheets/router'
@@ -126,6 +127,7 @@ app.use('/api/telegram', createTelegramWebhook(prisma))
 app.use('/api/admin/users', createAdminUsersRouter(prisma))
 app.use('/api/admin', createAdminRolesRouter(prisma))
 app.use('/api/admin/audit', createAdminAuditRouter(prisma))
+app.use('/api/purchasing', createPurchasingRouter(prisma))
 
 const PORT = process.env.PORT || 4000
 app.listen(PORT, () => {

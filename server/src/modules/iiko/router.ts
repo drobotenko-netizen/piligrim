@@ -1098,7 +1098,7 @@ export function createIikoRouter() {
     }
   })
 
-  /*router.get('/local/returns', async (req, res) => {
+  router.get('/local/returns', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
     if (!prisma) return res.status(503).json({ error: 'prisma not available' })
     const from = String(req.query.from || '').trim()
@@ -1139,7 +1139,7 @@ export function createIikoRouter() {
     } catch (e: any) {
       res.status(500).json({ error: String(e?.message || e) })
     }
-  })*/
+  })
 
   /*router.get('/local/sales/deleted', async (req, res) => {
     const prisma = (req as any).prisma || req.app.get('prisma')
@@ -1903,47 +1903,6 @@ export function createIikoRouter() {
     }
   })
 
-  // POST /iiko/stores/consumption  { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD', storeIds?:[], productIds?:[] }
-  // На базе OLAP TRANSACTIONS: суммарный расход по продуктам за период (отрицательные списания)
-  router.post('/stores/consumption', async (req, res) => {
-    try {
-      const fromDate = String(req.body?.from || '').trim()
-      const toDate = String(req.body?.to || '').trim()
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
-        return res.status(400).json({ error: 'from/to must be YYYY-MM-DD' })
-      }
-      const from = `${fromDate}T00:00:00.000`
-      const to = `${toDate}T00:00:00.000`
-      const storeIds: string[] = Array.isArray(req.body?.storeIds) ? req.body.storeIds : []
-      const productIds: string[] = Array.isArray(req.body?.productIds) ? req.body.productIds : []
-
-      const filters: any = {
-        'DateTime.Typed': { filterType: 'DateRange', periodType: 'CUSTOM', from, to },
-      }
-      // Фильтры по складу/продукту если заданы
-      if (storeIds.length) filters['Store'] = { filterType: 'IncludeValues', values: storeIds }
-      if (productIds.length) filters['Product.Id'] = { filterType: 'IncludeValues', values: productIds }
-
-      const body = {
-        reportType: 'TRANSACTIONS',
-        buildSummary: false,
-        groupByRowFields: ['Product.Id','Product.Name'],
-        groupByColFields: [],
-        // В колонках TRANSACTIONS денежная сумма может называться по-другому; начнем с Amount
-        aggregateFields: ['Amount'],
-        filters
-      }
-      const j: any = await client.postOlap(body)
-      const rows = (Array.isArray(j?.data) ? j.data : []).map((r: any) => ({
-        productId: r?.['Product.Id'] || null,
-        productName: r?.['Product.Name'] || null,
-        amount: Number(r?.Amount) || 0
-      }))
-      res.json({ from: fromDate, to: toDate, rows })
-    } catch (e: any) {
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
 
   // POST /iiko/stores/balances-table { timestamp: 'YYYY-MM-DDTHH:mm:ss.SSS', from: 'YYYY-MM-DD', to: 'YYYY-MM-DD', category?: string, dishId?: string }
   // Возвращает готовую таблицу с объединенными данными: остатки + расход

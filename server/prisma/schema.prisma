@@ -38,6 +38,11 @@ model Tenant {
   telegramBindings TelegramBinding[]
   telegramBindRequests TelegramBindRequest[]
   magicLinkTokens MagicLinkToken[]
+  productSuppliers ProductSupplier[]
+  productBuffers ProductBuffer[]
+  productStocks ProductStock[]
+  orderSchedules OrderSchedule[]
+  supplierOrders SupplierOrder[]
 }
 
 model Position {
@@ -363,6 +368,9 @@ model Counterparty {
   active       Boolean       @default(true)
   transactions Transaction[]
   expenseDocs  ExpenseDoc[]
+  productSuppliers ProductSupplier[]
+  orderSchedules OrderSchedule[]
+  supplierOrders SupplierOrder[]
   createdBy    String?
   updatedBy    String?
   createdAt    DateTime      @default(now())
@@ -666,4 +674,147 @@ model GsCashflowRow {
 
   @@unique([spreadsheet, sheet, rowNum])
   @@index([spreadsheet, sheet])
+}
+
+// ===== Система закупа =====
+
+// Поставщики продуктов (связь продукт-поставщик)
+model ProductSupplier {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  productId      String    // ID продукта из iiko (dishId)
+  productName    String    // Название продукта для отображения
+  supplierId     String    // ID поставщика (Counterparty)
+  supplier       Counterparty @relation(fields: [supplierId], references: [id])
+  isPrimary      Boolean   @default(false) // Основной поставщик
+  priority       Int       @default(1) // Приоритет среди запасных (1, 2, 3...)
+  isActive       Boolean   @default(true)
+  minOrderAmount Int?      // Минимальная сумма заказа в копейках
+  deliveryDays   Int       @default(1) // Дни доставки (1-7)
+  price          Int?      // Цена за единицу в копейках (если фиксированная)
+  unit           String    @default("кг") // Единица измерения
+  notes          String?
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([productId, supplierId])
+  @@index([productId])
+  @@index([supplierId])
+  @@index([isPrimary, priority])
+}
+
+// Буферные запасы продуктов
+model ProductBuffer {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  productId   String   // ID продукта из iiko (dishId)
+  productName String   // Название продукта для отображения
+  bufferDays  Int      @default(7) // На сколько дней буфер
+  minBuffer   Float    @default(0) // Минимальный буфер в единицах
+  maxBuffer   Float?   // Максимальный буфер в единицах
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId])
+  @@index([productId])
+}
+
+// Остатки продуктов на складах
+model ProductStock {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  productId         String   // ID продукта из iiko (dishId)
+  productName       String   // Название продукта для отображения
+  storeId           String   // ID склада из iiko
+  storeName         String   // Название склада
+  currentStock      Float    @default(0) // Текущий остаток
+  reservedStock     Float    @default(0) // Зарезервировано
+  lastUpdated       DateTime @default(now())
+  lastSyncWithIiko  DateTime @default(now())
+  notes             String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([productId, storeId])
+  @@index([productId])
+  @@index([storeId])
+}
+
+// График заказов
+model OrderSchedule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  supplierId  String   // ID поставщика (Counterparty)
+  supplier    Counterparty @relation(fields: [supplierId], references: [id])
+  dayOfWeek   Int      // День недели (1-7, где 1 = понедельник)
+  orderTime   String   // Время заказа (HH:MM)
+  isActive    Boolean  @default(true)
+  autoCreate  Boolean  @default(false) // Автоматически создавать заказы
+  notes       String?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([supplierId, dayOfWeek])
+  @@index([supplierId])
+  @@index([dayOfWeek])
+}
+
+// Заказы поставщикам
+model SupplierOrder {
+  id            String              @id @default(cuid())
+  tenantId      String
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  supplierId    String              // ID поставщика (Counterparty)
+  supplier      Counterparty        @relation(fields: [supplierId], references: [id])
+  status        String              @default("DRAFT") // DRAFT | SENT | CONFIRMED | DELIVERED | CANCELLED
+  orderDate     DateTime            @default(now()) // Дата создания заказа
+  scheduledDate DateTime            // Планируемая дата заказа
+  deliveryDate  DateTime?           // Дата доставки
+  totalAmount   Int                 @default(0) // Общая сумма заказа в копейках
+  items         SupplierOrderItem[]
+  notes         String?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderDate])
+  @@index([scheduledDate])
+}
+
+// Позиции заказа
+model SupplierOrderItem {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         SupplierOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String        // ID продукта из iiko (dishId)
+  productName   String        // Название продукта для отображения
+  quantity      Float         // Количество к заказу
+  unit          String        // Единица измерения
+  price         Int?          // Цена за единицу в копейках
+  totalAmount   Int           @default(0) // Сумма позиции в копейках
+  notes         String?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
 }
