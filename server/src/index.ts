@@ -80,6 +80,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     '/api/auth/_ping',
     '/api/auth/dev-login',
     '/api/auth/magic/callback',
+    '/api/auth/magic/verify',
     // short magic link
     '/api/auth/magic/s',
     // telegram webhook may be public

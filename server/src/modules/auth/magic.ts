@@ -45,6 +45,57 @@ export function createMagicRouter(prisma: PrismaClient) {
     }
   })
 
+  // Public: verify magic link token (for frontend)
+  router.post('/verify', async (req: any, res) => {
+    try {
+      const { token } = req.body || {}
+      if (!token) return res.status(400).json({ error: 'token required' })
+      
+      let decoded: any
+      try {
+        decoded = jwt.verify(token, MAGIC_LINK_SECRET, { algorithms: ['HS256'] })
+      } catch {
+        return res.status(400).json({ error: 'token_invalid_or_expired' })
+      }
+      
+      const jti = String(decoded?.jti || '')
+      const userId = String(decoded?.sub || '')
+      const tenantId = String(decoded?.ten || '')
+      const redirect = String(decoded?.redirect || '/sales/revenue')
+      if (!jti || !userId || !tenantId) return res.status(400).json({ error: 'malformed_token' })
+
+      const dbToken = await prisma.magicLinkToken.findUnique({ where: { id: jti } })
+      if (!dbToken || dbToken.userId !== userId || dbToken.tenantId !== tenantId) {
+        return res.status(400).json({ error: 'token_not_found' })
+      }
+      
+      if (dbToken.expiresAt.getTime() < Date.now()) {
+        return res.status(400).json({ error: 'token_expired' })
+      }
+
+      // Create session cookie
+      const roles = (await prisma.userRole.findMany({ where: { tenantId, userId }, include: { role: true } })).map(r => r.role.name)
+      const access = signAccessToken({ sub: userId, ten: tenantId, roles }, 30 * 24 * 60 * 60)
+      res.cookie('access_token', access, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 30 * 24 * 60 * 60 * 1000 })
+      
+      // Get user data
+      const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, fullName: true, phone: true, active: true }
+      })
+      
+      return res.json({ 
+        success: true, 
+        user, 
+        roles, 
+        redirect 
+      })
+    } catch (e) {
+      console.error('[magic] Verify error:', e)
+      return res.status(500).json({ error: 'internal_error' })
+    }
+  })
+
   // Public: complete magic login
   router.get('/callback', async (req: any, res) => {
     try {

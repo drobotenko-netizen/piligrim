@@ -20,6 +20,14 @@ export function HomeRedirect() {
       return
     }
 
+    // Check for magic link token
+    const token = urlParams.get('token')
+    if (token) {
+      // Process magic link token
+      handleMagicLink(token)
+      return
+    }
+
     async function redirectToFirstAvailable() {
       try {
         const API_BASE = getApiBase()
@@ -64,6 +72,48 @@ export function HomeRedirect() {
         // При ошибке показываем информацию о входе через Telegram
         setIsRedirecting(false)
       } finally {
+        setIsRedirecting(false)
+      }
+    }
+
+    async function handleMagicLink(token: string) {
+      try {
+        const API_BASE = getApiBase()
+        console.log('[HomeRedirect] Processing magic link with token:', token)
+        
+        const response = await fetch(`${API_BASE}/api/auth/magic/verify`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token })
+        })
+        
+        console.log('[HomeRedirect] Magic link verification response status:', response.status)
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('[HomeRedirect] Magic link verification failed:', errorData)
+          setError(errorData.error || 'Не удалось войти в систему')
+          setIsRedirecting(false)
+          return
+        }
+        
+        const data = await response.json()
+        console.log('[HomeRedirect] Magic link verification successful:', data)
+        
+        // После успешной верификации перенаправляем на первую доступную страницу
+        const roles = data?.roles || []
+        const firstMenuItem = getFirstAvailableMenuItem(roles)
+        
+        console.log('[HomeRedirect] User roles:', roles)
+        console.log('[HomeRedirect] Redirecting to:', firstMenuItem)
+        
+        router.replace(firstMenuItem)
+      } catch (error) {
+        console.error('[HomeRedirect] Error processing magic link:', error)
+        setError('Ошибка при обработке ссылки для входа')
         setIsRedirecting(false)
       }
     }
