@@ -15,6 +15,7 @@ export function HomeRedirect() {
     const urlParams = new URLSearchParams(window.location.search)
     const errorParam = urlParams.get('error')
     if (errorParam) {
+      console.log('[HomeRedirect] Error param found:', errorParam)
       setError(errorParam)
       setIsRedirecting(false)
       return
@@ -22,7 +23,10 @@ export function HomeRedirect() {
 
     // Check for magic link token
     const token = urlParams.get('token')
+    console.log('[HomeRedirect] URL params:', Object.fromEntries(urlParams.entries()))
+    console.log('[HomeRedirect] Token found:', token ? 'YES' : 'NO')
     if (token) {
+      console.log('[HomeRedirect] Processing magic link token')
       // Process magic link token
       handleMagicLink(token)
       return
