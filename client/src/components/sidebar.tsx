@@ -71,6 +71,16 @@ export function Sidebar() {
   const [openIiko, setOpenIiko] = useState(false)
   const [openImport, setOpenImport] = useState(false)
 
+  const toggleExclusive = useCallback((section: 'personnel'|'finance'|'sales'|'dishes'|'settings'|'iiko'|'import') => {
+    setOpenPersonnel(section === 'personnel')
+    setOpenFinance(section === 'finance')
+    setOpenSales(section === 'sales')
+    setOpenDishes(section === 'dishes')
+    setOpenSettings(section === 'settings')
+    setOpenIiko(section === 'iiko')
+    setOpenImport(section === 'import')
+  }, [])
+
   const fetchMe = useCallback(async () => {
     try {
       const API_BASE = getApiBase()
@@ -186,15 +196,6 @@ export function Sidebar() {
     } catch {}
   }, [])
 
-  const toggleExclusive = useCallback((section: 'personnel'|'finance'|'sales'|'dishes'|'settings'|'iiko'|'import') => {
-    setOpenPersonnel(section === 'personnel')
-    setOpenFinance(section === 'finance')
-    setOpenSales(section === 'sales')
-    setOpenDishes(section === 'dishes')
-    setOpenSettings(section === 'settings')
-    setOpenIiko(section === 'iiko')
-    setOpenImport(section === 'import')
-  }, [])
   const roles = useMemo(() => Array.isArray(me?.roles) ? me.roles : [], [me?.roles])
   
   // Используем утилитарную функцию для определения видимости
