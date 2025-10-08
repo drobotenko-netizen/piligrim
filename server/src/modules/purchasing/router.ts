@@ -115,7 +115,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // POST /api/purchasing/buffers - Создать буфер
-  router.post('/buffers', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.post('/buffers', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -145,7 +145,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // PUT /api/purchasing/buffers/:id - Обновить буфер
-  router.put('/buffers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.put('/buffers/:id', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -171,7 +171,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // DELETE /api/purchasing/buffers/:id - Удалить буфер
-  router.delete('/buffers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.delete('/buffers/:id', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -217,7 +217,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // POST /api/purchasing/product-suppliers - Создать связь продукт-поставщик
-  router.post('/product-suppliers', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.post('/product-suppliers', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -263,7 +263,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // PUT /api/purchasing/product-suppliers/:id - Обновить связь продукт-поставщик
-  router.put('/product-suppliers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.put('/product-suppliers/:id', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -302,7 +302,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // DELETE /api/purchasing/product-suppliers/:id - Удалить связь продукт-поставщик
-  router.delete('/product-suppliers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.delete('/product-suppliers/:id', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -352,7 +352,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // POST /api/purchasing/orders - Создать заказ
-  router.post('/orders', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.post('/orders', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -400,7 +400,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   })
 
   // PUT /api/purchasing/orders/:id/status - Изменить статус заказа
-  router.put('/orders/:id/status', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.put('/orders/:id/status', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
@@ -432,7 +432,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // ===== Синхронизация с iiko =====
 
   // POST /api/purchasing/sync-stocks - Синхронизация остатков с iiko
-  router.post('/sync-stocks', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
+  router.post('/sync-stocks', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
       const tenant = await getTenant(prisma, req)
       const tenantId = tenant.id
