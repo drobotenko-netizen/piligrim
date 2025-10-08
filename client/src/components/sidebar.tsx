@@ -39,11 +39,14 @@ const settingsItems = [
 
 const salesItems = [
   { href: '/sales/revenue', label: 'Выручка', icon: TrendingUp },
-  { href: '/sales/dishes', label: 'Блюда', icon: FileSpreadsheet },
-  { href: '/sales/purchasing', label: 'Закупки', icon: ShoppingCart },
   { href: '/sales/suppliers', label: 'Поставщики', icon: Contact },
   { href: '/sales/customers', label: 'Клиенты', icon: UserCheck },
   { href: '/analysis/checks-by-hour', label: 'Чеки по часам', icon: FileSpreadsheet },
+]
+
+const dishesItems = [
+  { href: '/sales/dishes', label: 'Меню', icon: FileSpreadsheet },
+  { href: '/sales/purchasing', label: 'Закупки', icon: ShoppingCart },
 ]
 
 const iikoItems = [
@@ -62,6 +65,7 @@ export function Sidebar() {
   const [openPersonnel, setOpenPersonnel] = useState(true)
   const [openFinance, setOpenFinance] = useState(false)
   const [openSales, setOpenSales] = useState(false)
+  const [openDishes, setOpenDishes] = useState(false)
   const [openSettings, setOpenSettings] = useState(false)
   const [me, setMe] = useState<any>(null)
   const [openIiko, setOpenIiko] = useState(false)
@@ -118,7 +122,9 @@ export function Sidebar() {
   // Авто-раскрытие нужной секции в зависимости от текущего пути
   useEffect(() => {
     if (!pathname) return
-    if (pathname.startsWith('/sales/')) {
+    if (pathname.startsWith('/sales/dishes') || pathname.startsWith('/sales/purchasing')) {
+      toggleExclusive('dishes')
+    } else if (pathname.startsWith('/sales/') || pathname.startsWith('/analysis/')) {
       toggleExclusive('sales')
     } else if (pathname.startsWith('/finance/')) {
       toggleExclusive('finance')
@@ -138,7 +144,7 @@ export function Sidebar() {
     } else if (pathname.startsWith('/admin/')) {
       toggleExclusive('settings')
     }
-  }, [pathname])
+  }, [pathname, toggleExclusive])
 
   useEffect(() => {
     // Проверяем авторизацию только при возвращении фокуса, но не чаще чем раз в 60 секунд
@@ -180,10 +186,11 @@ export function Sidebar() {
     } catch {}
   }, [])
 
-  const toggleExclusive = useCallback((section: 'personnel'|'finance'|'sales'|'settings'|'iiko'|'import') => {
+  const toggleExclusive = useCallback((section: 'personnel'|'finance'|'sales'|'dishes'|'settings'|'iiko'|'import') => {
     setOpenPersonnel(section === 'personnel')
     setOpenFinance(section === 'finance')
     setOpenSales(section === 'sales')
+    setOpenDishes(section === 'dishes')
     setOpenSettings(section === 'settings')
     setOpenIiko(section === 'iiko')
     setOpenImport(section === 'import')
@@ -254,32 +261,57 @@ export function Sidebar() {
         </div>
         )}
 
-        {visibleFinance && (
-        <div>
-          <button
-            type="button"
-            className="w-full px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between hover:text-foreground"
-            onClick={() => toggleExclusive('finance')}
-            aria-expanded={openFinance}
-          >
-            <span className="ml-[5px]">Финансы</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${openFinance ? 'rotate-0' : '-rotate-90'}`} />
-          </button>
-          <div className={`space-y-1 mt-1 ${openFinance ? '' : 'hidden'}`}>
-            {financeItems.map(({ href, label, icon: Icon }) => {
-              const active = pathname?.startsWith(href)
-              return (
-                <Button key={href} asChild variant={active ? 'secondary' : 'ghost'} className="w-full justify-start gap-2">
-                  <Link href={href}>
-                    <Icon size={18} />
-                    {label}
-                  </Link>
-                </Button>
-              )
-            })}
-          </div>
-        </div>
-        )}
+               {visibleFinance && (
+               <div>
+                 <button
+                   type="button"
+                   className="w-full px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between hover:text-foreground"
+                   onClick={() => toggleExclusive('finance')}
+                   aria-expanded={openFinance}
+                 >
+                   <span className="ml-[5px]">Финансы</span>
+                   <ChevronDown className={`h-4 w-4 transition-transform ${openFinance ? 'rotate-0' : '-rotate-90'}`} />
+                 </button>
+                 <div className={`space-y-1 mt-1 ${openFinance ? '' : 'hidden'}`}>
+                   {financeItems.map(({ href, label, icon: Icon }) => {
+                     const active = pathname?.startsWith(href)
+                     return (
+                       <Button key={href} asChild variant={active ? 'secondary' : 'ghost'} className="w-full justify-start gap-2">
+                         <Link href={href}>
+                           <Icon size={18} />
+                           {label}
+                         </Link>
+                       </Button>
+                     )
+                   })}
+                 </div>
+               </div>
+               )}
+
+               <div>
+                 <button
+                   type="button"
+                   className="w-full px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between hover:text-foreground"
+                   onClick={() => toggleExclusive('dishes')}
+                   aria-expanded={openDishes}
+                 >
+                   <span className="ml-[5px]">Блюда</span>
+                   <ChevronDown className={`h-4 w-4 transition-transform ${openDishes ? 'rotate-0' : '-rotate-90'}`} />
+                 </button>
+                 <div className={`space-y-1 mt-1 ${openDishes ? '' : 'hidden'}`}>
+                   {dishesItems.map(({ href, label, icon: Icon }) => {
+                     const active = pathname?.startsWith(href)
+                     return (
+                       <Button key={href} asChild variant={active ? 'secondary' : 'ghost'} className="w-full justify-start gap-2">
+                         <Link href={href}>
+                           <Icon size={18} />
+                           {label}
+                         </Link>
+                       </Button>
+                     )
+                   })}
+                 </div>
+               </div>
 
         <div>
           <button

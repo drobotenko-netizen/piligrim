@@ -45,10 +45,8 @@ export function getFirstAvailableMenuItem(roles: string[] = []): string {
   if (visibility.visibleSales) return '/sales/revenue'
   if (visibility.visiblePersonnel) return '/timesheets'
   if (visibility.visibleFinance) return '/shifts'
-  if (visibility.visibleSettings) return '/admin/users'
-  
-  // Если ничего не доступно, показываем iiko (всегда доступен)
-  return '/iiko/sales/summary'
+  // Блюда всегда доступны
+  return '/sales/dishes'
 }
 
 // Функция для получения всех доступных пунктов меню
@@ -59,13 +57,17 @@ export function getAvailableMenuItems(roles: string[] = []): MenuItem[] {
   if (visibility.visibleSales) {
     items.push(
       { href: '/sales/revenue', label: 'Выручка', section: 'sales' },
-      { href: '/sales/dishes', label: 'Блюда', section: 'sales' },
-      { href: '/sales/purchasing', label: 'Закупки', section: 'sales' },
       { href: '/sales/suppliers', label: 'Поставщики', section: 'sales' },
       { href: '/sales/customers', label: 'Клиенты', section: 'sales' },
       { href: '/analysis/checks-by-hour', label: 'Чеки по часам', section: 'sales' }
     )
   }
+  
+  // Блюда всегда доступны как отдельный раздел
+  items.push(
+    { href: '/sales/dishes', label: 'Меню', section: 'dishes' },
+    { href: '/sales/purchasing', label: 'Закупки', section: 'dishes' }
+  )
   
   if (visibility.visiblePersonnel) {
     items.push(
