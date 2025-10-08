@@ -11,7 +11,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // GET /api/purchasing/calculate-orders - Основной расчет заказов
   router.get('/calculate-orders', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { storeId, supplierId, productId, date } = req.query
 
       // Получаем все продукты с буферами
@@ -95,7 +96,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // GET /api/purchasing/buffers - Список буферов
   router.get('/buffers', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { productId } = req.query
 
       const buffers = await prisma.productBuffer.findMany({
@@ -115,7 +117,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // POST /api/purchasing/buffers - Создать буфер
   router.post('/buffers', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { productId, productName, bufferDays, minBuffer, maxBuffer, notes } = req.body
 
       if (!productId || !productName) {
@@ -144,7 +147,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // PUT /api/purchasing/buffers/:id - Обновить буфер
   router.put('/buffers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { id } = req.params
       const { bufferDays, minBuffer, maxBuffer, isActive, notes } = req.body
 
@@ -169,7 +173,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // DELETE /api/purchasing/buffers/:id - Удалить буфер
   router.delete('/buffers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { id } = req.params
 
       await prisma.productBuffer.delete({
@@ -187,7 +192,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // GET /api/purchasing/product-suppliers - Список поставщиков продуктов
   router.get('/product-suppliers', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { productId, supplierId } = req.query
 
       const productSuppliers = await prisma.productSupplier.findMany({
@@ -213,7 +219,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // POST /api/purchasing/product-suppliers - Создать связь продукт-поставщик
   router.post('/product-suppliers', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { 
         productId, 
         productName, 
@@ -258,7 +265,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // PUT /api/purchasing/product-suppliers/:id - Обновить связь продукт-поставщик
   router.put('/product-suppliers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { id } = req.params
       const { 
         isPrimary, 
@@ -296,7 +304,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // DELETE /api/purchasing/product-suppliers/:id - Удалить связь продукт-поставщик
   router.delete('/product-suppliers/:id', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { id } = req.params
 
       await prisma.productSupplier.delete({
@@ -314,7 +323,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // GET /api/purchasing/orders - Список заказов
   router.get('/orders', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { supplierId, status, from, to } = req.query
 
       const where: any = { tenantId }
@@ -344,7 +354,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // POST /api/purchasing/orders - Создать заказ
   router.post('/orders', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { supplierId, scheduledDate, items, notes } = req.body
 
       if (!supplierId || !scheduledDate || !items || !Array.isArray(items)) {
@@ -391,7 +402,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // PUT /api/purchasing/orders/:id/status - Изменить статус заказа
   router.put('/orders/:id/status', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { id } = req.params
       const { status, deliveryDate } = req.body
 
@@ -422,7 +434,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // POST /api/purchasing/sync-stocks - Синхронизация остатков с iiko
   router.post('/sync-stocks', requirePermission(prisma, 'iiko.manage'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { storeIds, productIds } = req.body
 
       const { createIikoClient } = await import('../iiko/client')
@@ -489,7 +502,8 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   // GET /api/purchasing/stocks - Получить остатки продуктов
   router.get('/stocks', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
     try {
-      const tenantId = await getTenant(prisma, req)
+      const tenant = await getTenant(prisma, req)
+      const tenantId = tenant.id
       const { storeId, productId, lowStock } = req.query
 
       const where: any = { tenantId }
