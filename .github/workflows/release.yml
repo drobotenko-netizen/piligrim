@@ -2,6 +2,8 @@ name: release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -39,7 +41,7 @@ jobs:
           file: server/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_API }}:${{ github.ref_name }}
+            ${{ env.IMAGE_API }}:${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
             ${{ env.IMAGE_API }}:latest
 
       - name: Build and push WEB image
@@ -49,7 +51,7 @@ jobs:
           file: client/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_WEB }}:${{ github.ref_name }}
+            ${{ env.IMAGE_WEB }}:${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
             ${{ env.IMAGE_WEB }}:latest
 
       - name: Deploy over SSH
@@ -60,9 +62,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
-            export TAG=${{ github.ref_name }}
-            export IMAGE_WEB=${{ env.IMAGE_WEB }}:${{ github.ref_name }}
-            export IMAGE_API=${{ env.IMAGE_API }}:${{ github.ref_name }}
+            export TAG=${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
+            export IMAGE_WEB=${{ env.IMAGE_WEB }}:${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
+            export IMAGE_API=${{ env.IMAGE_API }}:${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
 
             # Prepare directories (files should already exist from previous deployments)
             sudo mkdir -p /srv/piligrim/app
@@ -91,7 +93,9 @@ jobs:
             # Run new containers with correct names and network
             sudo docker run -d --name api --network infra_default --restart unless-stopped \
               -e PORT=4000 -e NODE_ENV=production -e DATABASE_URL=file:/data/dev.db \
-              -v piligrim_api_data:/data $IMAGE_API
+              -v infra_api_data:/data \
+              --env-file /srv/piligrim/app/server/.env \
+              $IMAGE_API
 
             sudo docker run -d --name web --network infra_default --restart unless-stopped \
               -e NODE_ENV=production -e PORT=3000 -e NEXT_PUBLIC_API_BASE=https://piligrim.5-star-roi.ru $IMAGE_WEB
