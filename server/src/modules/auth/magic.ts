@@ -78,8 +78,8 @@ export function createMagicRouter(prisma: PrismaClient) {
       const roles = (await prisma.userRole.findMany({ where: { tenantId, userId }, include: { role: true } })).map(r => r.role.name)
       const access = signAccessToken({ sub: userId, ten: tenantId, roles }, 30 * 24 * 60 * 60)
       res.cookie('access_token', access, { 
-        httpOnly: true, 
-        sameSite: 'lax', 
+        httpOnly: false, 
+        sameSite: 'none', 
         secure: true, 
         maxAge: 30 * 24 * 60 * 60 * 1000,
         domain: 'piligrim.5-star-roi.ru'
@@ -150,8 +150,8 @@ export function createMagicRouter(prisma: PrismaClient) {
       const roles = (await prisma.userRole.findMany({ where: { tenantId, userId }, include: { role: true } })).map(r => r.role.name)
       const access = signAccessToken({ sub: userId, ten: tenantId, roles }, 30 * 24 * 60 * 60)
       res.cookie('access_token', access, { 
-        httpOnly: true, 
-        sameSite: 'lax', 
+        httpOnly: false, 
+        sameSite: 'none', 
         secure: true, 
         maxAge: 30 * 24 * 60 * 60 * 1000,
         domain: 'piligrim.5-star-roi.ru'
@@ -200,8 +200,8 @@ export function createMagicRouter(prisma: PrismaClient) {
       const roles = (await prisma.userRole.findMany({ where: { tenantId: dbToken.tenantId, userId: dbToken.userId }, include: { role: true } })).map(r => r.role.name)
       const access = signAccessToken({ sub: dbToken.userId, ten: dbToken.tenantId, roles }, 30 * 24 * 60 * 60)
       res.cookie('access_token', access, { 
-        httpOnly: true, 
-        sameSite: 'lax', 
+        httpOnly: false, 
+        sameSite: 'none', 
         secure: true, 
         maxAge: 30 * 24 * 60 * 60 * 1000,
         domain: 'piligrim.5-star-roi.ru'
