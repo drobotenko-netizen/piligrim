@@ -28,7 +28,7 @@ export function getMenuVisibility(roles: string[]) {
   const has = (r: string) => hasRole(roles, r)
   
   return {
-    visibleSales: admin || has('SALES') || has('OWNER'),
+    visibleSales: true, // Анализ всегда доступен
     visiblePersonnel: admin || has('HR') || has('OWNER') || has('CASHIER'),
     visibleFinance: admin || has('FINANCE') || has('OWNER'),
     visibleSettings: admin,
@@ -60,6 +60,7 @@ export function getAvailableMenuItems(roles: string[] = []): MenuItem[] {
     items.push(
       { href: '/sales/revenue', label: 'Выручка', section: 'sales' },
       { href: '/sales/dishes', label: 'Блюда', section: 'sales' },
+      { href: '/sales/purchasing', label: 'Закупки', section: 'sales' },
       { href: '/sales/suppliers', label: 'Поставщики', section: 'sales' },
       { href: '/sales/customers', label: 'Клиенты', section: 'sales' },
       { href: '/analysis/checks-by-hour', label: 'Чеки по часам', section: 'sales' }
