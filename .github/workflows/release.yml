@@ -75,12 +75,8 @@ jobs:
 
             # Ensure shared proxy network exists and caddy attached
             sudo docker network create proxy || true
-            # restart caddy stack (it should already exist from bootstrap)
-            if [ -f /opt/infra/caddy/docker-compose.yml ]; then
-              (cd /opt/infra/caddy && sudo docker compose up -d)
-              # attach to proxy
-              sudo docker network connect proxy caddy || true
-            fi
+            # Connect existing caddy to proxy network if not already connected
+            sudo docker network connect proxy caddy || true
 
             # Pull new images
             sudo docker pull $IMAGE_WEB
