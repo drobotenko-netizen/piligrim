@@ -82,7 +82,7 @@ export function createMagicRouter(prisma: PrismaClient) {
         sameSite: 'lax', 
         secure: true, 
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        domain: '.5-star-roi.ru'
+        domain: 'piligrim.5-star-roi.ru'
       })
       
       // Get user data
@@ -154,7 +154,7 @@ export function createMagicRouter(prisma: PrismaClient) {
         sameSite: 'lax', 
         secure: true, 
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        domain: '.5-star-roi.ru'
+        domain: 'piligrim.5-star-roi.ru'
       })
       const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
       const target = `${frontendUrl}${redirect.startsWith('/') ? '' : '/'}${redirect}`
@@ -204,7 +204,7 @@ export function createMagicRouter(prisma: PrismaClient) {
         sameSite: 'lax', 
         secure: true, 
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        domain: '.5-star-roi.ru'
+        domain: 'piligrim.5-star-roi.ru'
       })
       const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
       const target = `${frontendUrl}${(dbToken.redirect || '/sales/revenue').startsWith('/') ? '' : '/'}${dbToken.redirect || '/sales/revenue'}`
