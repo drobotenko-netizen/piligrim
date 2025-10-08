@@ -20,25 +20,32 @@ export function createPurchasingRouter(prisma: PrismaClient) {
           tenantId,
           isActive: true,
           ...(productId && { productId })
-        },
-        include: {
-          productSuppliers: {
-            where: { isActive: true },
-            include: { supplier: true },
-            orderBy: [
-              { isPrimary: 'desc' },
-              { priority: 'asc' }
-            ]
-          }
         }
+      })
+
+      // Получаем поставщиков для продуктов отдельно
+      const productSuppliers = await prisma.productSupplier.findMany({
+        where: {
+          tenantId,
+          isActive: true,
+          ...(productId && { productId })
+        },
+        include: { supplier: true },
+        orderBy: [
+          { isPrimary: 'desc' },
+          { priority: 'asc' }
+        ]
       })
 
       const calculations = []
 
       for (const buffer of productsWithBuffers) {
+        // Получаем поставщиков для этого продукта
+        const productSuppliersForProduct = productSuppliers.filter(ps => ps.productId === buffer.productId)
+        
         // Получаем поставщика (основной или запасной)
-        const supplier = buffer.productSuppliers.find(ps => ps.isPrimary) || 
-                        buffer.productSuppliers[0]
+        const supplier = productSuppliersForProduct.find(ps => ps.isPrimary) || 
+                        productSuppliersForProduct[0]
 
         if (!supplier) continue
 
