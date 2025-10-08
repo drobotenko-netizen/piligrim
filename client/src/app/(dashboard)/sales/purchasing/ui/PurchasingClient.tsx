@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { Calculator, Package, Users, Calendar, BarChart3, Plus, Edit, Trash2, ShoppingCart } from 'lucide-react'
 import { getApiBase } from '@/lib/api'
 
@@ -326,45 +326,45 @@ export default function PurchasingClient() {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Результаты расчета</h3>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Продукт</TableHead>
-                      <TableHead>Поставщик</TableHead>
-                      <TableHead>Расход/нед</TableHead>
-                      <TableHead>Буфер</TableHead>
-                      <TableHead>Остаток</TableHead>
-                      <TableHead>К заказу</TableHead>
-                      <TableHead>Цена</TableHead>
-                      <TableHead>Сумма</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                  <THead>
+                    <TR>
+                      <TH>Продукт</TH>
+                      <TH>Поставщик</TH>
+                      <TH>Расход/нед</TH>
+                      <TH>Буфер</TH>
+                      <TH>Остаток</TH>
+                      <TH>К заказу</TH>
+                      <TH>Цена</TH>
+                      <TH>Сумма</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
                     {calculations.map((calc) => (
-                      <TableRow key={`${calc.productId}-${calc.supplierId}`}>
-                        <TableCell className="font-medium">{calc.productName}</TableCell>
-                        <TableCell>
+                      <TR key={`${calc.productId}-${calc.supplierId}`}>
+                        <TD className="font-medium">{calc.productName}</TD>
+                        <TD>
                           <div className="flex items-center gap-2">
                             {calc.supplierName}
                             {calc.isPrimarySupplier && (
                               <Badge variant="default" className="text-xs">Основной</Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>{calc.weeklyConsumption.toFixed(1)} {calc.unit}</TableCell>
-                        <TableCell>{calc.bufferStock.toFixed(1)} {calc.unit}</TableCell>
-                        <TableCell>{calc.currentStock.toFixed(1)} {calc.unit}</TableCell>
-                        <TableCell className="font-semibold text-green-600">
+                        </TD>
+                        <TD>{calc.weeklyConsumption.toFixed(1)} {calc.unit}</TD>
+                        <TD>{calc.bufferStock.toFixed(1)} {calc.unit}</TD>
+                        <TD>{calc.currentStock.toFixed(1)} {calc.unit}</TD>
+                        <TD className="font-semibold text-green-600">
                           {calc.orderQuantity.toFixed(1)} {calc.unit}
-                        </TableCell>
-                        <TableCell>
+                        </TD>
+                        <TD>
                           {calc.price ? formatCurrency(calc.price) : '—'}
-                        </TableCell>
-                        <TableCell className="font-semibold">
+                        </TD>
+                        <TD className="font-semibold">
                           {calc.totalAmount ? formatCurrency(calc.totalAmount) : '—'}
-                        </TableCell>
-                      </TableRow>
+                        </TD>
+                      </TR>
                     ))}
-                  </TableBody>
+                  </TBody>
                 </Table>
               </div>
             )}
@@ -390,49 +390,49 @@ export default function PurchasingClient() {
             </div>
 
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Продукт</TableHead>
-                  <TableHead>Склад</TableHead>
-                  <TableHead>Текущий остаток</TableHead>
-                  <TableHead>Зарезервировано</TableHead>
-                  <TableHead>Последняя синхронизация</TableHead>
-                  <TableHead>Статус</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              <THead>
+                <TR>
+                  <TH>Продукт</TH>
+                  <TH>Склад</TH>
+                  <TH>Текущий остаток</TH>
+                  <TH>Зарезервировано</TH>
+                  <TH>Последняя синхронизация</TH>
+                  <TH>Статус</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {stocks.map((stock) => {
                   const isLowStock = stock.currentStock <= 10
                   const lastSync = new Date(stock.lastSyncWithIiko)
                   const isStale = Date.now() - lastSync.getTime() > 24 * 60 * 60 * 1000 // 24 часа
                   
                   return (
-                    <TableRow key={stock.id}>
-                      <TableCell className="font-medium">{stock.productName}</TableCell>
-                      <TableCell>{stock.storeName}</TableCell>
-                      <TableCell className={isLowStock ? 'text-red-600 font-semibold' : ''}>
+                    <TR key={stock.id}>
+                      <TD className="font-medium">{stock.productName}</TD>
+                      <TD>{stock.storeName}</TD>
+                      <TD className={isLowStock ? 'text-red-600 font-semibold' : ''}>
                         {stock.currentStock.toFixed(1)}
-                      </TableCell>
-                      <TableCell>{stock.reservedStock.toFixed(1)}</TableCell>
-                      <TableCell>
+                      </TD>
+                      <TD>{stock.reservedStock.toFixed(1)}</TD>
+                      <TD>
                         {lastSync.toLocaleString('ru-RU')}
                         {isStale && (
                           <Badge variant="destructive" className="ml-2 text-xs">
                             Устарело
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </TD>
+                      <TD>
                         {isLowStock ? (
                           <Badge variant="destructive">Мало</Badge>
                         ) : (
                           <Badge variant="default">Норма</Badge>
                         )}
-                      </TableCell>
-                    </TableRow>
+                      </TD>
+                    </TR>
                   )
                 })}
-              </TableBody>
+              </TBody>
             </Table>
 
             {stocks.length === 0 && (
@@ -462,29 +462,29 @@ export default function PurchasingClient() {
             </div>
 
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Продукт</TableHead>
-                  <TableHead>Дни буфера</TableHead>
-                  <TableHead>Мин. буфер</TableHead>
-                  <TableHead>Макс. буфер</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead>Действия</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              <THead>
+                <TR>
+                  <TH>Продукт</TH>
+                  <TH>Дни буфера</TH>
+                  <TH>Мин. буфер</TH>
+                  <TH>Макс. буфер</TH>
+                  <TH>Статус</TH>
+                  <TH>Действия</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {buffers.map((buffer) => (
-                  <TableRow key={buffer.id}>
-                    <TableCell className="font-medium">{buffer.productName}</TableCell>
-                    <TableCell>{buffer.bufferDays} дней</TableCell>
-                    <TableCell>{buffer.minBuffer}</TableCell>
-                    <TableCell>{buffer.maxBuffer || '—'}</TableCell>
-                    <TableCell>
+                  <TR key={buffer.id}>
+                    <TD className="font-medium">{buffer.productName}</TD>
+                    <TD>{buffer.bufferDays} дней</TD>
+                    <TD>{buffer.minBuffer}</TD>
+                    <TD>{buffer.maxBuffer || '—'}</TD>
+                    <TD>
                       <Badge variant={buffer.isActive ? 'default' : 'secondary'}>
                         {buffer.isActive ? 'Активен' : 'Неактивен'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
+                    </TD>
+                    <TD>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline">
                           <Edit className="h-4 w-4" />
@@ -493,10 +493,10 @@ export default function PurchasingClient() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </TD>
+                  </TR>
                 ))}
-              </TableBody>
+              </TBody>
             </Table>
           </CardContent>
         </Card>
@@ -520,39 +520,39 @@ export default function PurchasingClient() {
             </div>
 
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Продукт</TableHead>
-                  <TableHead>Поставщик</TableHead>
-                  <TableHead>Тип</TableHead>
-                  <TableHead>Приоритет</TableHead>
-                  <TableHead>Дни доставки</TableHead>
-                  <TableHead>Цена</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead>Действия</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              <THead>
+                <TR>
+                  <TH>Продукт</TH>
+                  <TH>Поставщик</TH>
+                  <TH>Тип</TH>
+                  <TH>Приоритет</TH>
+                  <TH>Дни доставки</TH>
+                  <TH>Цена</TH>
+                  <TH>Статус</TH>
+                  <TH>Действия</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {productSuppliers.map((ps) => (
-                  <TableRow key={ps.id}>
-                    <TableCell className="font-medium">{ps.productName}</TableCell>
-                    <TableCell>{ps.supplier.name}</TableCell>
-                    <TableCell>
+                  <TR key={ps.id}>
+                    <TD className="font-medium">{ps.productName}</TD>
+                    <TD>{ps.supplier.name}</TD>
+                    <TD>
                       <Badge variant={ps.isPrimary ? 'default' : 'secondary'}>
                         {ps.isPrimary ? 'Основной' : 'Запасной'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>{ps.priority}</TableCell>
-                    <TableCell>{ps.deliveryDays} дней</TableCell>
-                    <TableCell>
+                    </TD>
+                    <TD>{ps.priority}</TD>
+                    <TD>{ps.deliveryDays} дней</TD>
+                    <TD>
                       {ps.price ? formatCurrency(ps.price) : '—'}
-                    </TableCell>
-                    <TableCell>
+                    </TD>
+                    <TD>
                       <Badge variant={ps.isActive ? 'default' : 'secondary'}>
                         {ps.isActive ? 'Активен' : 'Неактивен'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
+                    </TD>
+                    <TD>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline">
                           <Edit className="h-4 w-4" />
@@ -561,10 +561,10 @@ export default function PurchasingClient() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </TD>
+                  </TR>
                 ))}
-              </TableBody>
+              </TBody>
             </Table>
           </CardContent>
         </Card>
@@ -581,38 +581,38 @@ export default function PurchasingClient() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Дата заказа</TableHead>
-                  <TableHead>Поставщик</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead>Сумма</TableHead>
-                  <TableHead>Позиций</TableHead>
-                  <TableHead>Действия</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              <THead>
+                <TR>
+                  <TH>Дата заказа</TH>
+                  <TH>Поставщик</TH>
+                  <TH>Статус</TH>
+                  <TH>Сумма</TH>
+                  <TH>Позиций</TH>
+                  <TH>Действия</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {orders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>
+                  <TR key={order.id}>
+                    <TD>
                       {new Date(order.orderDate).toLocaleDateString('ru-RU')}
-                    </TableCell>
-                    <TableCell className="font-medium">{order.supplier.name}</TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell className="font-semibold">
+                    </TD>
+                    <TD className="font-medium">{order.supplier.name}</TD>
+                    <TD>{getStatusBadge(order.status)}</TD>
+                    <TD className="font-semibold">
                       {formatCurrency(order.totalAmount)}
-                    </TableCell>
-                    <TableCell>{order.items.length}</TableCell>
-                    <TableCell>
+                    </TD>
+                    <TD>{order.items.length}</TD>
+                    <TD>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline">
                           <Edit className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </TD>
+                  </TR>
                 ))}
-              </TableBody>
+              </TBody>
             </Table>
           </CardContent>
         </Card>
