@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Calculator, Package, Users, Calendar, BarChart3, Plus, Edit, Trash2, ShoppingCart } from 'lucide-react'
 import { getApiBase } from '@/lib/api'
 
@@ -266,6 +267,78 @@ export default function PurchasingClient() {
     }).format(amount / 100)
   }
 
+  // CRUD операции для буферов
+  const [showBufferForm, setShowBufferForm] = useState(false)
+  const [editingBuffer, setEditingBuffer] = useState<ProductBuffer | null>(null)
+
+  const addBuffer = () => {
+    setEditingBuffer(null)
+    setShowBufferForm(true)
+  }
+
+  const editBuffer = (buffer: ProductBuffer) => {
+    setEditingBuffer(buffer)
+    setShowBufferForm(true)
+  }
+
+  const deleteBuffer = async (bufferId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот буферный запас?')) return
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/purchasing/buffers/${bufferId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        // Перезагружаем данные
+        const buffersRes = await fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' })
+        if (buffersRes.ok) {
+          const data = await buffersRes.json()
+          setBuffers(data.buffers || [])
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting buffer:', error)
+    }
+  }
+
+  // CRUD операции для поставщиков
+  const [showSupplierForm, setShowSupplierForm] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<ProductSupplier | null>(null)
+
+  const addSupplier = () => {
+    setEditingSupplier(null)
+    setShowSupplierForm(true)
+  }
+
+  const editSupplier = (supplier: ProductSupplier) => {
+    setEditingSupplier(supplier)
+    setShowSupplierForm(true)
+  }
+
+  const deleteSupplier = async (supplierId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этого поставщика?')) return
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/purchasing/product-suppliers/${supplierId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        // Перезагружаем данные
+        const suppliersRes = await fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' })
+        if (suppliersRes.ok) {
+          const data = await suppliersRes.json()
+          setProductSuppliers(data.productSuppliers || [])
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting supplier:', error)
+    }
+  }
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <TabsList className="grid w-full grid-cols-6">
@@ -455,7 +528,7 @@ export default function PurchasingClient() {
           </CardHeader>
           <CardContent>
             <div className="flex justify-between items-center mb-4">
-              <Button>
+              <Button onClick={addBuffer}>
                 <Plus className="h-4 w-4 mr-2" />
                 Добавить буфер
               </Button>
@@ -486,10 +559,10 @@ export default function PurchasingClient() {
                     </TD>
                     <TD>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => editBuffer(buffer)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => deleteBuffer(buffer.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -513,7 +586,7 @@ export default function PurchasingClient() {
           </CardHeader>
           <CardContent>
             <div className="flex justify-between items-center mb-4">
-              <Button>
+              <Button onClick={addSupplier}>
                 <Plus className="h-4 w-4 mr-2" />
                 Добавить поставщика
               </Button>
@@ -554,10 +627,10 @@ export default function PurchasingClient() {
                     </TD>
                     <TD>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => editSupplier(ps)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => deleteSupplier(ps.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -635,5 +708,130 @@ export default function PurchasingClient() {
         </Card>
       </TabsContent>
     </Tabs>
+
+    {/* Модальное окно для буферов */}
+    <Dialog open={showBufferForm} onOpenChange={setShowBufferForm}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {editingBuffer ? 'Редактировать буферный запас' : 'Добавить буферный запас'}
+          </DialogTitle>
+          <DialogDescription>
+            {editingBuffer ? 'Измените параметры буферного запаса' : 'Создайте новый буферный запас для продукта'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="productName">Название продукта</Label>
+            <Input 
+              id="productName" 
+              placeholder="Введите название продукта"
+              defaultValue={editingBuffer?.productName || ''}
+            />
+          </div>
+          <div>
+            <Label htmlFor="bufferDays">Дни буфера</Label>
+            <Input 
+              id="bufferDays" 
+              type="number" 
+              placeholder="7"
+              defaultValue={editingBuffer?.bufferDays || 7}
+            />
+          </div>
+          <div>
+            <Label htmlFor="minBuffer">Минимальный буфер</Label>
+            <Input 
+              id="minBuffer" 
+              type="number" 
+              step="0.1"
+              placeholder="0"
+              defaultValue={editingBuffer?.minBuffer || 0}
+            />
+          </div>
+          <div>
+            <Label htmlFor="maxBuffer">Максимальный буфер (опционально)</Label>
+            <Input 
+              id="maxBuffer" 
+              type="number" 
+              step="0.1"
+              placeholder="Не указан"
+              defaultValue={editingBuffer?.maxBuffer || ''}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowBufferForm(false)}>
+            Отмена
+          </Button>
+          <Button onClick={() => {
+            // TODO: Реализовать сохранение
+            setShowBufferForm(false)
+          }}>
+            {editingBuffer ? 'Сохранить' : 'Создать'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Модальное окно для поставщиков */}
+    <Dialog open={showSupplierForm} onOpenChange={setShowSupplierForm}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {editingSupplier ? 'Редактировать поставщика' : 'Добавить поставщика'}
+          </DialogTitle>
+          <DialogDescription>
+            {editingSupplier ? 'Измените параметры поставщика' : 'Создайте новую связь продукт-поставщик'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="supplierProductName">Название продукта</Label>
+            <Input 
+              id="supplierProductName" 
+              placeholder="Введите название продукта"
+              defaultValue={editingSupplier?.productName || ''}
+            />
+          </div>
+          <div>
+            <Label htmlFor="supplierName">Название поставщика</Label>
+            <Input 
+              id="supplierName" 
+              placeholder="Введите название поставщика"
+              defaultValue={editingSupplier?.supplier.name || ''}
+            />
+          </div>
+          <div>
+            <Label htmlFor="deliveryDays">Дни доставки</Label>
+            <Input 
+              id="deliveryDays" 
+              type="number" 
+              placeholder="1"
+              defaultValue={editingSupplier?.deliveryDays || 1}
+            />
+          </div>
+          <div>
+            <Label htmlFor="price">Цена за единицу (копейки)</Label>
+            <Input 
+              id="price" 
+              type="number" 
+              placeholder="0"
+              defaultValue={editingSupplier?.price || ''}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowSupplierForm(false)}>
+            Отмена
+          </Button>
+          <Button onClick={() => {
+            // TODO: Реализовать сохранение
+            setShowSupplierForm(false)
+          }}>
+            {editingSupplier ? 'Сохранить' : 'Создать'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
