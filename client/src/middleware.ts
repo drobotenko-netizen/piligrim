@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // Публичные пути, которые не требуют авторизации
-  const publicPaths = ['/api/auth']
+  const publicPaths = ['/api/auth', '/']
   
   // Проверяем, является ли путь публичным
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
