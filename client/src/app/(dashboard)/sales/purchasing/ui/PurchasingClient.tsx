@@ -134,17 +134,11 @@ export default function PurchasingClient() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Формируем timestamp и даты для iiko
-      const now = new Date()
-      const y = now.getUTCFullYear()
-      const m = String(now.getUTCMonth() + 1).padStart(2, '0')
-      const d = String(now.getUTCDate()).padStart(2, '0')
-      const hh = String(now.getUTCHours()).padStart(2, '0')
-      const mm = String(now.getUTCMinutes()).padStart(2, '0')
-      const ss = String(now.getUTCSeconds()).padStart(2, '0')
-      const ms = String(now.getUTCMilliseconds()).padStart(3, '0')
-      const timestamp = `${y}-${m}-${d}T${hh}:${mm}:${ss}.${ms}`
-      const today = `${y}-${m}-${d}`
+      // Получаем последнюю дату с данными
+      const lastDateRes = await fetch(`${API_BASE}/api/iiko/last-data-date`, { credentials: 'include' })
+      const lastDateData = await lastDateRes.json()
+      const dateWithData = lastDateData.date || '2024-12-15'
+      const timestamp = `${dateWithData}T12:00:00.000`
       
       const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
@@ -155,7 +149,7 @@ export default function PurchasingClient() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ timestamp, from: today, to: today })
+          body: JSON.stringify({ timestamp, from: dateWithData, to: dateWithData })
         }),
         fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
       ])

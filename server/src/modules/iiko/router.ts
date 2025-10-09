@@ -1904,6 +1904,41 @@ export function createIikoRouter() {
   })
 
 
+  // GET /iiko/last-data-date - получить последнюю дату с данными
+  router.get('/last-data-date', async (req, res) => {
+    try {
+      const prisma = (req as any).prisma || req.app.get('prisma')
+      if (!prisma || !prisma.iikoReceipt) {
+        return res.json({ date: '2024-12-15' }) // fallback
+      }
+      
+      const lastReceipt = await prisma.iikoReceipt.findFirst({
+        where: {
+          AND: [
+            { OR: [{ isDeleted: false }, { isDeleted: null }] },
+            { OR: [{ isReturn: false }, { isReturn: null }] }
+          ]
+        },
+        orderBy: { date: 'desc' },
+        select: { date: true }
+      })
+      
+      if (!lastReceipt) {
+        return res.json({ date: '2024-12-15' }) // fallback
+      }
+      
+      const date = new Date(lastReceipt.date)
+      const y = date.getUTCFullYear()
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(date.getUTCDate()).padStart(2, '0')
+      
+      res.json({ date: `${y}-${m}-${d}` })
+    } catch (e: any) {
+      console.error('Error getting last data date:', e)
+      res.json({ date: '2024-12-15' }) // fallback
+    }
+  })
+
   // POST /iiko/stores/balances-table { timestamp: 'YYYY-MM-DDTHH:mm:ss.SSS', from: 'YYYY-MM-DD', to: 'YYYY-MM-DD', category?: string, dishId?: string }
   // Возвращает готовую таблицу с объединенными данными: остатки + расход
   router.post('/stores/balances-table', async (req, res) => {
