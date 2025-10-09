@@ -134,25 +134,14 @@ export default function PurchasingClient() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Получаем последнюю дату с данными
-      const lastDateRes = await fetch(`${API_BASE}/api/iiko/last-data-date`, { credentials: 'include' })
-      const lastDateData = await lastDateRes.json()
-      const dateWithData = lastDateData.date || '2024-12-15'
-      const timestamp = `${dateWithData}T12:00:00.000`
-      
-      console.log('[PurchasingClient] Loading ingredients with:', { timestamp, dateWithData })
+      console.log('[PurchasingClient] Loading data...')
       
       const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/iiko/stores/balances-table`, { 
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ timestamp, from: dateWithData, to: dateWithData })
-        }),
+        fetch(`${API_BASE}/api/iiko/entities/products`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
       ])
       
@@ -180,33 +169,22 @@ export default function PurchasingClient() {
 
       if (ingredientsRes.ok) {
         const data = await ingredientsRes.json()
-        console.log('[PurchasingClient] Ingredients data:', data)
-        const rows = data.rows || []
-        console.log('[PurchasingClient] First 3 rows:', rows.slice(0, 3))
+        console.log('[PurchasingClient] Products from iiko:', data.items?.length || 0)
         
-        // Группируем по product (productId) и суммируем amount (остаток)
-        const productsMap = new Map()
-        for (const row of rows) {
-          const productId = row.product
-          if (!productsMap.has(productId)) {
-            productsMap.set(productId, {
-              productId: productId,
-              productName: row.productName || 'Unknown',
-              totalStock: 0
-            })
-          }
-          const product = productsMap.get(productId)
-          product.totalStock += Number(row.amount) || 0
-        }
-        
-        const ingredients = Array.from(productsMap.values()).sort((a, b) => 
-          a.productName.localeCompare(b.productName)
-        )
+        const items = data.items || []
+        const ingredients = items
+          .filter((item: any) => item.id && item.name) // Только с ID и названием
+          .map((item: any) => ({
+            productId: item.id,
+            productName: item.name,
+            totalStock: 0 // Остатки загрузятся отдельно если нужно
+          }))
+          .sort((a, b) => a.productName.localeCompare(b.productName))
         
         console.log('[PurchasingClient] Processed ingredients:', ingredients.length, 'items')
         setIngredients(ingredients)
       } else {
-        const errorData = await ingredientsRes.json()
+        const errorData = await ingredientsRes.json().catch(() => ({ error: 'Unknown error' }))
         console.error('[PurchasingClient] Ingredients error:', errorData)
       }
 
