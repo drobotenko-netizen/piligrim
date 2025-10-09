@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { getTenant } from '../../utils/tenant'
 import { requirePermission } from '../../utils/auth'
+import { IikoClient } from '../iiko/client'
 
 export function createPurchasingRouter(prisma: PrismaClient) {
   const router = Router()
@@ -438,8 +439,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
       const tenantId = tenant.id
       const { storeIds, productIds } = req.body
 
-      const { createIikoClient } = await import('../iiko/client')
-      const client = createIikoClient()
+      const client = new IikoClient()
       
       // Получаем остатки из iiko
       const response = await client.getStoresBalances()
@@ -562,9 +562,8 @@ async function calculateWeeklyConsumption(prisma: PrismaClient, productId: strin
       filters
     }
 
-    // Используем существующий iiko клиент
-    const { createIikoClient } = await import('../iiko/client')
-    const client = createIikoClient()
+    // Используем iiko клиент
+    const client = new IikoClient()
     const response = await client.postOlap(body)
     
     const rows = Array.isArray(response?.data) ? response.data : []
@@ -615,8 +614,7 @@ async function getCurrentStock(prisma: PrismaClient, productId: string, storeId:
     }
 
     // Получаем актуальные данные из iiko
-    const { createIikoClient } = await import('../iiko/client')
-    const client = createIikoClient()
+    const client = new IikoClient()
     
     // Запрос остатков из iiko
     const response = await client.getStoresBalances()
