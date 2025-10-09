@@ -174,14 +174,14 @@ export default function PurchasingClient() {
         
         const items = data.items || []
         
-        // Фильтруем - исключаем блюда, оставляем только ингредиенты и заготовки
+        // Фильтруем - оставляем только ингредиенты (товары)
         // type может быть: DISH, GOODS, PREPARED (заготовка), MODIFIER
         const ingredients = items
           .filter((item: any) => {
             if (!item.id || !item.name) return false
             const type = String(item.type || '').toUpperCase()
-            // Исключаем блюда и модификаторы - нужны только товары и заготовки
-            return type !== 'DISH' && type !== 'MODIFIER'
+            // Оставляем только GOODS (товары/ингредиенты)
+            return type === 'GOODS'
           })
           .map((item: any) => ({
             productId: item.id,
