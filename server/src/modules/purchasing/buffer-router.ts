@@ -48,7 +48,7 @@ export function createBufferRouter(prisma: PrismaClient) {
       const body = {
         reportType: 'TRANSACTIONS',
         buildSummary: false,
-        groupByRowFields: ['Product.Id', 'DateTime.Typed'],
+        groupByRowFields: ['Product.Id', 'DateTime.Typed', 'Document.Type'],
         groupByColFields: [],
         aggregateFields: ['Amount'],
         filters: {
@@ -73,10 +73,12 @@ export function createBufferRouter(prisma: PrismaClient) {
       for (const row of consumption.data || []) {
         const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
         const amount = Number(row.Amount) || 0
+        const docType = row['Document.Type'] || 'unknown'
         
         // Пропускаем положительные значения (приход на склад)
-        // Нас интересует только расход (отрицательные значения)
+        // Пропускаем инвентаризации и другие корректировки
         if (amount >= 0) continue
+        if (docType === 'INVENTORY' || docType === 'CORRECTION') continue
         
         if (!dailyConsumption[dateKey]) {
           dailyConsumption[dateKey] = 0
@@ -160,10 +162,11 @@ export function createBufferRouter(prisma: PrismaClient) {
       const startDate = new Date(now)
       startDate.setDate(startDate.getDate() - analysisWindowDays)
 
+      // Добавляем группировку по Document.Type для отладки
       const body = {
         reportType: 'TRANSACTIONS',
         buildSummary: false,
-        groupByRowFields: ['Product.Id', 'DateTime.Typed'],
+        groupByRowFields: ['Product.Id', 'DateTime.Typed', 'Document.Type'],
         groupByColFields: [],
         aggregateFields: ['Amount'],
         filters: {
@@ -181,14 +184,21 @@ export function createBufferRouter(prisma: PrismaClient) {
       // Группируем расход по продуктам и дням
       const consumptionByProduct: { [productId: string]: { [date: string]: number } } = {}
 
+      // Собираем статистику по типам документов для отладки
+      const docTypes = new Set<string>()
+      
       for (const row of consumption.data || []) {
         const productId = row['Product.Id']
         const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
         const amount = Number(row.Amount) || 0
+        const docType = row['Document.Type'] || 'unknown'
+        
+        docTypes.add(docType)
         
         // Пропускаем положительные значения (приход на склад)
-        // Нас интересует только расход (отрицательные значения)
+        // Пропускаем инвентаризации и другие корректировки
         if (amount >= 0) continue
+        if (docType === 'INVENTORY' || docType === 'CORRECTION') continue
         
         if (!consumptionByProduct[productId]) {
           consumptionByProduct[productId] = {}
@@ -199,6 +209,8 @@ export function createBufferRouter(prisma: PrismaClient) {
         // Сохраняем абсолютное значение расхода
         consumptionByProduct[productId][dateKey] += Math.abs(amount)
       }
+      
+      console.log(`[buffer-recalculate] Document types found:`, Array.from(docTypes))
 
       let updated = 0
       let created = 0
