@@ -61,6 +61,10 @@ export function createBufferRouter(prisma: PrismaClient) {
           'Product.Id': {
             filterType: 'IncludeValues',
             values: [productId]
+          },
+          'TransactionType': {
+            filterType: 'IncludeValues',
+            values: ['SALES_REVENUE', 'SESSION_WRITEOFF', 'WRITEOFF']
           }
         }
       }
@@ -160,8 +164,7 @@ export function createBufferRouter(prisma: PrismaClient) {
       const startDate = new Date(now)
       startDate.setDate(startDate.getDate() - analysisWindowDays)
 
-      // Без группировки по типу документа (поле не найдено)
-      // Будем фильтровать только по знаку Amount
+      // Фильтруем только транзакции по техкартам (расход от продаж)
       const body = {
         reportType: 'TRANSACTIONS',
         buildSummary: false,
@@ -174,6 +177,10 @@ export function createBufferRouter(prisma: PrismaClient) {
             periodType: 'CUSTOM',
             from: toIikoDateTime(startDate),
             to: toIikoDateTime(now)
+          },
+          'TransactionType': {
+            filterType: 'IncludeValues',
+            values: ['SALES_REVENUE', 'SESSION_WRITEOFF', 'WRITEOFF']
           }
         }
       }
