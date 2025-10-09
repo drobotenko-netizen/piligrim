@@ -90,10 +90,10 @@ export default function BufferChartDialog({ open, onOpenChange, productId, produ
               <h4 className="font-semibold mb-2">Как читать график:</h4>
               <ul className="text-sm text-gray-700 space-y-1">
                 <li>• <span className="text-green-600 font-medium">Зеленый</span> — расход по техкартам (продажи)</li>
-                <li>• <span className="text-cyan-600 font-medium">Голубой</span> — списание по смене</li>
-                <li>• <span className="text-purple-600 font-medium">Фиолетовый</span> — другие списания</li>
-                <li>• <span className="text-orange-600 font-medium">Оранжевая линия</span> — скользящая сумма за окно закупа ({data.purchaseWindowDays} дней)</li>
-                <li>• Буфер = максимальное значение оранжевой линии ({data.maxWindowSum?.toFixed(1)} кг)</li>
+                <li>• <span className="text-orange-600 font-medium">Оранжевый</span> — списание по смене</li>
+                <li>• <span className="text-yellow-600 font-medium">Желтый</span> — другие списания</li>
+                <li>• <span className="text-red-600 font-medium">Красная линия</span> — скользящая сумма за окно закупа ({data.purchaseWindowDays} дней)</li>
+                <li>• Буфер = максимальное значение красной линии ({data.maxWindowSum?.toFixed(1)} кг)</li>
               </ul>
             </div>
 
@@ -111,12 +111,12 @@ export default function BufferChartDialog({ open, onOpenChange, productId, produ
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="salesRevenue" stackId="a" fill="#10b981" name="Техкарты (продажи)" />
-                  <Bar dataKey="sessionWriteoff" stackId="a" fill="#06b6d4" name="Списание по смене" />
-                  <Bar dataKey="writeoff" stackId="a" fill="#8b5cf6" name="Другие списания" />
+                  <Bar dataKey="sessionWriteoff" stackId="a" fill="#f97316" name="Списание по смене" />
+                  <Bar dataKey="writeoff" stackId="a" fill="#eab308" name="Другие списания" />
                   <Line 
                     type="monotone" 
                     dataKey="windowSum" 
-                    stroke="#f97316" 
+                    stroke="#dc2626" 
                     strokeWidth={2}
                     name={`Скользящая сумма (${data.purchaseWindowDays} дней)`}
                     dot={{ r: 3 }}
