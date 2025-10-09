@@ -72,10 +72,17 @@ export function createBufferRouter(prisma: PrismaClient) {
       
       for (const row of consumption.data || []) {
         const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
+        const amount = Number(row.Amount) || 0
+        
+        // Пропускаем положительные значения (приход на склад)
+        // Нас интересует только расход (отрицательные значения)
+        if (amount >= 0) continue
+        
         if (!dailyConsumption[dateKey]) {
           dailyConsumption[dateKey] = 0
         }
-        dailyConsumption[dateKey] += Number(row.Amount) || 0
+        // Сохраняем абсолютное значение расхода
+        dailyConsumption[dateKey] += Math.abs(amount)
       }
 
       // Создаем массив дней с расходом (включая дни с нулевым расходом)
@@ -177,6 +184,11 @@ export function createBufferRouter(prisma: PrismaClient) {
       for (const row of consumption.data || []) {
         const productId = row['Product.Id']
         const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
+        const amount = Number(row.Amount) || 0
+        
+        // Пропускаем положительные значения (приход на склад)
+        // Нас интересует только расход (отрицательные значения)
+        if (amount >= 0) continue
         
         if (!consumptionByProduct[productId]) {
           consumptionByProduct[productId] = {}
@@ -184,7 +196,8 @@ export function createBufferRouter(prisma: PrismaClient) {
         if (!consumptionByProduct[productId][dateKey]) {
           consumptionByProduct[productId][dateKey] = 0
         }
-        consumptionByProduct[productId][dateKey] += Number(row.Amount) || 0
+        // Сохраняем абсолютное значение расхода
+        consumptionByProduct[productId][dateKey] += Math.abs(amount)
       }
 
       let updated = 0
