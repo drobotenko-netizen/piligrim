@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client'
 import { getTenant } from '../../utils/tenant'
 import { requirePermission } from '../../utils/auth'
 import { IikoClient } from '../iiko/client'
+import { createPurchasingSettingsRouter } from './settings-router'
+import { createBufferRouter } from './buffer-router'
 
 // Функция для конвертации даты в формат iiko
 function toIikoDateTime(date: Date): string {
@@ -536,6 +538,10 @@ export function createPurchasingRouter(prisma: PrismaClient) {
       res.status(500).json({ error: String(e?.message || e) })
     }
   })
+
+  // Подключаем роутер настроек и буферов
+  router.use('/settings', createPurchasingSettingsRouter(prisma))
+  router.use('/buffers-calc', createBufferRouter(prisma))
 
   return router
 }

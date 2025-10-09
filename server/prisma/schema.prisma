@@ -43,6 +43,7 @@ model Tenant {
   productStocks ProductStock[]
   orderSchedules OrderSchedule[]
   supplierOrders SupplierOrder[]
+  purchasingSettings PurchasingSettings?
 }
 
 model Position {
@@ -707,22 +708,35 @@ model ProductSupplier {
   @@index([isPrimary, priority])
 }
 
+// Настройки системы закупок
+model PurchasingSettings {
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  purchaseWindowDays    Int      @default(3) // Окно закупа (дней между заказами)
+  analysisWindowDays    Int      @default(30) // Срок анализа окна закупа (за сколько дней анализируем)
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
 // Буферные запасы продуктов
 model ProductBuffer {
-  id          String   @id @default(cuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  productId   String   // ID продукта из iiko (dishId)
-  productName String   // Название продукта для отображения
-  bufferDays  Int      @default(7) // На сколько дней буфер
-  minBuffer   Float    @default(0) // Минимальный буфер в единицах
-  maxBuffer   Float?   // Максимальный буфер в единицах
-  isActive    Boolean  @default(true)
-  notes       String?
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  productId         String   // ID продукта из iiko (dishId)
+  productName       String   // Название продукта для отображения
+  autoBuffer        Float    @default(0) // Автоматически рассчитанный буфер
+  manualBuffer      Float?   // Ручная корректировка буфера (если null - используется autoBuffer)
+  unit              String   @default("кг") // Единица измерения
+  isActive          Boolean  @default(true)
+  notes             String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([productId])
   @@index([productId])

@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Calculator, Package, Users, Calendar, BarChart3, Plus, Edit, Trash2, ShoppingCart } from 'lucide-react'
+import { Calculator, Package, Users, Calendar, BarChart3, Plus, Edit, Trash2, ShoppingCart, RefreshCw } from 'lucide-react'
 import { getApiBase } from '@/lib/api'
+import BufferChartDialog from './BufferChartDialog'
 
 interface OrderCalculation {
   productId: string
@@ -129,6 +130,10 @@ export default function PurchasingClient() {
   // Множественный выбор ингредиентов
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set())
   const [showBulkSuppliersDialog, setShowBulkSuppliersDialog] = useState(false)
+  
+  // Модальное окно с графиком буфера
+  const [showBufferChart, setShowBufferChart] = useState(false)
+  const [selectedBufferProduct, setSelectedBufferProduct] = useState<{ id: string; name: string } | null>(null)
 
   const API_BASE = getApiBase()
 
@@ -144,7 +149,7 @@ export default function PurchasingClient() {
       
       const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/purchasing/buffers-calc`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/iiko/entities/products`, { credentials: 'include' }),
@@ -820,14 +825,40 @@ export default function PurchasingClient() {
           <CardHeader>
             <CardTitle>Буферные запасы</CardTitle>
             <CardDescription>
-              Управление буферными запасами для каждого продукта
+              Автоматический расчет буферов на основе статистики расхода
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center mb-4">
-              <Button onClick={addBuffer}>
-                <Plus className="h-4 w-4 mr-2" />
-                Добавить буфер
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Button
+                onClick={async () => {
+                  if (!confirm('Пересчитать буферы для всех ингредиентов? Это может занять несколько минут.')) return
+                  
+                  setLoading(true)
+                  try {
+                    const res = await fetch(`${API_BASE}/api/purchasing/buffers-calc/recalculate-all`, {
+                      method: 'POST',
+                      credentials: 'include'
+                    })
+                    
+                    if (res.ok) {
+                      const data = await res.json()
+                      alert(data.message)
+                      loadData()
+                    } else {
+                      alert('Ошибка при пересчете буферов')
+                    }
+                  } catch (error) {
+                    console.error('Error recalculating buffers:', error)
+                    alert('Ошибка при пересчете буферов')
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+                disabled={loading}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {loading ? 'Пересчет...' : 'Пересчитать буферы'}
               </Button>
             </div>
 
@@ -835,10 +866,10 @@ export default function PurchasingClient() {
               <THead>
                 <TR>
                   <TH>Продукт</TH>
-                  <TH>Дни буфера</TH>
-                  <TH>Мин. буфер</TH>
-                  <TH>Макс. буфер</TH>
-                  <TH>Статус</TH>
+                  <TH>Авто-буфер</TH>
+                  <TH>Ручная корректировка</TH>
+                  <TH>Итоговый буфер</TH>
+                  <TH>Единицы</TH>
                   <TH>Действия</TH>
                 </TR>
               </THead>
@@ -846,21 +877,54 @@ export default function PurchasingClient() {
                 {buffers.map((buffer) => (
                   <TR key={buffer.id}>
                     <TD className="font-medium">{buffer.productName}</TD>
-                    <TD>{buffer.bufferDays} дней</TD>
-                    <TD>{buffer.minBuffer}</TD>
-                    <TD>{buffer.maxBuffer || '—'}</TD>
+                    <TD>{buffer.autoBuffer.toFixed(1)}</TD>
                     <TD>
-                      <Badge variant={buffer.isActive ? 'default' : 'secondary'}>
-                        {buffer.isActive ? 'Активен' : 'Неактивен'}
-                      </Badge>
+                      {buffer.manualBuffer !== null && buffer.manualBuffer !== undefined 
+                        ? buffer.manualBuffer.toFixed(1) 
+                        : '—'}
                     </TD>
+                    <TD className="font-semibold">
+                      {(buffer.manualBuffer !== null && buffer.manualBuffer !== undefined 
+                        ? buffer.manualBuffer 
+                        : buffer.autoBuffer).toFixed(1)}
+                    </TD>
+                    <TD>{buffer.unit}</TD>
                     <TD>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => editBuffer(buffer)}>
-                          <Edit className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedBufferProduct({ id: buffer.productId, name: buffer.productName })
+                            setShowBufferChart(true)
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => deleteBuffer(buffer.id)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => {
+                            const newValue = prompt(
+                              `Ручная корректировка буфера для "${buffer.productName}".\nАвто-буфер: ${buffer.autoBuffer.toFixed(1)} ${buffer.unit}\nВведите новое значение (или оставьте пустым для использования авто-буфера):`,
+                              buffer.manualBuffer?.toString() || ''
+                            )
+                            
+                            if (newValue === null) return
+                            
+                            const manualBuffer = newValue.trim() === '' ? null : parseFloat(newValue)
+                            
+                            fetch(`${API_BASE}/api/purchasing/buffers-calc/${buffer.id}`, {
+                              method: 'PATCH',
+                              credentials: 'include',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ manualBuffer })
+                            }).then(() => {
+                              loadData()
+                            })
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
                       </div>
                     </TD>
@@ -868,6 +932,12 @@ export default function PurchasingClient() {
                 ))}
               </TBody>
             </Table>
+
+            {buffers.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                Нет данных о буферах. Нажмите "Пересчитать буферы" для автоматического расчета.
+              </div>
+            )}
           </CardContent>
         </Card>
       </TabsContent>
@@ -1424,6 +1494,16 @@ export default function PurchasingClient() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Модальное окно с графиком буфера */}
+    {selectedBufferProduct && (
+      <BufferChartDialog
+        open={showBufferChart}
+        onOpenChange={setShowBufferChart}
+        productId={selectedBufferProduct.id}
+        productName={selectedBufferProduct.name}
+      />
+    )}
     </>
   )
 }
