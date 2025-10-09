@@ -339,6 +339,124 @@ export default function PurchasingClient() {
     }
   }
 
+  // Сохранение буфера
+  const saveBuffer = async () => {
+    const productName = (document.getElementById('productName') as HTMLInputElement)?.value
+    const bufferDays = parseInt((document.getElementById('bufferDays') as HTMLInputElement)?.value || '7')
+    const minBuffer = parseFloat((document.getElementById('minBuffer') as HTMLInputElement)?.value || '0')
+    const maxBuffer = parseFloat((document.getElementById('maxBuffer') as HTMLInputElement)?.value || '0') || null
+    const productId = (document.getElementById('productId') as HTMLInputElement)?.value || `prod_${Date.now()}`
+
+    if (!productName) {
+      alert('Укажите название продукта')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const url = editingBuffer 
+        ? `${API_BASE}/api/purchasing/buffers/${editingBuffer.id}`
+        : `${API_BASE}/api/purchasing/buffers`
+      
+      const method = editingBuffer ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          productName,
+          bufferDays,
+          minBuffer,
+          maxBuffer,
+          isActive: true
+        })
+      })
+
+      if (response.ok) {
+        setShowBufferForm(false)
+        setEditingBuffer(null)
+        // Перезагружаем данные
+        const buffersRes = await fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' })
+        if (buffersRes.ok) {
+          const data = await buffersRes.json()
+          setBuffers(data.buffers || [])
+        }
+      } else {
+        const error = await response.json()
+        alert(`Ошибка: ${error.error || 'Не удалось сохранить'}`)
+      }
+    } catch (error) {
+      console.error('Error saving buffer:', error)
+      alert('Ошибка при сохранении')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Сохранение поставщика
+  const saveSupplier = async () => {
+    const productName = (document.getElementById('supplierProductName') as HTMLInputElement)?.value
+    const supplierName = (document.getElementById('supplierName') as HTMLInputElement)?.value
+    const deliveryDays = parseInt((document.getElementById('deliveryDays') as HTMLInputElement)?.value || '1')
+    const price = parseInt((document.getElementById('price') as HTMLInputElement)?.value || '0') || null
+    const productId = (document.getElementById('supplierProductId') as HTMLInputElement)?.value || `prod_${Date.now()}`
+    const supplierId = (document.getElementById('supplierIdInput') as HTMLInputElement)?.value || `supp_${Date.now()}`
+    const isPrimary = (document.getElementById('isPrimary') as HTMLInputElement)?.checked || false
+    const priority = parseInt((document.getElementById('priority') as HTMLInputElement)?.value || '1')
+
+    if (!productName || !supplierName) {
+      alert('Укажите название продукта и поставщика')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const url = editingSupplier 
+        ? `${API_BASE}/api/purchasing/product-suppliers/${editingSupplier.id}`
+        : `${API_BASE}/api/purchasing/product-suppliers`
+      
+      const method = editingSupplier ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          productName,
+          supplierId,
+          isPrimary,
+          priority,
+          deliveryDays,
+          price,
+          unit: 'кг',
+          isActive: true
+        })
+      })
+
+      if (response.ok) {
+        setShowSupplierForm(false)
+        setEditingSupplier(null)
+        // Перезагружаем данные
+        const suppliersRes = await fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' })
+        if (suppliersRes.ok) {
+          const data = await suppliersRes.json()
+          setProductSuppliers(data.productSuppliers || [])
+        }
+      } else {
+        const error = await response.json()
+        alert(`Ошибка: ${error.error || 'Не удалось сохранить'}`)
+      }
+    } catch (error) {
+      console.error('Error saving supplier:', error)
+      alert('Ошибка при сохранении')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <>
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -722,6 +840,7 @@ export default function PurchasingClient() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <input type="hidden" id="productId" defaultValue={editingBuffer?.productId || ''} />
           <div>
             <Label htmlFor="productName">Название продукта</Label>
             <Input 
@@ -761,14 +880,11 @@ export default function PurchasingClient() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setShowBufferForm(false)}>
+          <Button variant="outline" onClick={() => setShowBufferForm(false)} disabled={loading}>
             Отмена
           </Button>
-          <Button onClick={() => {
-            // TODO: Реализовать сохранение
-            setShowBufferForm(false)
-          }}>
-            {editingBuffer ? 'Сохранить' : 'Создать'}
+          <Button onClick={saveBuffer} disabled={loading}>
+            {loading ? 'Сохранение...' : (editingBuffer ? 'Сохранить' : 'Создать')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -786,6 +902,8 @@ export default function PurchasingClient() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <input type="hidden" id="supplierProductId" defaultValue={editingSupplier?.productId || ''} />
+          <input type="hidden" id="supplierIdInput" defaultValue={editingSupplier?.supplierId || ''} />
           <div>
             <Label htmlFor="supplierProductName">Название продукта</Label>
             <Input 
@@ -800,6 +918,24 @@ export default function PurchasingClient() {
               id="supplierName" 
               placeholder="Введите название поставщика"
               defaultValue={editingSupplier?.supplier.name || ''}
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <input 
+              type="checkbox" 
+              id="isPrimary" 
+              defaultChecked={editingSupplier?.isPrimary || false}
+              className="w-4 h-4"
+            />
+            <Label htmlFor="isPrimary">Основной поставщик</Label>
+          </div>
+          <div>
+            <Label htmlFor="priority">Приоритет (для запасных)</Label>
+            <Input 
+              id="priority" 
+              type="number" 
+              placeholder="1"
+              defaultValue={editingSupplier?.priority || 1}
             />
           </div>
           <div>
@@ -822,14 +958,11 @@ export default function PurchasingClient() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setShowSupplierForm(false)}>
+          <Button variant="outline" onClick={() => setShowSupplierForm(false)} disabled={loading}>
             Отмена
           </Button>
-          <Button onClick={() => {
-            // TODO: Реализовать сохранение
-            setShowSupplierForm(false)
-          }}>
-            {editingSupplier ? 'Сохранить' : 'Создать'}
+          <Button onClick={saveSupplier} disabled={loading}>
+            {loading ? 'Сохранение...' : (editingSupplier ? 'Сохранить' : 'Создать')}
           </Button>
         </DialogFooter>
       </DialogContent>
