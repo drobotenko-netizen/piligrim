@@ -444,40 +444,6 @@ export function createPurchasingRouter(prisma: PrismaClient) {
 
   // ===== Синхронизация с iiko =====
 
-  // GET /api/purchasing/ingredients - Получить список ингредиентов из iiko
-  router.get('/ingredients', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
-    try {
-      const client = new IikoClient()
-      const timestamp = toIikoDateTime(new Date())
-      
-      // Получаем остатки из iiko для получения списка всех продуктов
-      const balances = await client.getStoreBalances({ timestampIso: timestamp })
-      
-      // Группируем по productId чтобы избежать дубликатов
-      const productsMap = new Map()
-      for (const balance of balances) {
-        if (!productsMap.has(balance.productId)) {
-          productsMap.set(balance.productId, {
-            productId: balance.productId,
-            productName: balance.productName || 'Unknown',
-            totalStock: 0
-          })
-        }
-        const product = productsMap.get(balance.productId)
-        product.totalStock += Number(balance.balance) || 0
-      }
-      
-      const ingredients = Array.from(productsMap.values()).sort((a, b) => 
-        a.productName.localeCompare(b.productName)
-      )
-      
-      res.json({ ingredients })
-    } catch (e: any) {
-      console.error('Error fetching ingredients:', e)
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
-
   // POST /api/purchasing/sync-stocks - Синхронизация остатков с iiko
   router.post('/sync-stocks', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {

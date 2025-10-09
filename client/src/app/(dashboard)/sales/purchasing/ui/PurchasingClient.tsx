@@ -134,12 +134,23 @@ export default function PurchasingClient() {
   const loadData = async () => {
     setLoading(true)
     try {
+      // Формируем timestamp для iiko в формате yyyy-MM-ddTHH:mm:ss.SSS
+      const now = new Date()
+      const y = now.getUTCFullYear()
+      const m = String(now.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(now.getUTCDate()).padStart(2, '0')
+      const hh = String(now.getUTCHours()).padStart(2, '0')
+      const mm = String(now.getUTCMinutes()).padStart(2, '0')
+      const ss = String(now.getUTCSeconds()).padStart(2, '0')
+      const ms = String(now.getUTCMilliseconds()).padStart(3, '0')
+      const timestamp = `${y}-${m}-${d}T${hh}:${mm}:${ss}.${ms}`
+      
       const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/purchasing/ingredients`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/iiko/stores/balances?timestamp=${encodeURIComponent(timestamp)}`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
       ])
 
@@ -165,7 +176,27 @@ export default function PurchasingClient() {
 
       if (ingredientsRes.ok) {
         const data = await ingredientsRes.json()
-        setIngredients(data.ingredients || [])
+        const rows = data.rows || []
+        
+        // Группируем по productId чтобы избежать дубликатов и суммируем остатки
+        const productsMap = new Map()
+        for (const balance of rows) {
+          if (!productsMap.has(balance.productId)) {
+            productsMap.set(balance.productId, {
+              productId: balance.productId,
+              productName: balance.productName || 'Unknown',
+              totalStock: 0
+            })
+          }
+          const product = productsMap.get(balance.productId)
+          product.totalStock += Number(balance.balance) || 0
+        }
+        
+        const ingredients = Array.from(productsMap.values()).sort((a, b) => 
+          a.productName.localeCompare(b.productName)
+        )
+        
+        setIngredients(ingredients)
       }
 
       if (counterpartiesRes.ok) {
