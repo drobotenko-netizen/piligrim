@@ -134,7 +134,7 @@ export default function PurchasingClient() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Формируем timestamp для iiko в формате yyyy-MM-ddTHH:mm:ss.SSS
+      // Формируем timestamp и даты для iiko
       const now = new Date()
       const y = now.getUTCFullYear()
       const m = String(now.getUTCMonth() + 1).padStart(2, '0')
@@ -144,13 +144,19 @@ export default function PurchasingClient() {
       const ss = String(now.getUTCSeconds()).padStart(2, '0')
       const ms = String(now.getUTCMilliseconds()).padStart(3, '0')
       const timestamp = `${y}-${m}-${d}T${hh}:${mm}:${ss}.${ms}`
+      const today = `${y}-${m}-${d}`
       
       const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/iiko/stores/balances?timestamp=${encodeURIComponent(timestamp)}`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/iiko/stores/balances-table`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ timestamp, from: today, to: today })
+        }),
         fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
       ])
 
@@ -178,18 +184,19 @@ export default function PurchasingClient() {
         const data = await ingredientsRes.json()
         const rows = data.rows || []
         
-        // Группируем по productId чтобы избежать дубликатов и суммируем остатки
+        // Группируем по product (productId) и суммируем amount (остаток)
         const productsMap = new Map()
-        for (const balance of rows) {
-          if (!productsMap.has(balance.productId)) {
-            productsMap.set(balance.productId, {
-              productId: balance.productId,
-              productName: balance.productName || 'Unknown',
+        for (const row of rows) {
+          const productId = row.product
+          if (!productsMap.has(productId)) {
+            productsMap.set(productId, {
+              productId: productId,
+              productName: row.productName || 'Unknown',
               totalStock: 0
             })
           }
-          const product = productsMap.get(balance.productId)
-          product.totalStock += Number(balance.balance) || 0
+          const product = productsMap.get(productId)
+          product.totalStock += Number(row.amount) || 0
         }
         
         const ingredients = Array.from(productsMap.values()).sort((a, b) => 
