@@ -340,6 +340,7 @@ export default function PurchasingClient() {
   }
 
   return (
+    <>
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <TabsList className="grid w-full grid-cols-6">
         <TabsTrigger value="calculate" className="flex items-center gap-2">
@@ -833,5 +834,6 @@ export default function PurchasingClient() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   )
 }
