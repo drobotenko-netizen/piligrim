@@ -89,7 +89,7 @@ jobs:
             # Run new containers with correct names and network
             sudo docker run -d --name api --network infra_default --restart unless-stopped \
               -e PORT=4000 -e NODE_ENV=production -e DATABASE_URL=file:/data/dev.db \
-              -v infra_api_data:/data \
+              -v piligrim_api_data:/data \
               --env-file /srv/piligrim/app/server/.env \
               $IMAGE_API
 
