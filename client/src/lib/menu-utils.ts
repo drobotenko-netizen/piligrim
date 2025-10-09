@@ -29,8 +29,8 @@ export function getMenuVisibility(roles: string[]) {
   
   return {
     visibleSales: true, // Анализ всегда доступен
-    visiblePersonnel: admin || has('HR') || has('OWNER') || has('CASHIER'),
-    visibleFinance: admin || has('FINANCE') || has('OWNER'),
+    visiblePersonnel: admin || has('MANAGER') || has('CASHIER'),
+    visibleFinance: admin || has('ACCOUNTANT'),
     visibleSettings: admin,
     visibleIiko: true, // iiko всегда доступен
     visibleImport: true, // импорт всегда доступен
