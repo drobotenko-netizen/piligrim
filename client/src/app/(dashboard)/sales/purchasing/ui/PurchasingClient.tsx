@@ -124,6 +124,11 @@ export default function PurchasingClient() {
   // Новые состояния для управления поставщиками ингредиента
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
   const [showSuppliersDialog, setShowSuppliersDialog] = useState(false)
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
+  
+  // Множественный выбор ингредиентов
+  const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set())
+  const [showBulkSuppliersDialog, setShowBulkSuppliersDialog] = useState(false)
 
   const API_BASE = getApiBase()
 
@@ -175,25 +180,71 @@ export default function PurchasingClient() {
         const items = data.items || []
         
         // Фильтруем - оставляем только ингредиенты (товары)
-        // type может быть: DISH, GOODS, PREPARED (заготовка), MODIFIER
-        const ingredients = items
-          .filter((item: any) => {
-            if (!item.id || !item.name) return false
-            const type = String(item.type || '').toUpperCase()
-            // Оставляем только GOODS (товары/ингредиенты)
-            return type === 'GOODS'
-          })
-          .map((item: any) => ({
-            productId: item.id,
-            productName: item.name,
-            productType: item.type,
-            totalStock: 0 // Остатки загрузятся отдельно если нужно
-          }))
-          .sort((a, b) => a.productName.localeCompare(b.productName))
+        const goodsItems = items.filter((item: any) => {
+          if (!item.id || !item.name) return false
+          const type = String(item.type || '').toUpperCase()
+          return type === 'GOODS'
+        })
         
-        console.log('[PurchasingClient] Filtered ingredients:', ingredients.length, 'items')
-        console.log('[PurchasingClient] Sample types:', items.slice(0, 10).map((i: any) => i.type))
-        setIngredients(ingredients)
+        console.log('[PurchasingClient] Filtered GOODS:', goodsItems.length, 'items')
+        
+        // Загружаем остатки для этих товаров (используем фиксированную дату с данными)
+        const timestamp = '2024-12-15T12:00:00.000'
+        
+        try {
+          const balancesRes = await fetch(`${API_BASE}/api/iiko/stores/balances?timestamp=${encodeURIComponent(timestamp)}`, {
+            credentials: 'include'
+          })
+          
+          if (balancesRes.ok) {
+            const balancesData = await balancesRes.json()
+            const balances = balancesData.rows || []
+            
+            // Создаем мапу остатков по productId
+            const stockMap = new Map()
+            for (const balance of balances) {
+              const productId = balance.product
+              const currentStock = stockMap.get(productId) || 0
+              stockMap.set(productId, currentStock + (Number(balance.amount) || 0))
+            }
+            
+            // Создаем финальный список с остатками
+            const ingredients = goodsItems
+              .map((item: any) => ({
+                productId: item.id,
+                productName: item.name,
+                productType: item.type,
+                totalStock: stockMap.get(item.id) || 0
+              }))
+              .sort((a, b) => a.productName.localeCompare(b.productName))
+            
+            console.log('[PurchasingClient] Ingredients with stocks:', ingredients.length)
+            setIngredients(ingredients)
+          } else {
+            // Если не удалось загрузить остатки, показываем без них
+            const ingredients = goodsItems
+              .map((item: any) => ({
+                productId: item.id,
+                productName: item.name,
+                productType: item.type,
+                totalStock: 0
+              }))
+              .sort((a, b) => a.productName.localeCompare(b.productName))
+            setIngredients(ingredients)
+          }
+        } catch (e) {
+          console.error('Error loading balances:', e)
+          // Fallback без остатков
+          const ingredients = goodsItems
+            .map((item: any) => ({
+              productId: item.id,
+              productName: item.name,
+              productType: item.type,
+              totalStock: 0
+            }))
+            .sort((a, b) => a.productName.localeCompare(b.productName))
+          setIngredients(ingredients)
+        }
       } else {
         const errorData = await ingredientsRes.json().catch(() => ({ error: 'Unknown error' }))
         console.error('[PurchasingClient] Ingredients error:', errorData)
@@ -630,9 +681,51 @@ export default function PurchasingClient() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {ingredients.length > 0 && (
+              <div className="flex justify-between items-center">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedIngredients.size === ingredients.length) {
+                        setSelectedIngredients(new Set())
+                      } else {
+                        setSelectedIngredients(new Set(ingredients.map(i => i.productId)))
+                      }
+                    }}
+                  >
+                    {selectedIngredients.size === ingredients.length ? 'Снять всё' : 'Выбрать всё'}
+                  </Button>
+                  {selectedIngredients.size > 0 && (
+                    <Button
+                      onClick={() => setShowBulkSuppliersDialog(true)}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Назначить поставщиков ({selectedIngredients.size})
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <Table>
               <THead>
                 <TR>
+                  <TH className="w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedIngredients.size === ingredients.length && ingredients.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIngredients(new Set(ingredients.map(i => i.productId)))
+                        } else {
+                          setSelectedIngredients(new Set())
+                        }
+                      }}
+                      className="w-4 h-4"
+                    />
+                  </TH>
                   <TH>Ингредиент</TH>
                   <TH>Общий остаток</TH>
                   <TH>Поставщики</TH>
@@ -645,9 +738,26 @@ export default function PurchasingClient() {
                     ps => ps.productId === ingredient.productId
                   )
                   const primarySupplier = ingredientSuppliers.find(ps => ps.isPrimary)
+                  const isSelected = selectedIngredients.has(ingredient.productId)
                   
                   return (
-                    <TR key={ingredient.productId}>
+                    <TR key={ingredient.productId} className={isSelected ? 'bg-blue-50' : ''}>
+                      <TD>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSet = new Set(selectedIngredients)
+                            if (e.target.checked) {
+                              newSet.add(ingredient.productId)
+                            } else {
+                              newSet.delete(ingredient.productId)
+                            }
+                            setSelectedIngredients(newSet)
+                          }}
+                          className="w-4 h-4"
+                        />
+                      </TD>
                       <TD className="font-medium">{ingredient.productName}</TD>
                       <TD>{ingredient.totalStock.toFixed(1)}</TD>
                       <TD>
@@ -1103,8 +1213,8 @@ export default function PurchasingClient() {
             <div className="space-y-3">
               <div>
                 <Label htmlFor="newSupplier">Выберите поставщика</Label>
-                <Select>
-                  <SelectTrigger id="newSupplier">
+                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+                  <SelectTrigger>
                     <SelectValue placeholder="Выберите контрагента-поставщика" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1116,33 +1226,16 @@ export default function PurchasingClient() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label htmlFor="newSupplierDeliveryDays">Дни доставки</Label>
-                  <Input 
-                    id="newSupplierDeliveryDays" 
-                    type="number" 
-                    placeholder="1"
-                    defaultValue={1}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="newSupplierPrice">Цена (копейки)</Label>
-                  <Input 
-                    id="newSupplierPrice" 
-                    type="number" 
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="newSupplierPriority">Приоритет</Label>
-                  <Input 
-                    id="newSupplierPriority" 
-                    type="number" 
-                    placeholder="1"
-                    defaultValue={1}
-                  />
-                </div>
+              <div>
+                <Label htmlFor="newSupplierDeliveryDays">Дни доставки</Label>
+                <Input 
+                  id="newSupplierDeliveryDays" 
+                  type="number" 
+                  placeholder="1"
+                  defaultValue={1}
+                  min="1"
+                  max="30"
+                />
               </div>
               <div className="flex items-center space-x-2">
                 <input 
@@ -1156,16 +1249,12 @@ export default function PurchasingClient() {
                 onClick={async () => {
                   if (!selectedIngredient) return
                   
-                  const supplierSelect = document.getElementById('newSupplier') as any
-                  const supplierId = supplierSelect?.value
-                  if (!supplierId) {
+                  if (!selectedSupplierId) {
                     alert('Выберите поставщика')
                     return
                   }
                   
                   const deliveryDays = parseInt((document.getElementById('newSupplierDeliveryDays') as HTMLInputElement)?.value || '1')
-                  const price = parseInt((document.getElementById('newSupplierPrice') as HTMLInputElement)?.value || '0') || null
-                  const priority = parseInt((document.getElementById('newSupplierPriority') as HTMLInputElement)?.value || '1')
                   const isPrimary = (document.getElementById('newSupplierIsPrimary') as HTMLInputElement)?.checked || false
 
                   try {
@@ -1177,19 +1266,20 @@ export default function PurchasingClient() {
                       body: JSON.stringify({
                         productId: selectedIngredient.productId,
                         productName: selectedIngredient.productName,
-                        supplierId,
+                        supplierId: selectedSupplierId,
                         isPrimary,
-                        priority,
+                        priority: 1,
                         deliveryDays,
-                        price,
+                        price: null,
                         unit: 'кг',
                         isActive: true
                       })
                     })
 
                     if (response.ok) {
-                      // Перезагружаем данные
+                      // Перезагружаем данные и очищаем форму
                       await loadData()
+                      setSelectedSupplierId('')
                     } else {
                       const error = await response.json()
                       alert(`Ошибка: ${error.error || 'Не удалось добавить поставщика'}`)
@@ -1213,6 +1303,129 @@ export default function PurchasingClient() {
         <DialogFooter>
           <Button variant="outline" onClick={() => setShowSuppliersDialog(false)}>
             Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Модальное окно для массового назначения поставщиков */}
+    <Dialog open={showBulkSuppliersDialog} onOpenChange={setShowBulkSuppliersDialog}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            Массовое назначение поставщика
+          </DialogTitle>
+          <DialogDescription>
+            Назначить поставщика для {selectedIngredients.size} ингредиентов
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div>
+            <Label>Выберите поставщика</Label>
+            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите контрагента-поставщика" />
+              </SelectTrigger>
+              <SelectContent>
+                {counterparties.map((cp) => (
+                  <SelectItem key={cp.id} value={cp.id}>
+                    {cp.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label htmlFor="bulkDeliveryDays">Дни доставки</Label>
+            <Input 
+              id="bulkDeliveryDays" 
+              type="number" 
+              placeholder="1"
+              defaultValue={1}
+              min="1"
+              max="30"
+            />
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input 
+              type="checkbox" 
+              id="bulkIsPrimary" 
+              className="w-4 h-4"
+              defaultChecked={true}
+            />
+            <Label htmlFor="bulkIsPrimary">Сделать основным поставщиком для всех</Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowBulkSuppliersDialog(false)}>
+            Отмена
+          </Button>
+          <Button 
+            onClick={async () => {
+              if (!selectedSupplierId) {
+                alert('Выберите поставщика')
+                return
+              }
+              
+              const deliveryDays = parseInt((document.getElementById('bulkDeliveryDays') as HTMLInputElement)?.value || '1')
+              const isPrimary = (document.getElementById('bulkIsPrimary') as HTMLInputElement)?.checked || false
+
+              try {
+                setLoading(true)
+                let successCount = 0
+                let errorCount = 0
+                
+                for (const productId of selectedIngredients) {
+                  const ingredient = ingredients.find(i => i.productId === productId)
+                  if (!ingredient) continue
+                  
+                  try {
+                    const response = await fetch(`${API_BASE}/api/purchasing/product-suppliers`, {
+                      method: 'POST',
+                      credentials: 'include',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        productId: ingredient.productId,
+                        productName: ingredient.productName,
+                        supplierId: selectedSupplierId,
+                        isPrimary,
+                        priority: 1,
+                        deliveryDays,
+                        price: null,
+                        unit: 'кг',
+                        isActive: true
+                      })
+                    })
+
+                    if (response.ok) {
+                      successCount++
+                    } else {
+                      errorCount++
+                    }
+                  } catch (error) {
+                    errorCount++
+                  }
+                }
+
+                alert(`Готово! Успешно: ${successCount}, Ошибок: ${errorCount}`)
+                await loadData()
+                setSelectedIngredients(new Set())
+                setSelectedSupplierId('')
+                setShowBulkSuppliersDialog(false)
+              } catch (error) {
+                console.error('Error bulk assigning suppliers:', error)
+                alert('Ошибка при назначении поставщиков')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
+          >
+            {loading ? 'Назначение...' : 'Назначить поставщика'}
           </Button>
         </DialogFooter>
       </DialogContent>
