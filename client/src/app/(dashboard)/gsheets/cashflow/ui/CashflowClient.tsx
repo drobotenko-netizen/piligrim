@@ -1,8 +1,8 @@
 "use client"
 import { useEffect, useMemo, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Button } from '@/components/ui/button'
 import { Paperclip } from 'lucide-react'
+import { api } from '@/lib/api-client'
 
 function ymd(d: Date) {
   const y = d.getFullYear()
@@ -12,7 +12,6 @@ function ymd(d: Date) {
 }
 
 export default function CashflowClient() {
-  const API_BASE = getApiBase()
   const spreadsheetId = '1vEuHUs31i9DVxLebJ9AxHiOYXCJxQR094NhY8u3IPi8'
   const sheet = 'ДДС месяц'
 
@@ -36,11 +35,9 @@ export default function CashflowClient() {
   const [loadingToPayments, setLoadingToPayments] = useState(false)
 
   async function loadMeta() {
-    const u = new URL(`${API_BASE}/api/gsheets/cashflow/meta`)
-    u.searchParams.set('spreadsheetId', spreadsheetId)
-    u.searchParams.set('sheet', sheet)
-    const r = await fetch(u.toString(), { cache: 'no-store', credentials: 'include' })
-    const j = await r.json()
+    const j: any = await api.get('/api/gsheets/cashflow/meta', { 
+      params: { spreadsheetId, sheet } 
+    })
     setMeta(j)
     if (!dateFrom && j?.minDate) setDateFrom(j.minDate.slice(0,10))
     if (!dateTo && j?.maxDate) setDateTo(j.maxDate.slice(0,10))
@@ -49,21 +46,17 @@ export default function CashflowClient() {
   async function load() {
     setLoading(true)
     try {
-      const u = new URL(`${API_BASE}/api/gsheets/cashflow`)
-      u.searchParams.set('spreadsheetId', spreadsheetId)
-      u.searchParams.set('sheet', sheet)
-      if (dateFrom) u.searchParams.set('dateFrom', dateFrom)
-      if (dateTo) u.searchParams.set('dateTo', dateTo)
-      if (wallet) u.searchParams.set('wallet', wallet)
-      if (fund) u.searchParams.set('fund', fund)
-      if (flowType) u.searchParams.set('flowType', flowType)
-      if (search) u.searchParams.set('search', search)
-      if (incompleteTransfer) u.searchParams.set('incompleteTransfer', incompleteTransfer)
-      if (notImported) u.searchParams.set('notImported', notImported)
-      u.searchParams.set('page', String(page))
-      u.searchParams.set('limit', String(limit))
-      const r = await fetch(u.toString(), { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
+      const params: any = { spreadsheetId, sheet, page: String(page), limit: String(limit) }
+      if (dateFrom) params.dateFrom = dateFrom
+      if (dateTo) params.dateTo = dateTo
+      if (wallet) params.wallet = wallet
+      if (fund) params.fund = fund
+      if (flowType) params.flowType = flowType
+      if (search) params.search = search
+      if (incompleteTransfer) params.incompleteTransfer = incompleteTransfer
+      if (notImported) params.notImported = notImported
+      
+      const j: any = await api.get('/api/gsheets/cashflow', { params })
       setRows(Array.isArray(j?.rows) ? j.rows : [])
       setTotal(Number(j?.total || 0))
     } catch {
@@ -78,48 +71,20 @@ export default function CashflowClient() {
     try {
       // Сначала очищаем старые данные
       setImportResult('🗑️ Очистка старых данных...')
-      const clearResponse = await fetch(`${API_BASE}/api/gsheets/cashflow/clear`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          spreadsheetId,
-          gid: '0' // Используем gid=0
-        })
-      })
-      
-      if (!clearResponse.ok) {
-        throw new Error('Ошибка при очистке данных')
-      }
+      await api.post('/api/gsheets/cashflow/clear', { spreadsheetId, gid: '0' })
       
       // Затем импортируем новые данные
       setImportResult('🔄 Импорт новых данных...')
-      const importResponse = await fetch(`${API_BASE}/api/gsheets/cashflow/import`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          spreadsheetId,
-          gid: '0', // Используем gid=0 (лист с 7071 строками)
-          from: 5, // Начинаем с 5 строки (данные начинаются здесь)
-          to: 15000 // Импортируем все 7000+ строк
-        })
+      const result: any = await api.post('/api/gsheets/cashflow/import', {
+        spreadsheetId,
+        gid: '0',
+        from: 5,
+        to: 15000
       })
       
-      const result = await importResponse.json()
-      
-      if (importResponse.ok) {
-        setImportResult(`✅ Обновление завершено! Обработано строк: ${result.processed || 'неизвестно'}`)
-        // Перезагружаем данные после импорта
-        await loadMeta()
-        await load()
-      } else {
-        setImportResult(`❌ Ошибка импорта: ${result.error || 'неизвестная ошибка'}`)
-      }
+      setImportResult(`✅ Обновление завершено! Обработано строк: ${result.processed || 'неизвестно'}`)
+      await loadMeta()
+      await load()
     } catch (error) {
       setImportResult(`❌ Ошибка обновления: ${error}`)
     }
@@ -132,41 +97,15 @@ export default function CashflowClient() {
     try {
       // Сначала удаляем все транзакции
       setImportResult('🗑️ Удаление старых транзакций...')
-      const clearResponse = await fetch(`${API_BASE}/api/transactions/clear`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      })
-      
-      if (!clearResponse.ok) {
-        throw new Error('Ошибка при удалении транзакций')
-      }
+      await api.post('/api/transactions/clear', {})
       
       // Затем загружаем данные из Google Sheets в транзакции
       setImportResult('📊 Загрузка данных в транзакции...')
-      const loadResponse = await fetch(`${API_BASE}/api/transactions/load-from-gsheets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          spreadsheetId,
-          gid: '0'
-        })
-      })
+      const result: any = await api.post('/api/transactions/load-from-gsheets', { spreadsheetId, gid: '0' })
       
-      const result = await loadResponse.json()
-      
-      if (loadResponse.ok) {
-        const transferInfo = result.fullPairs ? `, обработано переводов: ${result.fullPairs}` : ''
-        const incompleteInfo = result.incompletePairs ? `, неполных переводов: ${result.incompletePairs}` : ''
-        setImportResult(`✅ Загрузка завершена! Создано транзакций: ${result.created || 'неизвестно'}${transferInfo}${incompleteInfo}`)
-      } else {
-        setImportResult(`❌ Ошибка загрузки: ${result.error || 'неизвестная ошибка'}`)
-      }
+      const transferInfo = result.fullPairs ? `, обработано переводов: ${result.fullPairs}` : ''
+      const incompleteInfo = result.incompletePairs ? `, неполных переводов: ${result.incompletePairs}` : ''
+      setImportResult(`✅ Загрузка завершена! Создано транзакций: ${result.created || 'неизвестно'}${transferInfo}${incompleteInfo}`)
     } catch (error) {
       setImportResult(`❌ Ошибка загрузки в транзакции: ${error}`)
     }
@@ -179,29 +118,12 @@ export default function CashflowClient() {
     try {
       // Загружаем расходы из Google Sheets в ExpenseDoc + Payment
       setImportResult('📊 Загрузка расходов в платежи...')
-      const loadResponse = await fetch(`${API_BASE}/api/payments/load-from-gsheets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          spreadsheetId,
-          gid: '0'
-        })
-      })
+      const result: any = await api.post('/api/payments/load-from-gsheets', { spreadsheetId, gid: '0' })
       
-      const result = await loadResponse.json()
-      
-      if (loadResponse.ok) {
-        const transferInfo = result.fullPairs ? `\nПолных переводов: ${result.fullPairs}` : ''
-        const incompleteInfo = result.incompletePairs ? `\nНеполных переводов: ${result.incompletePairs}` : ''
-        setImportResult(`✅ Загрузка завершена!\nУдалено платежей: ${result.deletedPayments}\nУдалено документов: ${result.deletedDocs}\nСоздано документов расходов: ${result.createdDocs}\nСоздано платежей: ${result.createdPayments}${transferInfo}${incompleteInfo}\nПропущено: ${result.skipped}`)
-        // Перезагружаем данные для обновления отметок
-        await load()
-      } else {
-        setImportResult(`❌ Ошибка загрузки: ${result.error || 'неизвестная ошибка'}`)
-      }
+      const transferInfo = result.fullPairs ? `\nПолных переводов: ${result.fullPairs}` : ''
+      const incompleteInfo = result.incompletePairs ? `\nНеполных переводов: ${result.incompletePairs}` : ''
+      setImportResult(`✅ Загрузка завершена!\nУдалено платежей: ${result.deletedPayments}\nУдалено документов: ${result.deletedDocs}\nСоздано документов расходов: ${result.createdDocs}\nСоздано платежей: ${result.createdPayments}${transferInfo}${incompleteInfo}\nПропущено: ${result.skipped}`)
+      await load()
     } catch (error) {
       setImportResult(`❌ Ошибка загрузки в платежи: ${error}`)
     }

@@ -1,13 +1,11 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 export default function ShiftsClient() {
   const [shifts, setShifts] = useState<any[]>([])
@@ -29,8 +27,7 @@ export default function ShiftsClient() {
 
   async function loadShifts() {
     try {
-      const res = await fetch(`${API_BASE}/api/shifts`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/shifts')
       console.log('📥 Loaded shifts from API:', data.items?.length || 0)
       setShifts(data.items || [])
     } catch (e) {
@@ -40,8 +37,7 @@ export default function ShiftsClient() {
 
   async function loadReconciliation() {
     try {
-      const res = await fetch(`${API_BASE}/api/reports/shifts-reconciliation`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/reports/shifts-reconciliation')
       setReconciliation(data.items || [])
     } catch (e) {
       console.error(e)
@@ -60,17 +56,10 @@ export default function ShiftsClient() {
       const payload = {
         fromDate: dateFrom,
         toDate: dateTo,
-        mergeByDay: false // Всегда импортируем раздельно
+        mergeByDay: false
       }
       
-      const res = await fetch(`${API_BASE}/api/iiko/import/shifts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      })
-      
-      const data = await res.json()
+      const data: any = await api.post('/api/iiko/import/shifts', payload)
       if (data.ok) {
         alert('Импорт завершён!\n\n' + data.output)
         await loadShifts()

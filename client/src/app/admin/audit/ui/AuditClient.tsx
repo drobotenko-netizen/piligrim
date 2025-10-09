@@ -1,55 +1,44 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useApi } from '@/hooks/use-api'
+import { api } from '@/lib/api-client'
 
 export default function AuditClient({ initialItems }: { initialItems: any[] }) {
-  const API_BASE = getApiBase()
-  const [items, setItems] = useState<any[]>(initialItems)
   const [year, setYear] = useState<string>('all')
   const [month, setMonth] = useState<string>('all')
   const [entity, setEntity] = useState<string>('all')
   const [userId, setUserId] = useState<string>('all')
-  const [users, setUsers] = useState<any[]>([])
   const [employeeId, setEmployeeId] = useState<string>('all')
-  const [employees, setEmployees] = useState<any[]>([])
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({})
 
-  async function reload() {
-    const qs = new URLSearchParams()
-    if (year && year !== 'all') qs.set('year', year)
-    if (month && month !== 'all') qs.set('month', month)
-    if (entity && entity !== 'all') qs.set('entity', entity)
-    if (userId && userId !== 'all') qs.set('userId', userId)
-    if (employeeId && employeeId !== 'all') qs.set('employeeId', employeeId)
-    qs.set('view', 'compact')
-    const suffix = qs.toString() ? `?${qs.toString()}` : ''
-    const r = await fetch(`${API_BASE}/api/admin/audit${suffix}`, { credentials: 'include' })
-    const j = await r.json()
-    setItems(j.items || [])
-  }
+  const { data: usersData } = useApi<{ items: any[] }>('/api/admin/users')
+  const { data: employeesData } = useApi<{ data: any[] }>('/api/employees')
+  
+  const users = usersData?.items || []
+  const employees = employeesData?.data || []
+
+  const params: any = { view: 'compact' }
+  if (year && year !== 'all') params.year = year
+  if (month && month !== 'all') params.month = month
+  if (entity && entity !== 'all') params.entity = entity
+  if (userId && userId !== 'all') params.userId = userId
+  if (employeeId && employeeId !== 'all') params.employeeId = employeeId
+
+  const { data, refetch } = useApi<{ items: any[] }>('/api/admin/audit', { 
+    initialData: { items: initialItems },
+    params 
+  })
+
+  const items = data?.items || []
 
   useEffect(() => {
-    reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    ;(async () => {
-      const [ru, re] = await Promise.all([
-        fetch(`${API_BASE}/api/admin/users`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/employees`, { credentials: 'include' })
-      ])
-      const ju = await ru.json()
-      const je = await re.json()
-      setUsers(ju.items || [])
-      setEmployees(je.data || [])
-    })()
-  }, [])
+    refetch(params)
+  }, [year, month, entity, userId, employeeId])
 
   return (
     <Card>
@@ -104,100 +93,46 @@ export default function AuditClient({ initialItems }: { initialItems: any[] }) {
             </SelectContent>
           </Select>
           <Select value={entity} onValueChange={v => setEntity(v)}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Сущность" /></SelectTrigger>
+            <SelectTrigger className="w-[200px]"><SelectValue placeholder="Сущность" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Все сущности</SelectItem>
-              <SelectItem value="Timesheet">Табель</SelectItem>
-              <SelectItem value="Employee">Сотрудник</SelectItem>
-              <SelectItem value="Adjustment">Корректировка</SelectItem>
-              <SelectItem value="Transaction">Транзакция</SelectItem>
-              <SelectItem value="Account">Счёт</SelectItem>
-              <SelectItem value="Category">Категория</SelectItem>
-              <SelectItem value="Payout">Выплата</SelectItem>
-              <SelectItem value="Counterparty">Контрагент</SelectItem>
-              <SelectItem value="User">Пользователь</SelectItem>
-              <SelectItem value="Role">Роль</SelectItem>
-              <SelectItem value="Permission">Право</SelectItem>
+              <SelectItem value="transaction">Транзакции</SelectItem>
+              <SelectItem value="payment">Платежи</SelectItem>
+              <SelectItem value="employee">Сотрудники</SelectItem>
+              <SelectItem value="shift">Смены</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex gap-2">
-            <Button onClick={reload} className="whitespace-nowrap">Показать</Button>
-            <Button variant="secondary" onClick={() => { setYear('all'); setMonth('all'); setEntity('all'); setUserId('all'); setEmployeeId('all'); reload() }}>Сброс</Button>
-          </div>
+          <Button onClick={() => refetch(params)} size="sm">Обновить</Button>
         </div>
-        <div className="flex-1 overflow-auto min-h-0">
-          <Table className="w-full table-fixed">
+        <div className="flex-1 overflow-auto mt-3">
+          <Table className="w-full">
             <THead className="sticky top-0 bg-card z-10">
               <TR>
-                <TH className="w-[200px] !h-8 px-3">Время</TH>
-                <TH className="w-[180px] !h-8 px-3">Пользователь</TH>
-                <TH className="w-[280px] !h-8 px-3">Действие</TH>
-                <TH className="w-[140px] !h-8 px-3 text-right">Значение</TH>
-                <TH className="w-auto !h-8 px-3">Детали</TH>
+                <TH className="h-8">Дата</TH>
+                <TH className="h-8">Пользователь</TH>
+                <TH className="h-8">Сотрудник</TH>
+                <TH className="h-8">Действие</TH>
+                <TH className="h-8">Сущность</TH>
+                <TH className="h-8">Значения</TH>
               </TR>
             </THead>
             <TBody>
-              {items.map((a: any) => {
-                const userLabel = a.userLabel || a.user?.fullName || a.user?.phone || a.userId || ''
-                const changes: string[] = (a.resolvedChanges || []).map((c: any) => `${c.label}: ${c.from ?? '—'} → ${c.to ?? '—'}`)
-                const actionText = (a.compact?.kind === 'timesheet')
-                  ? `Корректировка табеля ${a.entityDisplay || ''}`.trim()
-                  : (a.humanAction
-                      ? a.humanAction
-                      : `${a.entityLabel}${a.entityDisplay ? `: ${a.entityDisplay}` : ''}`)
-                return (
-                  <TR key={a.id}>
-                    <TD className="w-[200px] !p-2">{new Date(a.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</TD>
-                    <TD className="w-[180px] !p-2">{userLabel}</TD>
-                    <TD className="w-[280px] !p-2">
-                      <div className="text-sm">{actionText}</div>
-                      {a.compact?.kind === 'timesheet' && null}
-                    </TD>
-                    <TD className="w-[140px] !p-2 align-middle text-right">
-                      <div className="text-sm">{a.keyValue || ''}</div>
-                    </TD>
-                    <TD className="w-auto align-top whitespace-normal break-words !p-2">
-                      <div className="text-xs">
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => setOpenIds(s => ({ ...s, [a.id]: !s[a.id] }))}>
-                            {openIds[a.id] ? '−' : '+'}
-                          </Button>
-                          <span className="text-muted-foreground">{a.compact?.kind === 'timesheet' ? `Строк: ${a.compact.days?.length || 0}` : `Строк: ${changes.length}`}</span>
-                        </div>
-                        {openIds[a.id] && (
-                          <div className="mt-2 space-y-1">
-                            {a.compact?.kind === 'timesheet' ? (
-                              <div className="space-y-1">
-                                {a.compact.days?.map((d: any) => {
-                                  const fromHours = (d.fromMinutes ?? 0) / 60
-                                  const toHours = (d.toMinutes ?? 0) / 60
-                                  const dateRu = new Date(`${d.date}T00:00:00.000Z`).toLocaleDateString('ru-RU')
-                                  return (
-                                    <div key={d.date} className="truncate" title={`${dateRu}: ${fromHours}ч -> ${toHours}ч`}>
-                                      {dateRu}: {fromHours.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}ч → {toHours.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}ч
-                                    </div>
-                                  )
-                                })}
-                                {Array.isArray(a.compact.days) && (
-                                  <div className="font-medium pt-1">
-                                    Итого: {((a.compact.days.reduce((s: number, x: any) => s + (x.toMinutes || 0), 0)) / 60).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ч
-                                  </div>
-                                )}
-                              </div>
-                            ) : changes.length > 0 ? (
-                              <div className="space-y-1">
-                                {changes.map((c, idx) => (<div key={idx} className="truncate" title={c}>{c}</div>))}
-                              </div>
-                            ) : (
-                              <div className="truncate" title={a.diff}>{a.diff}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TD>
-                  </TR>
-                )
-              })}
+              {items.map((it: any) => (
+                <TR key={it.id} className="cursor-pointer" onClick={() => setOpenIds(old => ({ ...old, [it.id]: !old[it.id] }))}>
+                  <TD className="py-1.5 text-xs">{new Date(it.createdAt).toLocaleString('ru')}</TD>
+                  <TD className="py-1.5 text-xs">{it.userName || '—'}</TD>
+                  <TD className="py-1.5 text-xs">{it.employeeName || '—'}</TD>
+                  <TD className="py-1.5 text-xs">{it.action}</TD>
+                  <TD className="py-1.5 text-xs">{it.entity}</TD>
+                  <TD className="py-1.5 text-xs">
+                    {openIds[it.id] ? (
+                      <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(it.values, null, 2)}</pre>
+                    ) : (
+                      <div className="truncate max-w-xs">{JSON.stringify(it.values)}</div>
+                    )}
+                  </TD>
+                </TR>
+              ))}
             </TBody>
           </Table>
         </div>
@@ -205,5 +140,4 @@ export default function AuditClient({ initialItems }: { initialItems: any[] }) {
     </Card>
   )
 }
-
 

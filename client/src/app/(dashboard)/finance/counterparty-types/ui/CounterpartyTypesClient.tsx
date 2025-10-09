@@ -1,28 +1,26 @@
 "use client"
 
 import { useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useCrud } from '@/hooks/use-crud'
 
-export default function CounterpartyTypesClient({ initialItems }: { initialItems: any[] }) {
-  const API_BASE = getApiBase()
-  const [items, setItems] = useState<any[]>(initialItems)
+type CounterpartyType = { id: string; label: string; active: boolean }
+
+export default function CounterpartyTypesClient({ initialItems }: { initialItems: CounterpartyType[] }) {
+  const types = useCrud<CounterpartyType>('/api/counterparty-types', { 
+    initialItems,
+    transformData: (d) => d.items || d.data || d
+  })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<{ label: string }>({ label: '' })
   const [statusTab, setStatusTab] = useState<'ACTIVE'|'INACTIVE'>('ACTIVE')
 
-  async function reload() {
-    const r = await fetch(`${API_BASE}/api/counterparty-types`, { credentials: 'include' })
-    const j = await r.json()
-    setItems(j.items || [])
-  }
-
-  function startEdit(row: any) {
+  function startEdit(row: CounterpartyType) {
     setEditingId(row.id)
     setForm({ label: row.label || '' })
   }
@@ -30,23 +28,20 @@ export default function CounterpartyTypesClient({ initialItems }: { initialItems
   async function save() {
     if (!form.label.trim()) return
     if (!editingId) {
-      await fetch(`${API_BASE}/api/counterparty-types`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ label: form.label }) })
+      await types.create({ label: form.label } as any)
     } else {
-      await fetch(`${API_BASE}/api/counterparty-types/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ label: form.label }) })
+      await types.update(editingId, { label: form.label } as any)
     }
     setEditingId(null)
     setForm({ label: '' })
-    await reload()
   }
 
   async function remove(id: string) {
-    await fetch(`${API_BASE}/api/counterparty-types/${id}`, { method: 'DELETE', credentials: 'include' })
-    await reload()
+    await types.remove(id)
   }
 
   async function setActive(id: string, active: boolean) {
-    await fetch(`${API_BASE}/api/counterparty-types/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ active }) })
-    await reload()
+    await types.update(id, { active } as any)
   }
 
   return (
@@ -71,7 +66,7 @@ export default function CounterpartyTypesClient({ initialItems }: { initialItems
                 </TR>
               </THead>
               <TBody>
-                {(items || []).filter((it: any) => (statusTab === 'ACTIVE' ? it.active : !it.active)).map((it: any) => (
+                {types.items.filter((it: any) => (statusTab === 'ACTIVE' ? it.active : !it.active)).map((it: any) => (
                   <TR key={it.id} onClick={() => startEdit(it)} className={editingId === it.id ? 'bg-accent' : 'cursor-pointer hover:bg-accent/20'}>
                     <TD className="py-1.5 px-2">{it.label}</TD>
                     <TD className="py-1.5 px-2">{it.active ? 'Да' : 'Нет'}</TD>
@@ -112,5 +107,4 @@ export default function CounterpartyTypesClient({ initialItems }: { initialItems
     </div>
   )
 }
-
 

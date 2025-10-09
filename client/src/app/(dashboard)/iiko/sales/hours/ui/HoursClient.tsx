@@ -1,8 +1,8 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts'
+import { api } from '@/lib/api-client'
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -14,7 +14,6 @@ function dtToYMD(d: Date) {
 type ViewMode = 'day' | 'week' | 'month'
 
 export default function HoursClient() {
-  const API_BASE = getApiBase()
   const [from, setFrom] = useState<string>('2025-09-01')
   const [to, setTo] = useState<string>('2025-09-30')
   const [view, setView] = useState<ViewMode>('day')
@@ -133,8 +132,7 @@ export default function HoursClient() {
       }
 
       // Новый быстрый эндпоинт матрицы
-      const fast = await fetch(`${API_BASE}/api/iiko/local/sales/hours/matrix?from=${from}&to=${to}`, { cache: 'no-store', credentials: 'include' })
-      const jm = await fast.json()
+      const jm: any = await api.get('/api/iiko/local/sales/hours/matrix', { params: { from, to } })
       const colsResp: string[] = Array.isArray(jm?.cols) ? jm.cols : cols
 
       // Base matrices from server (per-day columns)

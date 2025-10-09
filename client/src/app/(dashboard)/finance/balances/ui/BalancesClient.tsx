@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Calendar, Wallet, TrendingUp, TrendingDown } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
 
 interface Balance {
   accountId: string
@@ -38,8 +38,6 @@ export default function BalancesClient() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_BASE = getApiBase()
-
   function rubFmt(cents: number) {
     return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽'
   }
@@ -69,18 +67,7 @@ export default function BalancesClient() {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE}/api/balances?dateFrom=${dateFrom}&dateTo=${dateTo}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      const data: BalancesData = await response.json()
+      const data: BalancesData = await api.get('/api/balances', { params: { dateFrom, dateTo } }) as any
       setBalances(data.balances)
       setTotalStartBalance(data.totalStartBalance)
       setTotalPeriodChange(data.totalPeriodChange)

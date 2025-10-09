@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Save } from 'lucide-react'
-import { getApiBase } from '@/lib/api'
+import { useApi } from '@/hooks/use-api'
+import { api } from '@/lib/api-client'
 
 interface Settings {
   id: string
@@ -15,58 +16,27 @@ interface Settings {
 }
 
 export default function PurchasingSettingsClient() {
-  const [settings, setSettings] = useState<Settings | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { data, loading, refetch } = useApi<{ settings: Settings }>('/api/purchasing/settings')
   const [saving, setSaving] = useState(false)
   const [purchaseWindowDays, setPurchaseWindowDays] = useState(3)
   const [analysisWindowDays, setAnalysisWindowDays] = useState(30)
 
-  const API_BASE = getApiBase()
-
   useEffect(() => {
-    loadSettings()
-  }, [])
-
-  const loadSettings = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/purchasing/settings`, {
-        credentials: 'include'
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setSettings(data.settings)
-        setPurchaseWindowDays(data.settings.purchaseWindowDays)
-        setAnalysisWindowDays(data.settings.analysisWindowDays)
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error)
-    } finally {
-      setLoading(false)
+    if (data?.settings) {
+      setPurchaseWindowDays(data.settings.purchaseWindowDays)
+      setAnalysisWindowDays(data.settings.analysisWindowDays)
     }
-  }
+  }, [data])
 
   const saveSettings = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/api/purchasing/settings`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          purchaseWindowDays,
-          analysisWindowDays
-        })
+      await api.patch('/api/purchasing/settings', {
+        purchaseWindowDays,
+        analysisWindowDays
       })
-
-      if (res.ok) {
-        const data = await res.json()
-        setSettings(data.settings)
-        alert('Настройки сохранены!')
-      } else {
-        alert('Ошибка при сохранении настроек')
-      }
+      await refetch()
+      alert('Настройки сохранены!')
     } catch (error) {
       console.error('Error saving settings:', error)
       alert('Ошибка при сохранении настроек')

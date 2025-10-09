@@ -1,14 +1,12 @@
 "use client"
 import { useEffect, useState, useMemo } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import HeaderControls from './HeaderControls'
 import SummaryStats from './SummaryStats'
 import ChartArea from './ChartArea'
 import DataTable from './DataTable'
 import { ChartPoint, formatDate, getWeekday } from './utils'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 export function RevenueClient() {
   const [year1, setYear1] = useState(2025)
@@ -27,8 +25,7 @@ export function RevenueClient() {
   // Функция для проверки аутентификации
   const checkAuth = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
-      const data = await response.json()
+      const data: any = await api.get('/api/auth/me')
       const isAuth = !!(data?.user)
       setIsAuthenticated(isAuth)
       return isAuth
@@ -42,12 +39,7 @@ export function RevenueClient() {
   // Функция для автоматической установки дат
   const setDefaultDates = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/iiko/local/sales/available-months`, { credentials: 'include' })
-      if (!response.ok) {
-        console.log('Available months request failed:', response.status)
-        return
-      }
-      const data = await response.json()
+      const data: any = await api.get('/api/iiko/local/sales/available-months')
       
       if (data.months && data.months.length > 0) {
         // Берем последний месяц с данными
@@ -118,15 +110,12 @@ export function RevenueClient() {
           endpoint2 = `${API_BASE}/api/iiko/local/sales/revenue/month?year=${year2}&month=${month2}`
       }
       
-      const [res1, res2] = await Promise.all([
-        fetch(endpoint1, { credentials: 'include' }),
-        fetch(endpoint2, { credentials: 'include' })
+      const [json1, json2] = await Promise.all([
+        api.get(endpoint1),
+        api.get(endpoint2)
       ])
       
-      console.log('API responses:', { res1: res1.status, res2: res2.status })
-      
-      const json1 = await res1.json()
-      const json2 = await res2.json()
+      console.log('API data loaded:', { json1, json2 })
       
       console.log('API data:', { json1, json2 })
       

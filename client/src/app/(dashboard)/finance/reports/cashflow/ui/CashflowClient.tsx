@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, Fragment } from 'react'
-import { getApiBase } from "@/lib/api"
+import { useMemo, useState, Fragment } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -27,7 +26,6 @@ export default function CashflowClient({ initialYFrom, initialMFrom, initialYTo,
   const [months, setMonths] = useState<Array<{ year: number; month: number; key: string; label: string }>>(initialMonths)
   const [total, setTotal] = useState<number>(initialTotal)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
-  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
 
@@ -70,9 +68,9 @@ export default function CashflowClient({ initialYFrom, initialMFrom, initialYTo,
   }
 
   async function reload() {
-    const qs = new URLSearchParams({ yFrom: String(yFrom), mFrom: String(mFrom), yTo: String(yTo), mTo: String(mTo) })
-    const res = await fetch(`${API_BASE}/api/reports/cashflow?${qs.toString()}`)
-    const json = await res.json()
+    const json: any = await import('@/lib/api-client').then(m => m.api.get('/api/reports/cashflow', { 
+      params: { yFrom: String(yFrom), mFrom: String(mFrom), yTo: String(yTo), mTo: String(mTo) } 
+    }))
     setItems(json.items || [])
     setMonths(json.months || [])
     setTotal(json.total || 0)

@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
+import { api } from '@/lib/api-client'
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -10,7 +10,6 @@ function dtToYMD(d: Date) {
 }
 
 export default function ConsumptionClient() {
-  const API_BASE = getApiBase()
   const [from, setFrom] = useState(dtToYMD(new Date()))
   const [to, setTo] = useState(dtToYMD(new Date()))
   const [rows, setRows] = useState<any[]>([])
@@ -19,11 +18,7 @@ export default function ConsumptionClient() {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/stores/consumption`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to }), cache: 'no-store', credentials: 'include'
-      })
-      const j = await r.json()
+      const j: any = await api.post('/api/iiko/stores/consumption', { from, to })
       setRows(Array.isArray(j?.rows) ? j.rows : [])
     } catch { setRows([]) }
     setLoading(false)
@@ -68,5 +63,4 @@ export default function ConsumptionClient() {
     </div>
   )
 }
-
 

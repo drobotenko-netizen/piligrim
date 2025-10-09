@@ -1,13 +1,11 @@
 "use client"
 import { useEffect, useState, useMemo } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 function formatNumber(value: number | null): string {
   if (value === null || value === undefined) return '-'
@@ -95,9 +93,7 @@ export function DishesClient() {
   // Загрузка категорий блюд
   const loadCategories = async () => {
     try {
-      const params = new URLSearchParams({ from: dateFrom, to: dateTo })
-      const res = await fetch(`${API_BASE}/api/iiko/local/sales/dish-categories?${params.toString()}`, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/local/sales/dish-categories', { params: { from: dateFrom, to: dateTo } })
       setCategories(json.categories || [])
     } catch (e) {
       console.error('Error loading categories:', e)
@@ -107,12 +103,10 @@ export function DishesClient() {
   // Загрузка списка блюд
   const loadDishes = async () => {
     try {
-      const params = new URLSearchParams({ from: dateFrom, to: dateTo, limit: String(300) })
-      if (selectedCategory !== 'all') params.set('category', selectedCategory)
-      const url = `${API_BASE}/api/iiko/local/sales/dishes?${params.toString()}`
+      const params: any = { from: dateFrom, to: dateTo, limit: '300' }
+      if (selectedCategory !== 'all') params.category = selectedCategory
       
-      const res = await fetch(url, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/local/sales/dishes', { params })
       console.log('Loaded dishes:', json)
       setDishes(json.dishes || [])
       // При смене категории автоматически выбираем соответствующий режим
@@ -153,13 +147,10 @@ export function DishesClient() {
         endpoint = `${API_BASE}/api/iiko/local/sales/dish/${selectedDish}`
       }
       
-      const [resCurrent, resLastYear] = await Promise.all([
-        fetch(`${endpoint}?from=${dateFrom}&to=${dateTo}`, { credentials: 'include' }),
-        fetch(`${endpoint}?from=${lastYearFrom.toISOString().slice(0, 10)}&to=${lastYearTo.toISOString().slice(0, 10)}`, { credentials: 'include' })
+      const [jsonCurrent, jsonLastYear] = await Promise.all([
+        api.get(endpoint, { params: { from: dateFrom, to: dateTo } }),
+        api.get(endpoint, { params: { from: lastYearFrom.toISOString().slice(0, 10), to: lastYearTo.toISOString().slice(0, 10) } })
       ])
-      
-      const jsonCurrent = await resCurrent.json()
-      const jsonLastYear = await resLastYear.json()
       
       console.log('Loaded data:', { jsonCurrent, jsonLastYear })
       

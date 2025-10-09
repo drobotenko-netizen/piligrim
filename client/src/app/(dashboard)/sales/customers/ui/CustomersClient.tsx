@@ -1,11 +1,9 @@
 "use client"
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 interface Customer {
   name: string
@@ -59,8 +57,7 @@ export function CustomersClient() {
   // Функция для проверки аутентификации
   const checkAuth = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
-      const data = await response.json()
+      const data: any = await api.get('/api/auth/me')
       const isAuth = !!(data?.user)
       setIsAuthenticated(isAuth)
       return isAuth
@@ -79,8 +76,7 @@ export function CustomersClient() {
     
     setLoading(true)
     try {
-      const response = await fetch(`${API_BASE}/api/iiko/local/sales/customers?from=${fromDate}&to=${toDate}`, { credentials: 'include' })
-      const data = await response.json()
+      const data: any = await api.get('/api/iiko/local/sales/customers', { params: { from: fromDate, to: toDate } })
       setCustomers(data.customers || [])
     } catch (error) {
       console.error('Ошибка при загрузке клиентов:', error)

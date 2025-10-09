@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
+import { api } from '@/lib/api-client'
 
 function yearsAround(now = new Date(), before = 1, after = 0) {
   const y = now.getUTCFullYear()
@@ -10,7 +10,6 @@ function yearsAround(now = new Date(), before = 1, after = 0) {
 }
 
 export default function ImportClient() {
-  const API_BASE = getApiBase()
   const [year, setYear] = useState(new Date().getUTCFullYear())
   const [status, setStatus] = useState<{ year: number; months: { month: number; loaded: boolean; receipts: number }[] } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -24,8 +23,7 @@ export default function ImportClient() {
   async function loadStatus(y = year) {
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/import/status?year=${y}`, { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
+      const j: any = await api.get('/api/iiko/local/import/status', { params: { year: y } })
       setStatus(j)
     } catch { setStatus(null) }
     setLoading(false)
@@ -47,15 +45,7 @@ export default function ImportClient() {
         const dd = String(d.getUTCDate()).padStart(2, '0')
         const date = `${y}-${mm}-${dd}`
         try {
-          const r = await fetch(`${API_BASE}/api/iiko/etl/receipts`, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ date })
-          })
-          if (!r.ok) {
-            console.error('Import day failed', date, await r.text())
-          }
+          await api.post('/api/iiko/etl/receipts', { date })
         } catch (e) {
           console.error('Import day error', date, e)
         }
@@ -88,15 +78,7 @@ export default function ImportClient() {
         setRangeProgress({ current: processedDays + 1, total: totalDays, currentDate: date })
         
         try {
-          const r = await fetch(`${API_BASE}/api/iiko/etl/receipts`, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ date })
-          })
-          if (!r.ok) {
-            console.error('Import day failed', date, await r.text())
-          }
+          await api.post('/api/iiko/etl/receipts', { date })
         } catch (e) {
           console.error('Import day error', date, e)
         }

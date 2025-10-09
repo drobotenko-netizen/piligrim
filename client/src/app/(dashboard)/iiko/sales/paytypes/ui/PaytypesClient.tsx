@@ -1,6 +1,6 @@
 "use client"
-import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
+import { useState } from 'react'
+import { useApi } from '@/hooks/use-api'
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -10,22 +10,13 @@ function dtToYMD(d: Date) {
 }
 
 export default function PaytypesClient() {
-  const API_BASE = getApiBase()
   const [date, setDate] = useState(dtToYMD(new Date()))
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const { data, loading, refetch } = useApi<{ rows?: any[] }>(`/api/iiko/local/sales/paytypes`, { 
+    skip: true,
+    params: { date }
+  })
 
-  async function load() {
-    setLoading(true)
-    try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/sales/paytypes?date=${date}`, { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
-      setRows(Array.isArray(j?.rows) ? j.rows : j)
-    } catch { setRows([]) }
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [])
+  const rows = Array.isArray(data?.rows) ? data.rows : (Array.isArray(data) ? data : [])
 
   return (
     <div className="space-y-3">
@@ -34,7 +25,7 @@ export default function PaytypesClient() {
           <div className="text-xs text-muted-foreground">Дата</div>
           <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
         </div>
-        <button onClick={load} className="border rounded px-3 py-1 text-sm">Показать</button>
+        <button onClick={() => refetch({ date })} className="border rounded px-3 py-1 text-sm">Показать</button>
       </div>
       <div className="rounded-lg border p-2">
         {loading ? <div className="p-4 text-sm">Загрузка…</div> : (
@@ -64,5 +55,4 @@ export default function PaytypesClient() {
     </div>
   )
 }
-
 

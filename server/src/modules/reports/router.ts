@@ -1,5 +1,6 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { asyncHandler } from '../../utils/common-middleware'
 
 export function createReportsRouter(prisma: PrismaClient) {
   const router = Router()

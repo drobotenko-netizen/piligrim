@@ -1,15 +1,14 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { asyncHandler, validateYearMonth } from '../../utils/common-middleware'
 
 export function createPayrollRouter(prisma: PrismaClient) {
   const router = Router()
 
-  // GET расчёт по месяцу
-  router.get('/', async (req, res) => {
-    const y = Number(req.query.y)
-    const m = Number(req.query.m)
-    if (!y || !m) return res.status(400).json({ error: 'y/m required' })
-
+  // GET / - расчёт зарплаты по месяцу
+  router.get('/', validateYearMonth(), asyncHandler(async (req: any, res: Response) => {
+    const { year: y, month: m } = req
+    
     const start = new Date(Date.UTC(y, m - 1, 1))
     const end = new Date(Date.UTC(y, m, 1))
 
@@ -20,10 +19,18 @@ export function createPayrollRouter(prisma: PrismaClient) {
 
     // Табели и операции/выплаты за месяц (модели могут отсутствовать в сгенерированном клиенте)
     const [timesheets, adjustments, payouts, rates] = await Promise.all([
-      prisma.timesheet.findMany({ where: { workDate: { gte: start, lt: end } } }),
-      (prisma as any).adjustment ? prisma.adjustment.findMany({ where: { date: { gte: start, lt: end } } }) : Promise.resolve([]),
-      (prisma as any).payout ? (prisma as any).payout.findMany({ where: { date: { gte: start, lt: end } } }) : Promise.resolve([]),
-      (prisma as any).positionRate ? (prisma as any).positionRate.findMany({ where: { year: y, month: m } }) : Promise.resolve([])
+      prisma.timesheet.findMany({ 
+        where: { workDate: { gte: start, lt: end } } 
+      }),
+      (prisma as any).adjustment 
+        ? prisma.adjustment.findMany({ where: { date: { gte: start, lt: end } } }) 
+        : Promise.resolve([]),
+      (prisma as any).payout 
+        ? (prisma as any).payout.findMany({ where: { date: { gte: start, lt: end } } }) 
+        : Promise.resolve([]),
+      (prisma as any).positionRate 
+        ? (prisma as any).positionRate.findMany({ where: { year: y, month: m } }) 
+        : Promise.resolve([])
     ])
 
     const rateByPosition: Record<string, any> = {}
@@ -35,6 +42,7 @@ export function createPayrollRouter(prisma: PrismaClient) {
       const hours = totalMinutes / 60
 
       const positionKind = emp.position?.kind || ''
+      
       // Приоритет: персональная ставка -> ставка периода -> ставка из позиции
       const periodRate = emp.positionId ? rateByPosition[emp.positionId] : undefined
       const hourRate = emp.personalHourRate ?? periodRate?.baseHourRate ?? emp.position?.baseHourRate ?? 0
@@ -74,14 +82,21 @@ export function createPayrollRouter(prisma: PrismaClient) {
         deductionAmount,
         payoutsTotal,
         balance,
-        payouts: payoutsList.map(p => ({ id: p.id, date: p.date, amount: p.amount, method: p.method, note: p.note }))
+        payouts: payoutsList.map(p => ({ 
+          id: p.id, 
+          date: p.date, 
+          amount: p.amount, 
+          method: p.method, 
+          note: p.note 
+        }))
       }
     })
 
+    // Фильтруем только тех, у кого есть начисления
     const items = computed.filter(r => (r.totalAmount || 0) !== 0)
 
     res.json({ y, m, items })
-  })
+  }))
 
   return router
 }

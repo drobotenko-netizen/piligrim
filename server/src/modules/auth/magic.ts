@@ -1,9 +1,10 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 import { getTenant } from '../../utils/tenant'
 import { requirePermission } from '../../utils/auth'
 import { signAccessToken } from '../../utils/jwt'
+import { asyncHandler, validateId } from '../../utils/common-middleware'
 
 const MAGIC_LINK_SECRET = process.env.MAGIC_LINK_SECRET || 'dev-magic-secret'
 const SERVER_PUBLIC_URL = process.env.SERVER_PUBLIC_URL || `http://localhost:${process.env.PORT || 4000}`
@@ -15,8 +16,7 @@ export function createMagicRouter(prisma: PrismaClient) {
   const router = Router()
 
   // Admin/API: issue magic link for a user
-  router.post('/issue', requirePermission(prisma, 'users.manage'), async (req: any, res) => {
-    try {
+  router.post('/issue', requirePermission(prisma, 'users.manage'), asyncHandler(async (req: Request, res: Response) => {
       // Require admin permission in your API gateway/middleware if needed
       const tenant = await getTenant(prisma, req as any)
       const userId = String(req.body?.userId || '').trim()
@@ -41,14 +41,10 @@ export function createMagicRouter(prisma: PrismaClient) {
       const url = `${frontendUrl}/?token=${encodeURIComponent(token)}`
       const shortUrl = `${SERVER_PUBLIC_URL}/api/auth/magic/s/${encodeURIComponent(tokenId.id)}`
       return res.json({ url, shortUrl, tokenId: tokenId.id, expiresAt })
-    } catch (e) {
-      return res.status(500).json({ error: 'internal_error' })
-    }
-  })
+  }))
 
   // Public: verify magic link token (for frontend)
-  router.post('/verify', async (req: any, res) => {
-    try {
+  router.post('/verify', asyncHandler(async (req: Request, res: Response) => {
       const { token } = req.body || {}
       if (!token) return res.status(400).json({ error: 'token required' })
       
@@ -96,15 +92,10 @@ export function createMagicRouter(prisma: PrismaClient) {
         roles, 
         redirect 
       })
-    } catch (e) {
-      console.error('[magic] Verify error:', e)
-      return res.status(500).json({ error: 'internal_error' })
-    }
-  })
+  }))
 
   // Public: complete magic login
-  router.get('/callback', async (req: any, res) => {
-    try {
+  router.get('/callback', asyncHandler(async (req: Request, res: Response) => {
       const raw = String(req.query?.token || '').trim()
       if (!raw) return res.status(400).send('Bad request')
       let decoded: any
@@ -157,14 +148,10 @@ export function createMagicRouter(prisma: PrismaClient) {
       const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
       const target = `${frontendUrl}${redirect.startsWith('/') ? '' : '/'}${redirect}`
       return res.redirect(target)
-    } catch (e) {
-      return res.status(500).send('Internal error')
-    }
-  })
+  }))
 
   // Public: short magic link by token id
-  router.get('/s/:id', async (req: any, res) => {
-    try {
+  router.get('/s/:id', validateId('id'), asyncHandler(async (req: Request, res: Response) => {
       const jti = String(req.params.id || '').trim()
       if (!jti) return res.status(400).send('Bad request')
       const dbToken = await prisma.magicLinkToken.findUnique({ where: { id: jti } })
@@ -206,10 +193,7 @@ export function createMagicRouter(prisma: PrismaClient) {
       const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
       const target = `${frontendUrl}${(dbToken.redirect || '/sales/revenue').startsWith('/') ? '' : '/'}${dbToken.redirect || '/sales/revenue'}`
       return res.redirect(target)
-    } catch (e) {
-      return res.status(500).send('Internal error')
-    }
-  })
+  }))
 
   return router
 }

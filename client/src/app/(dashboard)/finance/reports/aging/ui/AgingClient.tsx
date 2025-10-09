@@ -1,12 +1,10 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 export default function AgingClient() {
   const [items, setItems] = useState<any[]>([])
@@ -24,12 +22,11 @@ export default function AgingClient() {
 
   async function loadData() {
     try {
-      const params = new URLSearchParams()
-      if (filters.vendorId && filters.vendorId !== 'all') params.set('vendorId', filters.vendorId)
-      if (filters.asOfDate) params.set('asOfDate', filters.asOfDate)
+      const params: any = {}
+      if (filters.vendorId && filters.vendorId !== 'all') params.vendorId = filters.vendorId
+      if (filters.asOfDate) params.asOfDate = filters.asOfDate
 
-      const res = await fetch(`${API_BASE}/api/reports/aging?${params}`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/reports/aging', { params })
       setItems(data.items || [])
       setSummary(data.summary || {})
     } catch (e) {
@@ -39,8 +36,7 @@ export default function AgingClient() {
 
   async function loadVendors() {
     try {
-      const res = await fetch(`${API_BASE}/api/counterparties`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/counterparties')
       setVendors(data.items || [])
     } catch (e) {
       console.error(e)

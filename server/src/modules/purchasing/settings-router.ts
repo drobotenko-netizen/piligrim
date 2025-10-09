@@ -1,14 +1,14 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { getTenant } from '../../utils/tenant'
 import { getUserId } from '../../utils/auth'
+import { asyncHandler } from '../../utils/common-middleware'
 
 export function createPurchasingSettingsRouter(prisma: PrismaClient) {
   const router = Router()
 
   // GET настройки
-  router.get('/', async (req, res) => {
-    try {
+  router.get('/', asyncHandler(async (req: Request, res: Response) => {
       const tenant = await getTenant(prisma, req as any)
       
       let settings = await (prisma as any).purchasingSettings?.findUnique({
@@ -28,15 +28,10 @@ export function createPurchasingSettingsRouter(prisma: PrismaClient) {
       }
 
       res.json({ settings })
-    } catch (error: any) {
-      console.error('Error loading purchasing settings:', error)
-      res.status(500).json({ error: error?.message || 'Failed to load settings' })
-    }
-  })
+  }))
 
   // PATCH обновление настроек
-  router.patch('/', async (req, res) => {
-    try {
+  router.patch('/', asyncHandler(async (req: Request, res: Response) => {
       const tenant = await getTenant(prisma, req as any)
       const { purchaseWindowDays, analysisWindowDays } = req.body
 
@@ -64,11 +59,7 @@ export function createPurchasingSettingsRouter(prisma: PrismaClient) {
       })
 
       res.json({ settings })
-    } catch (error: any) {
-      console.error('Error updating purchasing settings:', error)
-      res.status(500).json({ error: error?.message || 'Failed to update settings' })
-    }
-  })
+  }))
 
   return router
 }

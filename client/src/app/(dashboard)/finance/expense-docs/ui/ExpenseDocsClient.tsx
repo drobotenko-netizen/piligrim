@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -10,8 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal } from 'lucide-react'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 export default function ExpenseDocsClient() {
   const [docs, setDocs] = useState<any[]>([])
@@ -43,12 +41,11 @@ export default function ExpenseDocsClient() {
 
   async function loadDocs() {
     try {
-      const params = new URLSearchParams()
-      if (filters.status && filters.status !== 'all') params.set('status', filters.status)
-      if (filters.vendorId && filters.vendorId !== 'all') params.set('vendorId', filters.vendorId)
+      const params: any = {}
+      if (filters.status && filters.status !== 'all') params.status = filters.status
+      if (filters.vendorId && filters.vendorId !== 'all') params.vendorId = filters.vendorId
 
-      const res = await fetch(`${API_BASE}/api/expense-docs?${params}`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/expense-docs', { params })
       setDocs(data.items || [])
     } catch (e) {
       console.error(e)
@@ -57,8 +54,7 @@ export default function ExpenseDocsClient() {
 
   async function loadVendors() {
     try {
-      const res = await fetch(`${API_BASE}/api/counterparties`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/counterparties')
       setVendors(data.items || [])
     } catch (e) {
       console.error(e)
@@ -67,8 +63,7 @@ export default function ExpenseDocsClient() {
 
   async function loadCategories() {
     try {
-      const res = await fetch(`${API_BASE}/api/categories`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/categories')
       
       // Flatten categories
       const flatCats: any[] = []
@@ -98,19 +93,9 @@ export default function ExpenseDocsClient() {
       }
 
       if (editingId) {
-        await fetch(`${API_BASE}/api/expense-docs/${editingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body)
-        })
+        await api.patch(`/api/expense-docs/${editingId}`, body)
       } else {
-        await fetch(`${API_BASE}/api/expense-docs`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body)
-        })
+        await api.post('/api/expense-docs', body)
       }
 
       resetForm()
@@ -152,10 +137,7 @@ export default function ExpenseDocsClient() {
   async function voidDoc(id: string) {
     if (!confirm('Отменить документ?')) return
     try {
-      await fetch(`${API_BASE}/api/expense-docs/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      })
+      await api.delete(`/api/expense-docs/${id}`)
       loadDocs()
     } catch (e) {
       console.error(e)

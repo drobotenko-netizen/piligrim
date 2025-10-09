@@ -1,13 +1,13 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { importCashflowRange } from './importer'
+import { asyncHandler } from '../../utils/common-middleware'
 
 export function createGSheetsRouter() {
   const router = Router()
 
   // GET /gsheets/sheet-range?spreadsheetId=...&sheet=...&from=4&to=24
-  router.get('/sheet-range', async (req, res) => {
-    try {
+  router.get('/sheet-range', asyncHandler(async (req: Request, res: Response) => {
       const spreadsheetId = String(req.query.spreadsheetId || '').trim()
       const sheet = String(req.query.sheet || '').trim()
       const from = Number(String(req.query.from || '').trim() || 1)
@@ -21,10 +21,7 @@ export function createGSheetsRouter() {
       const csv = await r.text()
       const rows = csv.split(/\r?\n/).filter(Boolean).map(line => line.split(','))
       res.json({ sheet, from, to, rows })
-    } catch (e: any) {
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
+  }))
 
   return router
 }
@@ -32,8 +29,7 @@ export function createGSheetsRouter() {
 export function createGSheetsImportRouter(prisma: PrismaClient) {
   const router = Router()
   // POST /gsheets/cashflow/import
-  router.post('/cashflow/import', async (req, res) => {
-    try {
+  router.post('/cashflow/import', asyncHandler(async (req: Request, res: Response) => {
       const { spreadsheetId, sheet, gid, from, to } = req.body || {}
       if (!spreadsheetId) return res.status(400).json({ error: 'spreadsheetId required' })
       if (!sheet && !gid) return res.status(400).json({ error: 'sheet or gid required' })
@@ -44,14 +40,10 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
       await prisma.gsCashflowRow.deleteMany({ where: { spreadsheet: spreadsheetId, ...(sheet ? { sheet } : {}) } })
       const r = await importCashflowRange(prisma, { spreadsheetId, sheet, gid, fromRow, toRow })
       res.json(r)
-    } catch (e: any) {
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
+  }))
 
   // POST /gsheets/cashflow/clear
-  router.post('/cashflow/clear', async (req, res) => {
-    try {
+  router.post('/cashflow/clear', asyncHandler(async (req: Request, res: Response) => {
       const { spreadsheetId, sheet, gid } = req.body || {}
       if (!spreadsheetId) return res.status(400).json({ error: 'spreadsheetId required' })
       
@@ -62,14 +54,10 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
       const deleted = await prisma.gsCashflowRow.deleteMany({ where })
       
       res.json({ deleted: deleted.count })
-    } catch (e: any) {
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
+  }))
 
   // GET /gsheets/cashflow
-  router.get('/cashflow', async (req, res) => {
-    try {
+  router.get('/cashflow', asyncHandler(async (req: Request, res: Response) => {
       const spreadsheetId = String(req.query.spreadsheetId || '').trim()
       const sheet = String(req.query.sheet || '').trim()
       const gid = String(req.query.gid || '').trim()
@@ -125,15 +113,11 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
           take: limit,
         }),
       ])
-      res.json({ total, page, limit, rows })
-    } catch (e: any) {
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
+      res.json({ items: rows, total, page, pages: Math.ceil(total / limit), limit })
+  }))
 
   // GET /gsheets/cashflow/meta
-  router.get('/cashflow/meta', async (req, res) => {
-    try {
+  router.get('/cashflow/meta', asyncHandler(async (req: Request, res: Response) => {
       const spreadsheetId = String(req.query.spreadsheetId || '').trim()
       const sheet = String(req.query.sheet || '').trim()
       const where: any = {}
@@ -168,10 +152,8 @@ export function createGSheetsImportRouter(prisma: PrismaClient) {
         funds: funds.map(r => r.v).filter(Boolean),
         flowTypes: flowTypes.map(r => r.v).filter(Boolean),
       })
-    } catch (e: any) {
-      res.status(500).json({ error: String(e?.message || e) })
-    }
-  })
+  }))
+  
   return router
 }
 

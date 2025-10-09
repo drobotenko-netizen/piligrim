@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useMemo, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { api } from '@/lib/api-client'
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -13,7 +13,6 @@ function dtToYMD(d: Date) {
 type Ingredient = { id: string; name: string; amount?: number | null; unit?: string | null }
 
 export default function RecipesClient() {
-  const API_BASE = getApiBase()
   const [date, setDate] = useState(() => {
     // Используем вчерашний день или последний день декабря 2024, если есть данные
     const today = new Date()
@@ -33,9 +32,7 @@ export default function RecipesClient() {
 
   async function loadCategories() {
     try {
-      const params = new URLSearchParams({ from: date, to: date })
-      const res = await fetch(`${API_BASE}/api/iiko/local/sales/dish-categories?${params.toString()}`, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/local/sales/dish-categories', { params: { from: date, to: date } })
       setCategories(json.categories || [])
     } catch (e) {
       console.error('Error loading categories:', e)
@@ -44,12 +41,10 @@ export default function RecipesClient() {
 
   async function loadDishes() {
     try {
-      const params = new URLSearchParams({ from: date, to: date, limit: '300' })
-      if (selectedCategory !== 'all') params.set('category', selectedCategory)
-      const url = `${API_BASE}/api/iiko/local/sales/dishes?${params.toString()}`
+      const params: any = { from: date, to: date, limit: '300' }
+      if (selectedCategory !== 'all') params.category = selectedCategory
       
-      const res = await fetch(url, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/local/sales/dishes', { params })
       const dishes = json.dishes || []
       
       // Преобразуем в формат { id, name, category }
@@ -66,8 +61,7 @@ export default function RecipesClient() {
 
   async function loadProducts() {
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/entities/products`, { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
+      const j: any = await api.get('/api/iiko/entities/products')
       const items = Array.isArray(j?.items) ? j.items : []
       
       // Создадим map id->name для отображения ингредиентов по id
@@ -86,8 +80,7 @@ export default function RecipesClient() {
     if (!productId) return
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/api/iiko/recipes/prepared?date=${date}&productId=${productId}`, { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
+      const j: any = await api.get('/api/iiko/recipes/prepared', { params: { date, productId } })
       setPrepared(j)
     } catch { setPrepared(null) }
     setLoading(false)
@@ -122,10 +115,9 @@ export default function RecipesClient() {
     (async () => {
       if (!ingredientsIds.length) { setTxUnits({}); return }
       try {
-        const params = new URLSearchParams({ date })
-        for (const id of ingredientsIds) params.append('id', String(id))
-        const r = await fetch(`${API_BASE}/api/iiko/recipes/units?${params.toString()}`, { cache: 'no-store', credentials: 'include' })
-        const j = await r.json()
+        const params: any = { date }
+        ingredientsIds.forEach((id, idx) => { params[`id[${idx}]`] = String(id) })
+        const j: any = await api.get('/api/iiko/recipes/units', { params })
         setTxUnits(j?.units || {})
       } catch { setTxUnits({}) }
     })()

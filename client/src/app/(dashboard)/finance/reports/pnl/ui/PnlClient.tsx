@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useState, useMemo, Fragment } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { api } from '@/lib/api-client'
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
@@ -22,7 +22,6 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   const [mTo, setMTo] = useState(initialMTo)
   const [data, setData] = useState<any>(null)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
-  const API_BASE = getApiBase()
 
   function rubFmt(cents: number) { return new Intl.NumberFormat('ru-RU').format(Math.round(cents/100)) + ' ₽' }
   
@@ -49,8 +48,7 @@ export default function PnlClient({ initialYFrom, initialMFrom, initialYTo, init
   }
 
   async function reload() {
-    const res = await fetch(`${API_BASE}/api/reports/pnl?yFrom=${yFrom}&mFrom=${mFrom}&yTo=${yTo}&mTo=${mTo}`, { credentials: 'include' })
-    const json = await res.json()
+    const json: any = await api.get('/api/reports/pnl', { params: { yFrom, mFrom, yTo, mTo } })
     setData(json)
   }
 

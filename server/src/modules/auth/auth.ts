@@ -1,7 +1,8 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { signAccessToken, verifyAccessToken } from '../../utils/jwt'
 import { getTenant } from '../../utils/tenant'
+import { asyncHandler } from '../../utils/common-middleware'
 
 export function createAuthRouter(prisma: PrismaClient) {
   const router = Router()
@@ -10,8 +11,7 @@ export function createAuthRouter(prisma: PrismaClient) {
   router.get('/_ping', (_req, res) => res.json({ ok: true }))
 
   // DEV: вход без Telegram — только для уже существующих пользователей (для разработки)
-  router.post('/dev-login', async (req: any, res) => {
-    try {
+  router.post('/dev-login', asyncHandler(async (req: Request, res: Response) => {
       const phone = String(req.body?.phone || '').trim()
       if (!phone) return res.status(400).json({ error: 'phone required' })
       const tenant = await getTenant(prisma, req as any)
@@ -31,15 +31,10 @@ export function createAuthRouter(prisma: PrismaClient) {
       })
       
       res.json({ ok: true, user: { id: user.id, fullName: user.fullName, phone: user.phone, roles } })
-    } catch (e) {
-      console.error('Dev login error:', e)
-      res.status(500).json({ error: 'internal_error' })
-    }
-  })
+  }))
 
   // Получить информацию о текущем пользователе
-  router.get('/me', async (req: any, res) => {
-    try {
+  router.get('/me', asyncHandler(async (req: Request, res: Response) => {
       const raw = req.cookies?.access_token || ''
       console.log('[auth/me] cookie present:', Boolean(raw))
       
@@ -58,25 +53,20 @@ export function createAuthRouter(prisma: PrismaClient) {
       console.log('[auth/me] user resolved:', user?.id, user?.fullName)
       
       return res.json({ user, roles: payload?.roles || [] })
-    } catch (e) {
-      console.log('[auth/me] error while resolving user:', e)
-      return res.json({ user: null })
-    }
-  })
+  }))
 
   // Выход из системы
-  router.post('/logout', async (_req, res) => {
+  router.post('/logout', asyncHandler(async (_req: Request, res: Response) => {
     res.clearCookie('access_token', { 
       httpOnly: true, 
       sameSite: 'lax', 
       secure: process.env.NODE_ENV === 'production' 
     })
     res.json({ ok: true })
-  })
+  }))
 
   // DEV: создать привязку Telegram напрямую (для тестирования)
-  router.post('/telegram-bind', async (req: any, res) => {
-    try {
+  router.post('/telegram-bind', asyncHandler(async (req: Request, res: Response) => {
       const phone = String(req.body?.phone || '').trim()
       const chatId = String(req.body?.chatId || '').trim()
       
@@ -99,11 +89,7 @@ export function createAuthRouter(prisma: PrismaClient) {
       })
       
       return res.json({ ok: true, message: 'Telegram binding created' })
-    } catch (e) {
-      console.error('Telegram bind error:', e)
-      return res.status(500).json({ error: 'internal_error' })
-    }
-  })
+  }))
 
   return router
 }

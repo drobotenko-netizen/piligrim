@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState, useMemo } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { api } from '@/lib/api-client'
 
 function dtToIso(d: Date) {
   const y = d.getUTCFullYear()
@@ -11,7 +11,6 @@ function dtToIso(d: Date) {
 }
 
 export default function BalancesClient() {
-  const API_BASE = getApiBase()
   const [timestamp, setTimestamp] = useState('2024-12-15T12:00:00.000') // Используем дату с данными
   const [tableData, setTableData] = useState<any>(null) // Готовая таблица с сервера
   const [loading, setLoading] = useState(false)
@@ -31,21 +30,13 @@ export default function BalancesClient() {
 
   async function loadTableData() {
     try {
-      const res = await fetch(`${API_BASE}/api/iiko/stores/balances-table`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          timestamp, 
-          from: fromDate, 
-          to: toDate,
-          category: selectedCategory !== 'all' ? selectedCategory : undefined,
-          dishId: (selectedDish !== 'all' && selectedDish !== 'category') ? selectedDish : undefined
-        }),
-        cache: 'no-store',
-        credentials: 'include'
+      const json: any = await api.post('/api/iiko/stores/balances-table', { 
+        timestamp, 
+        from: fromDate, 
+        to: toDate,
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        dishId: (selectedDish !== 'all' && selectedDish !== 'category') ? selectedDish : undefined
       })
-      const json = await res.json()
       setTableData(json)
     } catch (e) {
       console.error('Error loading table data:', e)
@@ -55,10 +46,7 @@ export default function BalancesClient() {
 
   async function loadCategories() {
     try {
-      // Загружаем категории из API продаж (используем фиксированную дату с данными)
-      const params = new URLSearchParams({ from: '2024-12-15', to: '2024-12-15' })
-      const res = await fetch(`${API_BASE}/api/iiko/local/sales/dish-categories?${params.toString()}`, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/local/sales/dish-categories', { params: { from: '2024-12-15', to: '2024-12-15' } })
       setCategories(json.categories || [])
     } catch (e) {
       console.error('Error loading categories:', e)
@@ -67,13 +55,10 @@ export default function BalancesClient() {
 
   async function loadDishes() {
     try {
-      // Загружаем блюда с категориями из API продаж (используем фиксированную дату с данными)
-      const params = new URLSearchParams({ from: '2024-12-15', to: '2024-12-15', limit: '500' })
-      if (selectedCategory !== 'all') params.set('category', selectedCategory)
-      const url = `${API_BASE}/api/iiko/local/sales/dishes?${params.toString()}`
+      const params: any = { from: '2024-12-15', to: '2024-12-15', limit: '500' }
+      if (selectedCategory !== 'all') params.category = selectedCategory
       
-      const res = await fetch(url, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/local/sales/dishes', { params })
       const dishList = json.dishes || []
       
       // Преобразуем в нужный формат
@@ -97,11 +82,7 @@ export default function BalancesClient() {
     
     try {
       const dateStr = timestamp.split('T')[0]
-      const res = await fetch(`${API_BASE}/api/iiko/recipes/prepared?date=${dateStr}&productId=${selectedDish}`, { 
-        cache: 'no-store', 
-        credentials: 'include' 
-      })
-      const json = await res.json()
+      const json: any = await api.get('/api/iiko/recipes/prepared', { params: { date: dateStr, productId: selectedDish } })
       const items = json?.preparedCharts?.[0]?.items || []
       const ingredientIds = Array.from(new Set(items.map((it: any) => String(it?.productId || '')).filter(Boolean)))
       setDishIngredients(ingredientIds)

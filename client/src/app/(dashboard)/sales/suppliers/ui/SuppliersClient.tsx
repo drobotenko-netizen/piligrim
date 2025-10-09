@@ -1,13 +1,11 @@
 "use client"
 import { useEffect, useState, useMemo } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 function formatNumber(value: number | null): string {
   if (value === null || value === undefined) return '-'
@@ -120,10 +118,9 @@ export function SuppliersClient() {
   // Загрузка списка контрагентов
   const loadCounterparties = async () => {
     try {
-      const u = new URL(`${API_BASE}/api/counterparties`)
-      if (counterpartyType && counterpartyType !== 'all') u.searchParams.set('type', counterpartyType)
-      const res = await fetch(u.toString(), { credentials: 'include' })
-      const json = await res.json()
+      const params: any = {}
+      if (counterpartyType && counterpartyType !== 'all') params.type = counterpartyType
+      const json: any = await api.get('/api/counterparties', { params })
       const list = (json.counterparties || json.items || [])
       console.log('Loaded counterparties:', { type: counterpartyType, count: list.length })
       setCounterparties(list)
@@ -139,14 +136,12 @@ export function SuppliersClient() {
   // Загрузка доступных типов с ненулевым количеством
   const loadCounterpartyTypes = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/counterparties/types`, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/counterparties/types')
       let items = (json.items || []) as Array<{ kind: string; count: number }>
       // Fallback: если бэкенд вернул пусто (все kind = null), посчитаем из списка контрагентов
       if (!items.length) {
         try {
-          const resAll = await fetch(`${API_BASE}/api/counterparties?type=all`, { credentials: 'include' })
-          const jAll = await resAll.json()
+          const jAll: any = await api.get('/api/counterparties', { params: { type: 'all' } })
           const list = (jAll.counterparties || jAll.items || []) as Array<{ kind?: string | null }>
           const map = new Map<string, number>()
           for (const cp of list) {
@@ -229,8 +224,7 @@ export function SuppliersClient() {
       // Последовательно (не так много месяцев)
       for (const { y, m } of months) {
         try {
-          const r = await fetch(`${API_BASE}/api/iiko/local/sales/revenue/month?year=${y}&month=${m}`, { credentials: 'include' })
-          const jr = await r.json()
+          const jr: any = await api.get('/api/iiko/local/sales/revenue/month', { params: { year: y, month: m } })
           const rows = jr.revenue || []
           rows.forEach((row: any) => {
             const d = row.date || row.day || row.ymd || row.Date || ''

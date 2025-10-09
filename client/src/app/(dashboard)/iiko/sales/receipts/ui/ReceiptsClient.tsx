@@ -1,8 +1,8 @@
 "use client"
-import { useEffect, useMemo, useState } from 'react'
-import { getApiBase } from "@/lib/api"
+import { useMemo, useState } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
 
 function dtToYMD(d: Date) {
   const y = d.getUTCFullYear()
@@ -12,9 +12,6 @@ function dtToYMD(d: Date) {
 }
 
 export default function ReceiptsClient() {
-  const API_BASE = getApiBase()
-  
-  // Получаем параметры из URL
   const [date, setDate] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
@@ -31,16 +28,14 @@ export default function ReceiptsClient() {
     return 'all'
   })
   
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<'all' | 'actual' | 'returns' | 'deleted'>('all')
   const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(new Set())
-  const returnsCount = useMemo(() => rows.filter((r: any) => (!!r.isReturn) || ((Number(r.returnSum) || 0) > 0)).length, [rows])
-  const deletedCount = useMemo(() => rows.filter((r: any) => r.isDeleted === true).length, [rows])
-  const actualCount = useMemo(
-    () => rows.filter((r: any) => (r.isDeleted !== true) && !((!!r.isReturn) || ((Number(r.returnSum) || 0) > 0))).length,
-    [rows]
-  )
+
+  const { data, loading, refetch } = useApi<{ rows?: any[] }>('/api/iiko/local/sales/receipts', {
+    params: { date, includeItems: '1' }
+  })
+
+  const rows = Array.isArray(data?.rows) ? data.rows : []
 
   const toggleReceipt = (orderNum: string) => {
     const newExpanded = new Set(expandedReceipts)
@@ -52,21 +47,6 @@ export default function ReceiptsClient() {
     setExpandedReceipts(newExpanded)
   }
 
-  async function load() {
-    setLoading(true)
-    try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/sales/receipts?date=${date}&includeItems=1`, { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
-      setRows(Array.isArray(j?.rows) ? j.rows : [])
-    } catch { setRows([]) }
-    setLoading(false)
-  }
-
-  useEffect(() => { 
-    load()
-  }, [date])
-  
-  // Список уникальных номеров смен
   const sessionNumbers = useMemo(() => {
     const sessions = new Set<number>()
     rows.forEach(r => {
@@ -75,7 +55,6 @@ export default function ReceiptsClient() {
     return Array.from(sessions).sort((a, b) => a - b)
   }, [rows])
   
-  // Фильтрация по выбранной смене
   const filteredRows = useMemo(() => {
     if (selectedSession === 'all') return rows
     return rows.filter(r => r.sessionNumber === Number(selectedSession))
@@ -101,7 +80,7 @@ export default function ReceiptsClient() {
             ))}
           </select>
         </div>
-        <button onClick={() => { load(); }} className="border rounded px-3 py-1 text-sm">Показать</button>
+        <button onClick={() => refetch({ date, includeItems: '1' })} className="border rounded px-3 py-1 text-sm">Показать</button>
         <div className="ml-auto flex items-center gap-3">
           <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
             <TabsList>
@@ -185,7 +164,6 @@ export default function ReceiptsClient() {
                       <td className="px-2 py-1">{r.register}</td>
                     </tr>
                     
-                    {/* Развернутые позиции чека */}
                     {isExpanded && hasItems && (
                       <>
                         {r.items.map((item: any, itemIndex: number) => (
@@ -222,5 +200,4 @@ export default function ReceiptsClient() {
     </div>
   )
 }
-
 

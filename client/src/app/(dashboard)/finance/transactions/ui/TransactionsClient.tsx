@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal } from 'lucide-react'
+import { api } from '@/lib/api-client'
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
@@ -24,7 +24,6 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
   const [filters, setFilters] = useState<{ accountId?: string; categoryId?: string; activity?: string; counterpartyId?: string }>({})
   const [form, setForm] = useState<any>({ paymentDate: new Date().toISOString().slice(0,10), accrualYear: String(initialY), accrualMonth: String(initialM), accountId: '', categoryId: '', counterpartyId: '', amountRub: '', note: '' })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const API_BASE = getApiBase()
 
   const flatCategories = useMemo(() => {
     const acc: any[] = []
@@ -61,8 +60,7 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
     if (filters.counterpartyId) params.set('counterpartyId', filters.counterpartyId)
     // Убираем view=transfer-aggregated, так как теперь переводы создаются как одна транзакция
     params.set('pageSize', '5000') // Увеличиваем лимит для показа всех транзакций месяца
-    const res = await fetch(`${API_BASE}/api/transactions?${params.toString()}`, { credentials: 'include' })
-    const json = await res.json()
+    const json: any = await api.get('/api/transactions', { params: Object.fromEntries(params) })
     setItems(json.items || [])
   }
 
@@ -70,7 +68,7 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
 
   useEffect(() => {
     async function loadCp() {
-      try { const r = await fetch(`${API_BASE}/api/counterparties`, { credentials: 'include' }).then(x => x.json()); setCounterparties(r.items || []) } catch {}
+      try { const r: any = await api.get('/api/counterparties'); setCounterparties(r.items || []) } catch {}
     }
     loadCp()
   }, [])
@@ -90,9 +88,9 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
       note: form.note || null,
     }
     if (editingId) {
-      await fetch(`${API_BASE}/api/transactions/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) })
+      await api.patch(`/api/transactions/${editingId}`, payload)
     } else {
-      await fetch(`${API_BASE}/api/transactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) })
+      await api.post('/api/transactions', payload)
     }
     setForm((f: any) => ({ ...f, amountRub: '' }))
     setEditingId(null)
@@ -104,9 +102,9 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
     const amount = Math.round(parseFloat(String(form.amountRub).replace(',', '.')) * 100)
     const payload = { paymentDate: form.paymentDate, fromAccountId: form.fromAccountId, toAccountId: form.toAccountId, amount, note: form.note || null }
     if (editingId) {
-      await fetch(`${API_BASE}/api/transactions/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) })
+      await api.patch(`/api/transactions/${editingId}`, payload)
     } else {
-      await fetch(`${API_BASE}/api/transactions/transfer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) })
+      await api.post('/api/transactions/transfer', payload)
     }
     setForm((f: any) => ({ ...f, amountRub: '' }))
     setEditingId(null)
@@ -176,7 +174,7 @@ export default function TransactionsClient({ initialY, initialM, initialAccounts
   }
 
   async function remove(id: string) {
-    await fetch(`${API_BASE}/api/transactions/${id}`, { method: 'DELETE', credentials: 'include' })
+    await api.delete(`/api/transactions/${id}`)
     if (editingId === id) setEditingId(null)
     await reload()
   }

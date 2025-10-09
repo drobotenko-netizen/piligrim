@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { api } from '@/lib/api-client'
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
@@ -25,12 +25,10 @@ export default function PayoutsClient({ initialY, initialM, initialEmployees, in
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState<{ employeeId: string; dateIso: string; year: string; month: string; accountId?: string | null; amountRub: string; note?: string }>({ employeeId: '', dateIso: `${initialY}-${String(initialM).padStart(2,'0')}-01`, year: String(initialY), month: String(initialM), accountId: '', amountRub: '' })
   const [activeDept, setActiveDept] = useState<'ALL' | 'KITCHEN' | 'HALL' | 'BAR' | 'OPERATORS' | 'OFFICE'>('ALL')
-  const API_BASE = getApiBase()
 
   async function reload() {
     try {
-      const res = await fetch(`${API_BASE}/api/payouts?y=${y}&m=${m}`, { credentials: 'include' })
-      const json = await res.json()
+      const json: any = await api.get('/api/payouts', { params: { y, m } })
       setItems(Array.isArray(json.items) ? json.items : [])
     } catch { setItems([]) }
   }
@@ -42,8 +40,7 @@ export default function PayoutsClient({ initialY, initialM, initialEmployees, in
     (async () => {
       if (accounts.length === 0) {
         try {
-          const r = await fetch(`${API_BASE}/api/accounts`, { credentials: 'include' })
-          const j = await r.json()
+          const j: any = await api.get('/api/accounts')
           setAccounts(j.items || j.data || [])
         } catch {}
       }
@@ -65,14 +62,13 @@ export default function PayoutsClient({ initialY, initialM, initialEmployees, in
     if (!form.employeeId || !form.amountRub) return
     const amount = Math.round(parseFloat(form.amountRub.replace(',', '.')) * 100)
     const payload: any = { employeeId: form.employeeId, date: form.dateIso, year: Number(form.year), month: Number(form.month), amount, accountId: form.accountId || null, note: form.note }
-    const res = await fetch(`${API_BASE}/api/payouts`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    if (!res.ok) return
+    await api.post('/api/payouts', payload)
     setForm(f => ({ ...f, employeeId: '', amountRub: '' }))
     await reload()
   }
 
   async function remove(id: string) {
-    await fetch(`${API_BASE}/api/payouts/${id}`, { method: 'DELETE', credentials: 'include' })
+    await api.delete(`/api/payouts/${id}`)
     await reload()
   }
 

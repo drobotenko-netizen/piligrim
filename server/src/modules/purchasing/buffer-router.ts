@@ -1,8 +1,9 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { getTenant } from '../../utils/tenant'
 import { getUserId } from '../../utils/auth'
 import { IikoClient } from '../iiko/client'
+import { asyncHandler, validateId } from '../../utils/common-middleware'
 
 // Функция для конвертации даты в формат iiko
 function toIikoDateTime(date: Date): string {
@@ -21,8 +22,7 @@ export function createBufferRouter(prisma: PrismaClient) {
   const client = new IikoClient()
 
   // GET расчет скользящих сумм для конкретного ингредиента
-  router.get('/calculate/:productId', async (req, res) => {
-    try {
+  router.get('/calculate/:productId', validateId('productId'), asyncHandler(async (req: Request, res: Response) => {
       const tenant = await getTenant(prisma, req as any)
       const { productId } = req.params
 
@@ -142,15 +142,10 @@ export function createBufferRouter(prisma: PrismaClient) {
         windowSums,
         maxWindowSum
       })
-    } catch (error: any) {
-      console.error('Error calculating buffer:', error)
-      res.status(500).json({ error: error?.message || 'Failed to calculate buffer' })
-    }
-  })
+  }))
 
   // POST массовый пересчет буферов для всех ингредиентов
-  router.post('/recalculate-all', async (req, res) => {
-    try {
+  router.post('/recalculate-all', asyncHandler(async (req: Request, res: Response) => {
       const tenant = await getTenant(prisma, req as any)
       const userId = getUserId(req as any)
 
@@ -288,15 +283,10 @@ export function createBufferRouter(prisma: PrismaClient) {
         created,
         updated
       })
-    } catch (error: any) {
-      console.error('Error recalculating buffers:', error)
-      res.status(500).json({ error: error?.message || 'Failed to recalculate buffers' })
-    }
-  })
+  }))
 
   // GET список буферов
-  router.get('/', async (req, res) => {
-    try {
+  router.get('/', asyncHandler(async (req: Request, res: Response) => {
       const tenant = await getTenant(prisma, req as any)
       
       const buffers = await (prisma as any).productBuffer?.findMany({
@@ -305,15 +295,10 @@ export function createBufferRouter(prisma: PrismaClient) {
       }) || []
 
       res.json({ buffers })
-    } catch (error: any) {
-      console.error('Error loading buffers:', error)
-      res.status(500).json({ error: error?.message || 'Failed to load buffers' })
-    }
-  })
+  }))
 
   // PATCH обновление буфера (ручная корректировка)
-  router.patch('/:id', async (req, res) => {
-    try {
+  router.patch('/:id', validateId('id'), asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params
       const { manualBuffer, notes } = req.body
       const userId = getUserId(req as any)
@@ -336,11 +321,7 @@ export function createBufferRouter(prisma: PrismaClient) {
       })
 
       res.json({ buffer })
-    } catch (error: any) {
-      console.error('Error updating buffer:', error)
-      res.status(500).json({ error: error?.message || 'Failed to update buffer' })
-    }
-  })
+  }))
 
   return router
 }

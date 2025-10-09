@@ -1,33 +1,31 @@
 'use client'
 
 import { useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
+import { useCrud } from '@/hooks/use-crud'
+import { api } from '@/lib/api-client'
 
-export default function RolesClient({ initialRoles, allPermissions }: { initialRoles: any[]; allPermissions: any[] }) {
-  const API_BASE = getApiBase()
-  const [roles, setRoles] = useState<any[]>(initialRoles)
+type Role = { id: string; name: string; permissions?: string[] }
+
+export default function RolesClient({ initialRoles, allPermissions }: { initialRoles: Role[]; allPermissions: any[] }) {
+  const roles = useCrud<Role>('/api/admin/roles', { 
+    initialItems: initialRoles,
+    transformData: (data) => data.items || data.data || data
+  })
   const [newRole, setNewRole] = useState('')
-
-  async function reload() {
-    const r = await fetch(`${API_BASE}/api/admin/roles`, { credentials: 'include' })
-    const j = await r.json()
-    setRoles(j.items || [])
-  }
 
   async function create() {
     if (!newRole.trim()) return
-    await fetch(`${API_BASE}/api/admin/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ name: newRole }) })
+    await roles.create({ name: newRole } as any)
     setNewRole('')
-    await reload()
   }
 
   async function setPerms(roleId: string, permNames: string[]) {
-    await fetch(`${API_BASE}/api/admin/roles/${roleId}/permissions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ permissions: permNames }) })
-    await reload()
+    await api.post(`/api/admin/roles/${roleId}/permissions`, { permissions: permNames })
+    await roles.refetch()
   }
 
   return (
@@ -42,7 +40,7 @@ export default function RolesClient({ initialRoles, allPermissions }: { initialR
               </TR>
             </THead>
             <TBody>
-              {roles.map(r => {
+              {roles.items.map(r => {
                 const selected = new Set<string>((r.permissions || []) as string[])
                 return (
                   <TR key={r.id}>
@@ -84,5 +82,4 @@ export default function RolesClient({ initialRoles, allPermissions }: { initialR
     </div>
   )
 }
-
 

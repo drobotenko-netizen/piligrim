@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
+import { useApi } from '@/hooks/use-api'
 
 function startOfMonth(d = new Date()) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))
@@ -16,30 +16,22 @@ function dtToYMD(d: Date) {
 }
 
 export default function ReturnsClient() {
-  const API_BASE = getApiBase()
   const [from, setFrom] = useState(dtToYMD(startOfMonth()))
   const [to, setTo] = useState(dtToYMD(endOfMonth()))
   const [group, setGroup] = useState<'waiter' | 'register'>('waiter')
-  const [summary, setSummary] = useState<any[]>([])
-  const [details, setDetails] = useState<any[]>([])
-  const [dishes, setDishes] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
 
-  async function load() {
-    setLoading(true)
-    try {
-      const r = await fetch(`${API_BASE}/api/iiko/local/returns?from=${from}&to=${to}&group=${group}`, { cache: 'no-store', credentials: 'include' })
-      const j = await r.json()
-      setSummary(Array.isArray(j?.rows) ? j.rows : [])
-      setDetails(Array.isArray(j?.details) ? j.details : [])
-      setDishes(Array.isArray(j?.dishes) ? j.dishes : [])
-    } catch {
-      setSummary([]); setDetails([]); setDishes([])
-    }
-    setLoading(false)
-  }
+  const { data, loading, refetch } = useApi<{ rows?: any[]; details?: any[]; dishes?: any[] }>('/api/iiko/local/returns', {
+    skip: true,
+    params: { from, to, group }
+  })
 
-  useEffect(() => { load() }, [])
+  const summary = Array.isArray(data?.rows) ? data.rows : []
+  const details = Array.isArray(data?.details) ? data.details : []
+  const dishes = Array.isArray(data?.dishes) ? data.dishes : []
+
+  useEffect(() => {
+    refetch({ from, to, group })
+  }, [])
 
   return (
     <div className="space-y-4">
@@ -59,7 +51,7 @@ export default function ReturnsClient() {
             <option value="register">По кассам</option>
           </select>
         </div>
-        <button onClick={load} className="border rounded px-3 py-1 text-sm">Показать</button>
+        <button onClick={() => refetch({ from, to, group })} className="border rounded px-3 py-1 text-sm">Показать</button>
       </div>
 
       <div className="rounded-lg border">
@@ -141,5 +133,4 @@ export default function ReturnsClient() {
     </div>
   )
 }
-
 

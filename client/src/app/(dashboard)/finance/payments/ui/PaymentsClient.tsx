@@ -1,15 +1,13 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { getApiBase } from "@/lib/api"
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
-
-const API_BASE = getApiBase()
+import { api } from '@/lib/api-client'
 
 export default function PaymentsClient() {
   const [payments, setPayments] = useState<any[]>([])
@@ -33,8 +31,7 @@ export default function PaymentsClient() {
 
   async function loadPayments() {
     try {
-      const res = await fetch(`${API_BASE}/api/payments`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/payments')
       setPayments(data.items || [])
     } catch (e) {
       console.error(e)
@@ -43,8 +40,7 @@ export default function PaymentsClient() {
 
   async function loadAccounts() {
     try {
-      const res = await fetch(`${API_BASE}/api/accounts`, { credentials: 'include' })
-      const data = await res.json()
+      const data: any = await api.get('/api/accounts')
       setAccounts(data.items || [])
     } catch (e) {
       console.error(e)
@@ -53,10 +49,10 @@ export default function PaymentsClient() {
 
   async function loadUnpaidDocs() {
     try {
-      const res = await fetch(`${API_BASE}/api/expense-docs?status=unpaid`, { credentials: 'include' })
-      const data1 = await res.json()
-      const res2 = await fetch(`${API_BASE}/api/expense-docs?status=partial`, { credentials: 'include' })
-      const data2 = await res2.json()
+      const [data1, data2]: any[] = await Promise.all([
+        api.get('/api/expense-docs', { params: { status: 'unpaid' } }),
+        api.get('/api/expense-docs', { params: { status: 'partial' } })
+      ])
       setUnpaidDocs([...(data1.items || []), ...(data2.items || [])])
     } catch (e) {
       console.error(e)
@@ -87,12 +83,7 @@ export default function PaymentsClient() {
         allocations: allocsArray
       }
 
-      await fetch(`${API_BASE}/api/payments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body)
-      })
+      await api.post('/api/payments', body)
 
       resetForm()
       loadPayments()
@@ -116,10 +107,7 @@ export default function PaymentsClient() {
   async function deletePayment(id: string) {
     if (!confirm('Отменить платёж? Это пересчитает суммы в документах.')) return
     try {
-      await fetch(`${API_BASE}/api/payments/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      })
+      await api.delete(`/api/payments/${id}`)
       loadPayments()
       loadUnpaidDocs()
     } catch (e) {

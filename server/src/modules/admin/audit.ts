@@ -1,7 +1,8 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { getTenant } from '../../utils/tenant'
 import { requirePermission } from '../../utils/auth'
+import { asyncHandler } from '../../utils/common-middleware'
 
 export function createAdminAuditRouter(prisma: PrismaClient) {
   const router = Router()
@@ -206,7 +207,7 @@ export function createAdminAuditRouter(prisma: PrismaClient) {
     return null
   }
 
-  router.get('/', requirePermission(prisma, 'users.manage'), async (req, res) => {
+  router.get('/', requirePermission(prisma, 'users.manage'), asyncHandler(async (req: Request, res: Response) => {
     const tenant = await getTenant(prisma, req as any)
     const { entity, q, limit = '100', view, year, month, userId, employeeId } = req.query as any
     const where: any = { tenantId: tenant.id }
@@ -471,7 +472,7 @@ export function createAdminAuditRouter(prisma: PrismaClient) {
       items.push({ ...a, entityLabel, entityDisplay, resolvedChanges, humanAction, keyValue })
     }
     res.json({ items })
-  })
+  }))
 
   return router
 }
