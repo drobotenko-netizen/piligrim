@@ -62,45 +62,30 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
-            export TAG=${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
+            
+            # Docker login to GHCR
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest images
             export IMAGE_WEB=${{ env.IMAGE_WEB }}:${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
             export IMAGE_API=${{ env.IMAGE_API }}:${{ github.event_name == 'push' && github.ref_name == 'main' && github.sha || github.ref_name }}
+            docker pull $IMAGE_WEB
+            docker pull $IMAGE_API
+            
+            # Tag as latest for docker-compose
+            docker tag $IMAGE_WEB piligrim-web:latest
+            docker tag $IMAGE_API piligrim-api:latest
 
-            # Prepare directories (files should already exist from previous deployments)
-            sudo mkdir -p /srv/piligrim/app
-            sudo mkdir -p /opt/infra/caddy
+            # Deploy using docker-compose
+            cd /srv/piligrim/app
+            docker compose -f infra/docker-compose.yml up -d
 
-            # Docker login to GHCR for pulls (using GITHUB_TOKEN as fallback)
-            echo ${{ secrets.GITHUB_TOKEN }} | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-            # Ensure shared proxy network exists and caddy attached
-            sudo docker network create proxy || true
-            # Connect existing caddy to proxy network if not already connected
-            sudo docker network connect proxy caddy || true
-
-            # Pull new images
-            sudo docker pull $IMAGE_WEB
-            sudo docker pull $IMAGE_API
-
-            # Stop and remove old containers
-            sudo docker stop api web 2>/dev/null || true
-            sudo docker rm api web 2>/dev/null || true
-
-            # Run new containers with correct names and network
-            sudo docker run -d --name api --network infra_default --restart unless-stopped \
-              -e PORT=4000 -e NODE_ENV=production -e DATABASE_URL=file:/data/dev.db \
-              -v piligrim_api_data:/data \
-              --env-file /srv/piligrim/app/server/.env \
-              $IMAGE_API
-
-            sudo docker run -d --name web --network infra_default --restart unless-stopped \
-              -e NODE_ENV=production -e PORT=3000 -e NEXT_PUBLIC_API_BASE=https://piligrim.5-star-roi.ru $IMAGE_WEB
-
-            # Connect to proxy network for Caddy routing
-            sudo docker network connect proxy api 2>/dev/null || true
-            sudo docker network connect proxy web 2>/dev/null || true
+            # Cleanup old images (keep last 3 versions)
+            docker image prune -af --filter "until=72h"
 
             # Health check
-            sleep 5
-            curl -fsSL https://piligrim.5-star-roi.ru/api/health -o /dev/null
+            sleep 10
+            curl -fsSL https://piligrim.5-star-roi.ru/api/health
+            
+            echo "✅ Deploy completed successfully!"
             
