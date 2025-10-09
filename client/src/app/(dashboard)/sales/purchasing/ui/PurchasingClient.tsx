@@ -99,6 +99,7 @@ interface ProductStock {
 interface Ingredient {
   productId: string
   productName: string
+  productType?: string
   totalStock: number
 }
 
@@ -172,16 +173,26 @@ export default function PurchasingClient() {
         console.log('[PurchasingClient] Products from iiko:', data.items?.length || 0)
         
         const items = data.items || []
+        
+        // Фильтруем - исключаем блюда, оставляем только ингредиенты и заготовки
+        // type может быть: DISH, GOODS, PREPARED (заготовка), MODIFIER
         const ingredients = items
-          .filter((item: any) => item.id && item.name) // Только с ID и названием
+          .filter((item: any) => {
+            if (!item.id || !item.name) return false
+            const type = String(item.type || '').toUpperCase()
+            // Исключаем блюда и модификаторы - нужны только товары и заготовки
+            return type !== 'DISH' && type !== 'MODIFIER'
+          })
           .map((item: any) => ({
             productId: item.id,
             productName: item.name,
+            productType: item.type,
             totalStock: 0 // Остатки загрузятся отдельно если нужно
           }))
           .sort((a, b) => a.productName.localeCompare(b.productName))
         
-        console.log('[PurchasingClient] Processed ingredients:', ingredients.length, 'items')
+        console.log('[PurchasingClient] Filtered ingredients:', ingredients.length, 'items')
+        console.log('[PurchasingClient] Sample types:', items.slice(0, 10).map((i: any) => i.type))
         setIngredients(ingredients)
       } else {
         const errorData = await ingredientsRes.json().catch(() => ({ error: 'Unknown error' }))
