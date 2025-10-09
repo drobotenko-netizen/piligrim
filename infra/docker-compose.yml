@@ -1,3 +1,7 @@
+networks:
+  default:
+    name: infra_default
+
 services:
   caddy:
     image: caddy:2
@@ -10,9 +14,13 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     restart: unless-stopped
+    networks:
+      - default
   web:
     image: piligrim-web:${TAG-latest}
     restart: unless-stopped
+    networks:
+      - default
   api:
     image: piligrim-api:${TAG-latest}
     env_file:
@@ -23,6 +31,8 @@ services:
       - api_data:/data
       - /srv/piligrim/app/server/.env:/app/.env:ro
     restart: unless-stopped
+    networks:
+      - default
 volumes:
   caddy_data: {}
   caddy_config: {}
