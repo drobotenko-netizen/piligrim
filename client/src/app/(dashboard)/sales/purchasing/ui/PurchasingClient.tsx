@@ -96,14 +96,33 @@ interface ProductStock {
   notes?: string
 }
 
+interface Ingredient {
+  productId: string
+  productName: string
+  totalStock: number
+}
+
+interface Counterparty {
+  id: string
+  name: string
+  kind: string
+  active: boolean
+}
+
 export default function PurchasingClient() {
   const [calculations, setCalculations] = useState<OrderCalculation[]>([])
   const [stocks, setStocks] = useState<ProductStock[]>([])
   const [buffers, setBuffers] = useState<ProductBuffer[]>([])
   const [productSuppliers, setProductSuppliers] = useState<ProductSupplier[]>([])
   const [orders, setOrders] = useState<SupplierOrder[]>([])
+  const [ingredients, setIngredients] = useState<Ingredient[]>([])
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('calculate')
+  
+  // Новые состояния для управления поставщиками ингредиента
+  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
+  const [showSuppliersDialog, setShowSuppliersDialog] = useState(false)
 
   const API_BASE = getApiBase()
 
@@ -115,22 +134,18 @@ export default function PurchasingClient() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [calculationsRes, stocksRes, buffersRes, suppliersRes, ordersRes] = await Promise.all([
+      const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/purchasing/stocks`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' })
+        fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/purchasing/ingredients`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
       ])
 
       if (calculationsRes.ok) {
         const data = await calculationsRes.json()
         setCalculations(data.calculations || [])
-      }
-
-      if (stocksRes.ok) {
-        const data = await stocksRes.json()
-        setStocks(data.stocks || [])
       }
 
       if (buffersRes.ok) {
@@ -146,6 +161,16 @@ export default function PurchasingClient() {
       if (ordersRes.ok) {
         const data = await ordersRes.json()
         setOrders(data.orders || [])
+      }
+
+      if (ingredientsRes.ok) {
+        const data = await ingredientsRes.json()
+        setIngredients(data.ingredients || [])
+      }
+
+      if (counterpartiesRes.ok) {
+        const data = await counterpartiesRes.json()
+        setCounterparties(data.items || [])
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -467,7 +492,7 @@ export default function PurchasingClient() {
         </TabsTrigger>
         <TabsTrigger value="stocks" className="flex items-center gap-2">
           <Package className="h-4 w-4" />
-          Остатки
+          Ингредиенты
         </TabsTrigger>
         <TabsTrigger value="buffers" className="flex items-center gap-2">
           <Package className="h-4 w-4" />
@@ -564,62 +589,64 @@ export default function PurchasingClient() {
         </Card>
       </TabsContent>
 
-      {/* Остатки */}
+      {/* Ингредиенты */}
       <TabsContent value="stocks" className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Остатки продуктов</CardTitle>
+            <CardTitle>Ингредиенты</CardTitle>
             <CardDescription>
-              Текущие остатки продуктов на складах, синхронизированные с iiko
+              Список всех ингредиентов из iiko с возможностью настройки поставщиков
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-4">
-              <Button onClick={syncStocks} disabled={loading}>
-                <Package className="h-4 w-4 mr-2" />
-                Синхронизировать с iiko
-              </Button>
-            </div>
-
             <Table>
               <THead>
                 <TR>
-                  <TH>Продукт</TH>
-                  <TH>Склад</TH>
-                  <TH>Текущий остаток</TH>
-                  <TH>Зарезервировано</TH>
-                  <TH>Последняя синхронизация</TH>
-                  <TH>Статус</TH>
+                  <TH>Ингредиент</TH>
+                  <TH>Общий остаток</TH>
+                  <TH>Поставщики</TH>
+                  <TH>Действия</TH>
                 </TR>
               </THead>
               <TBody>
-                {stocks.map((stock) => {
-                  const isLowStock = stock.currentStock <= 10
-                  const lastSync = new Date(stock.lastSyncWithIiko)
-                  const isStale = Date.now() - lastSync.getTime() > 24 * 60 * 60 * 1000 // 24 часа
+                {ingredients.map((ingredient) => {
+                  const ingredientSuppliers = productSuppliers.filter(
+                    ps => ps.productId === ingredient.productId
+                  )
+                  const primarySupplier = ingredientSuppliers.find(ps => ps.isPrimary)
                   
                   return (
-                    <TR key={stock.id}>
-                      <TD className="font-medium">{stock.productName}</TD>
-                      <TD>{stock.storeName}</TD>
-                      <TD className={isLowStock ? 'text-red-600 font-semibold' : ''}>
-                        {stock.currentStock.toFixed(1)}
-                      </TD>
-                      <TD>{stock.reservedStock.toFixed(1)}</TD>
+                    <TR key={ingredient.productId}>
+                      <TD className="font-medium">{ingredient.productName}</TD>
+                      <TD>{ingredient.totalStock.toFixed(1)}</TD>
                       <TD>
-                        {lastSync.toLocaleString('ru-RU')}
-                        {isStale && (
-                          <Badge variant="destructive" className="ml-2 text-xs">
-                            Устарело
-                          </Badge>
-                        )}
-                      </TD>
-                      <TD>
-                        {isLowStock ? (
-                          <Badge variant="destructive">Мало</Badge>
+                        {ingredientSuppliers.length === 0 ? (
+                          <Badge variant="outline">Не настроено</Badge>
                         ) : (
-                          <Badge variant="default">Норма</Badge>
+                          <div className="flex gap-2 flex-wrap">
+                            {primarySupplier && (
+                              <Badge variant="default">{primarySupplier.supplier.name}</Badge>
+                            )}
+                            {ingredientSuppliers.filter(ps => !ps.isPrimary).length > 0 && (
+                              <Badge variant="secondary">
+                                +{ingredientSuppliers.filter(ps => !ps.isPrimary).length} запасных
+                              </Badge>
+                            )}
+                          </div>
                         )}
+                      </TD>
+                      <TD>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedIngredient(ingredient)
+                            setShowSuppliersDialog(true)
+                          }}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Настроить поставщиков
+                        </Button>
                       </TD>
                     </TR>
                   )
@@ -627,9 +654,15 @@ export default function PurchasingClient() {
               </TBody>
             </Table>
 
-            {stocks.length === 0 && (
+            {ingredients.length === 0 && !loading && (
               <div className="text-center py-8 text-muted-foreground">
-                Остатки не найдены. Нажмите "Синхронизировать с iiko" для загрузки данных.
+                Нет данных об ингредиентах. Попробуйте обновить страницу.
+              </div>
+            )}
+            
+            {loading && (
+              <div className="text-center py-8 text-muted-foreground">
+                Загрузка ингредиентов...
               </div>
             )}
           </CardContent>
@@ -963,6 +996,192 @@ export default function PurchasingClient() {
           </Button>
           <Button onClick={saveSupplier} disabled={loading}>
             {loading ? 'Сохранение...' : (editingSupplier ? 'Сохранить' : 'Создать')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Модальное окно для управления поставщиками ингредиента */}
+    <Dialog open={showSuppliersDialog} onOpenChange={setShowSuppliersDialog}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Настройка поставщиков для: {selectedIngredient?.productName}
+          </DialogTitle>
+          <DialogDescription>
+            Выберите поставщиков для этого ингредиента и укажите основного
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          {/* Текущие поставщики */}
+          <div>
+            <h3 className="font-semibold mb-2">Текущие поставщики:</h3>
+            {selectedIngredient && productSuppliers
+              .filter(ps => ps.productId === selectedIngredient.productId)
+              .length === 0 && (
+              <p className="text-sm text-muted-foreground">Поставщики не назначены</p>
+            )}
+            <div className="space-y-2">
+              {selectedIngredient && productSuppliers
+                .filter(ps => ps.productId === selectedIngredient.productId)
+                .map((ps) => (
+                  <div key={ps.id} className="flex items-center justify-between border rounded p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{ps.supplier.name}</span>
+                      {ps.isPrimary && (
+                        <Badge variant="default">Основной</Badge>
+                      )}
+                      {!ps.isPrimary && (
+                        <Badge variant="secondary">Приоритет: {ps.priority}</Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          // Сделать основным
+                          const updatedSuppliers = productSuppliers.map(s => 
+                            s.productId === selectedIngredient.productId
+                              ? { ...s, isPrimary: s.id === ps.id }
+                              : s
+                          )
+                          // TODO: сохранить изменения через API
+                        }}
+                        disabled={ps.isPrimary}
+                      >
+                        Сделать основным
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => deleteSupplier(ps.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Добавить нового поставщика */}
+          <div>
+            <h3 className="font-semibold mb-2">Добавить поставщика:</h3>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="newSupplier">Выберите поставщика</Label>
+                <Select>
+                  <SelectTrigger id="newSupplier">
+                    <SelectValue placeholder="Выберите контрагента-поставщика" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {counterparties.map((cp) => (
+                      <SelectItem key={cp.id} value={cp.id}>
+                        {cp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="newSupplierDeliveryDays">Дни доставки</Label>
+                  <Input 
+                    id="newSupplierDeliveryDays" 
+                    type="number" 
+                    placeholder="1"
+                    defaultValue={1}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="newSupplierPrice">Цена (копейки)</Label>
+                  <Input 
+                    id="newSupplierPrice" 
+                    type="number" 
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="newSupplierPriority">Приоритет</Label>
+                  <Input 
+                    id="newSupplierPriority" 
+                    type="number" 
+                    placeholder="1"
+                    defaultValue={1}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  id="newSupplierIsPrimary" 
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="newSupplierIsPrimary">Сделать основным поставщиком</Label>
+              </div>
+              <Button 
+                onClick={async () => {
+                  if (!selectedIngredient) return
+                  
+                  const supplierSelect = document.getElementById('newSupplier') as any
+                  const supplierId = supplierSelect?.value
+                  if (!supplierId) {
+                    alert('Выберите поставщика')
+                    return
+                  }
+                  
+                  const deliveryDays = parseInt((document.getElementById('newSupplierDeliveryDays') as HTMLInputElement)?.value || '1')
+                  const price = parseInt((document.getElementById('newSupplierPrice') as HTMLInputElement)?.value || '0') || null
+                  const priority = parseInt((document.getElementById('newSupplierPriority') as HTMLInputElement)?.value || '1')
+                  const isPrimary = (document.getElementById('newSupplierIsPrimary') as HTMLInputElement)?.checked || false
+
+                  try {
+                    setLoading(true)
+                    const response = await fetch(`${API_BASE}/api/purchasing/product-suppliers`, {
+                      method: 'POST',
+                      credentials: 'include',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        productId: selectedIngredient.productId,
+                        productName: selectedIngredient.productName,
+                        supplierId,
+                        isPrimary,
+                        priority,
+                        deliveryDays,
+                        price,
+                        unit: 'кг',
+                        isActive: true
+                      })
+                    })
+
+                    if (response.ok) {
+                      // Перезагружаем данные
+                      await loadData()
+                    } else {
+                      const error = await response.json()
+                      alert(`Ошибка: ${error.error || 'Не удалось добавить поставщика'}`)
+                    }
+                  } catch (error) {
+                    console.error('Error adding supplier:', error)
+                    alert('Ошибка при добавлении поставщика')
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+                disabled={loading}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Добавить поставщика
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowSuppliersDialog(false)}>
+            Закрыть
           </Button>
         </DialogFooter>
       </DialogContent>
