@@ -117,7 +117,6 @@ export function getAvailableMenuItems(roles: string[] = []): MenuItem[] {
   
   if (visibility.visibleSettings) {
     items.push(
-      { href: '/settings/purchasing', label: 'Настройки закупок', section: 'settings' },
       { href: '/admin/users', label: 'Пользователи', section: 'settings' },
       { href: '/admin/roles', label: 'Роли', section: 'settings' },
       { href: '/admin/audit', label: 'Аудит', section: 'settings' }
