@@ -32,8 +32,8 @@ export function getMenuVisibility(roles: string[]) {
     visiblePersonnel: admin || has('MANAGER') || has('CASHIER'),
     visibleFinance: admin || has('ACCOUNTANT'),
     visibleSettings: admin,
-    visibleIiko: true, // iiko всегда доступен
-    visibleImport: true, // импорт всегда доступен
+    visibleIiko: admin || has('MANAGER') || has('ACCOUNTANT'), // данные iiko для управленцев и бухгалтеров
+    visibleImport: admin || has('ACCOUNTANT'), // импорт только для админов и бухгалтеров
   }
 }
 
