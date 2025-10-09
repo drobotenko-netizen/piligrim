@@ -66,7 +66,8 @@ export function getAvailableMenuItems(roles: string[] = []): MenuItem[] {
   // Блюда всегда доступны как отдельный раздел
   items.push(
     { href: '/sales/dishes', label: 'Меню', section: 'dishes' },
-    { href: '/sales/purchasing', label: 'Закупки', section: 'dishes' }
+    { href: '/sales/purchasing', label: 'Закупки', section: 'dishes' },
+    { href: '/settings/purchasing', label: 'Настройки закупок', section: 'dishes' }
   )
   
   if (visibility.visiblePersonnel) {
