@@ -40,30 +40,42 @@ export function createBufferRouter(prisma: PrismaClient) {
 
       const { purchaseWindowDays, analysisWindowDays } = settings
 
-      // Получаем данные расхода из iiko за analysisWindowDays
+      // Получаем данные расхода из iiko за analysisWindowDays через OLAP
       const now = new Date()
       const startDate = new Date(now)
       startDate.setDate(startDate.getDate() - analysisWindowDays)
 
-      const consumption = await client.getStoreConsumption(
-        toIikoDateTime(startDate),
-        toIikoDateTime(now)
-      )
+      const body = {
+        reportType: 'TRANSACTIONS',
+        buildSummary: false,
+        groupByRowFields: ['Product.Id', 'DateTime.Typed'],
+        groupByColFields: [],
+        aggregateFields: ['Amount'],
+        filters: {
+          'DateTime.Typed': {
+            filterType: 'DateRange',
+            periodType: 'CUSTOM',
+            from: toIikoDateTime(startDate),
+            to: toIikoDateTime(now)
+          },
+          'Product.Id': {
+            filterType: 'IncludeValues',
+            values: [productId]
+          }
+        }
+      }
 
-      // Фильтруем данные для конкретного продукта
-      const productConsumption = consumption.rows?.filter((row: any) => 
-        row.product === productId
-      ) || []
+      const consumption = await client.postOlap(body)
 
       // Группируем по дням
       const dailyConsumption: { [date: string]: number } = {}
       
-      for (const row of productConsumption) {
-        const dateKey = row.date?.split('T')[0] || ''
+      for (const row of consumption.data || []) {
+        const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
         if (!dailyConsumption[dateKey]) {
           dailyConsumption[dateKey] = 0
         }
-        dailyConsumption[dateKey] += Number(row.amount) || 0
+        dailyConsumption[dateKey] += Number(row.Amount) || 0
       }
 
       // Создаем массив дней с расходом (включая дни с нулевым расходом)
@@ -128,29 +140,43 @@ export function createBufferRouter(prisma: PrismaClient) {
       const { purchaseWindowDays, analysisWindowDays } = settings
 
       // Получаем список всех ингредиентов (GOODS)
-      const products = await client.getProducts()
-      const ingredients = products.items?.filter((item: any) => 
+      const products = await client.listProducts({ includeDeleted: false })
+      const items = Array.isArray(products) ? products : (products?.items || products?.data || [])
+      const ingredients = items.filter((item: any) => 
         item.type === 'GOODS'
       ) || []
 
       console.log(`[buffer-recalculate] Processing ${ingredients.length} ingredients`)
 
-      // Получаем данные расхода из iiko
+      // Получаем данные расхода из iiko через OLAP
       const now = new Date()
       const startDate = new Date(now)
       startDate.setDate(startDate.getDate() - analysisWindowDays)
 
-      const consumption = await client.getStoreConsumption(
-        toIikoDateTime(startDate),
-        toIikoDateTime(now)
-      )
+      const body = {
+        reportType: 'TRANSACTIONS',
+        buildSummary: false,
+        groupByRowFields: ['Product.Id', 'DateTime.Typed'],
+        groupByColFields: [],
+        aggregateFields: ['Amount'],
+        filters: {
+          'DateTime.Typed': {
+            filterType: 'DateRange',
+            periodType: 'CUSTOM',
+            from: toIikoDateTime(startDate),
+            to: toIikoDateTime(now)
+          }
+        }
+      }
+
+      const consumption = await client.postOlap(body)
 
       // Группируем расход по продуктам и дням
       const consumptionByProduct: { [productId: string]: { [date: string]: number } } = {}
 
-      for (const row of consumption.rows || []) {
-        const productId = row.product
-        const dateKey = row.date?.split('T')[0] || ''
+      for (const row of consumption.data || []) {
+        const productId = row['Product.Id']
+        const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
         
         if (!consumptionByProduct[productId]) {
           consumptionByProduct[productId] = {}
@@ -158,7 +184,7 @@ export function createBufferRouter(prisma: PrismaClient) {
         if (!consumptionByProduct[productId][dateKey]) {
           consumptionByProduct[productId][dateKey] = 0
         }
-        consumptionByProduct[productId][dateKey] += Number(row.amount) || 0
+        consumptionByProduct[productId][dateKey] += Number(row.Amount) || 0
       }
 
       let updated = 0
