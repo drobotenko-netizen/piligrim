@@ -47,6 +47,7 @@ const salesItems = [
 const dishesItems = [
   { href: '/sales/dishes', label: 'Меню', icon: FileSpreadsheet },
   { href: '/sales/purchasing', label: 'Закупки', icon: ShoppingCart },
+  { href: '/settings/purchasing', label: 'Настройки закупок', icon: Settings },
 ]
 
 const iikoItems = [
