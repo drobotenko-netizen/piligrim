@@ -4,6 +4,18 @@ import { getTenant } from '../../utils/tenant'
 import { requirePermission } from '../../utils/auth'
 import { IikoClient } from '../iiko/client'
 
+// Функция для конвертации даты в формат iiko
+function toIikoDateTime(date: Date): string {
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
+  const hh = String(date.getUTCHours()).padStart(2, '0')
+  const mm = String(date.getUTCMinutes()).padStart(2, '0')
+  const ss = String(date.getUTCSeconds()).padStart(2, '0')
+  const ms = String(date.getUTCMilliseconds()).padStart(3, '0')
+  return `${y}-${m}-${d}T${hh}:${mm}:${ss}.${ms}`
+}
+
 export function createPurchasingRouter(prisma: PrismaClient) {
   const router = Router()
 
@@ -436,7 +448,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
   router.get('/ingredients', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
     try {
       const client = new IikoClient()
-      const timestamp = new Date().toISOString()
+      const timestamp = toIikoDateTime(new Date())
       
       // Получаем остатки из iiko для получения списка всех продуктов
       const balances = await client.getStoreBalances({ timestampIso: timestamp })
@@ -474,7 +486,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
       const { storeIds, productIds } = req.body
 
       const client = new IikoClient()
-      const timestamp = new Date().toISOString()
+      const timestamp = toIikoDateTime(new Date())
       
       // Получаем остатки из iiko
       const balances = await client.getStoreBalances({ timestampIso: timestamp })
@@ -649,7 +661,7 @@ async function getCurrentStock(prisma: PrismaClient, productId: string, storeId:
 
     // Получаем актуальные данные из iiko
     const client = new IikoClient()
-    const timestamp = new Date().toISOString()
+    const timestamp = toIikoDateTime(new Date())
     
     // Запрос остатков из iiko
     const balances = await client.getStoreBalances({ timestampIso: timestamp })
