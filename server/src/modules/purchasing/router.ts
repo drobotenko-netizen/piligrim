@@ -61,7 +61,7 @@ export function createPurchasingRouter(prisma: PrismaClient) {
         const bufferStock = calculateBufferStock(buffer, weeklyConsumption)
 
         // Получаем текущий остаток
-        const currentStock = await getCurrentStock(prisma, buffer.productId, storeId || 'default')
+        const currentStock = await getCurrentStock(prisma, buffer.productId, storeId || 'default', tenantId)
 
         // Рассчитываем количество к заказу
         const orderQuantity = bufferStock - Math.max(currentStock, 0)
@@ -432,6 +432,40 @@ export function createPurchasingRouter(prisma: PrismaClient) {
 
   // ===== Синхронизация с iiko =====
 
+  // GET /api/purchasing/ingredients - Получить список ингредиентов из iiko
+  router.get('/ingredients', requirePermission(prisma, 'iiko.read'), async (req: any, res) => {
+    try {
+      const client = new IikoClient()
+      const timestamp = new Date().toISOString()
+      
+      // Получаем остатки из iiko для получения списка всех продуктов
+      const balances = await client.getStoreBalances({ timestampIso: timestamp })
+      
+      // Группируем по productId чтобы избежать дубликатов
+      const productsMap = new Map()
+      for (const balance of balances) {
+        if (!productsMap.has(balance.productId)) {
+          productsMap.set(balance.productId, {
+            productId: balance.productId,
+            productName: balance.productName || 'Unknown',
+            totalStock: 0
+          })
+        }
+        const product = productsMap.get(balance.productId)
+        product.totalStock += Number(balance.balance) || 0
+      }
+      
+      const ingredients = Array.from(productsMap.values()).sort((a, b) => 
+        a.productName.localeCompare(b.productName)
+      )
+      
+      res.json({ ingredients })
+    } catch (e: any) {
+      console.error('Error fetching ingredients:', e)
+      res.status(500).json({ error: String(e?.message || e) })
+    }
+  })
+
   // POST /api/purchasing/sync-stocks - Синхронизация остатков с iiko
   router.post('/sync-stocks', requirePermission(prisma, 'iiko.write'), async (req: any, res) => {
     try {
@@ -440,10 +474,10 @@ export function createPurchasingRouter(prisma: PrismaClient) {
       const { storeIds, productIds } = req.body
 
       const client = new IikoClient()
+      const timestamp = new Date().toISOString()
       
       // Получаем остатки из iiko
-      const response = await client.getStoresBalances()
-      const balances = Array.isArray(response?.data) ? response.data : []
+      const balances = await client.getStoreBalances({ timestampIso: timestamp })
       
       let syncedCount = 0
       const errors: string[] = []
@@ -595,7 +629,7 @@ function calculateBufferStock(buffer: any, weeklyConsumption: number): number {
 }
 
 // Получение текущего остатка из iiko
-async function getCurrentStock(prisma: PrismaClient, productId: string, storeId: string): Promise<number> {
+async function getCurrentStock(prisma: PrismaClient, productId: string, storeId: string, tenantId?: string): Promise<number> {
   try {
     // Сначала проверяем локальную базу данных
     const localStock = await prisma.productStock.findFirst({
@@ -615,10 +649,10 @@ async function getCurrentStock(prisma: PrismaClient, productId: string, storeId:
 
     // Получаем актуальные данные из iiko
     const client = new IikoClient()
+    const timestamp = new Date().toISOString()
     
     // Запрос остатков из iiko
-    const response = await client.getStoresBalances()
-    const balances = Array.isArray(response?.data) ? response.data : []
+    const balances = await client.getStoreBalances({ timestampIso: timestamp })
     
     const productBalance = balances.find((balance: any) => 
       balance.productId === productId && balance.storeId === storeId
@@ -626,27 +660,30 @@ async function getCurrentStock(prisma: PrismaClient, productId: string, storeId:
 
     const currentStock = productBalance ? Number(productBalance.balance) || 0 : 0
 
-    // Обновляем локальную базу данных
-    await prisma.productStock.upsert({
-      where: {
-        productId_storeId: {
+    // Обновляем локальную базу данных только если есть tenantId
+    if (tenantId) {
+      await prisma.productStock.upsert({
+        where: {
+          productId_storeId: {
+            productId,
+            storeId
+          }
+        },
+        update: {
+          currentStock,
+          lastSyncWithIiko: new Date()
+        },
+        create: {
+          tenantId,
           productId,
-          storeId
+          productName: productBalance?.productName || 'Unknown',
+          storeId,
+          storeName: productBalance?.storeName || 'Unknown',
+          currentStock,
+          lastSyncWithIiko: new Date()
         }
-      },
-      update: {
-        currentStock,
-        lastSyncWithIiko: new Date()
-      },
-      create: {
-        productId,
-        productName: productBalance?.productName || 'Unknown',
-        storeId,
-        storeName: productBalance?.storeName || 'Unknown',
-        currentStock,
-        lastSyncWithIiko: new Date()
-      }
-    })
+      })
+    }
 
     return currentStock
   } catch (error) {
