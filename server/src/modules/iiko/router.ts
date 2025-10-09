@@ -1949,6 +1949,8 @@ export function createIikoRouter() {
       const category = String(req.body?.category || '').trim()
       const dishId = String(req.body?.dishId || '').trim()
       
+      console.log('[balances-table] Request params:', { timestamp, fromDate, toDate, category, dishId })
+      
       if (!timestamp) return res.status(400).json({ error: 'timestamp required (yyyy-MM-ddTHH:mm:ss.SSS)' })
       if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
         return res.status(400).json({ error: 'from/to must be YYYY-MM-DD' })
@@ -2124,6 +2126,7 @@ export function createIikoRouter() {
         totalConsumption: Math.round(tableRows.reduce((sum, r) => sum + r.consumption, 0))
       })
     } catch (e: any) {
+      console.error('[balances-table] Error:', e)
       res.status(500).json({ error: String(e?.message || e) })
     }
   })
