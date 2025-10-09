@@ -125,23 +125,10 @@ export default function PurchasingClient() {
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
   const [showSuppliersDialog, setShowSuppliersDialog] = useState(false)
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
-  const [orderDays, setOrderDays] = useState<number[]>([1]) // Дни недели для заказа (1-7)
-  const [deliveryDays, setDeliveryDays] = useState<number>(1) // Количество дней на доставку
   
   // Множественный выбор ингредиентов
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set())
   const [showBulkSuppliersDialog, setShowBulkSuppliersDialog] = useState(false)
-  
-  // Названия дней недели
-  const weekDays = [
-    { value: 1, label: 'Понедельник' },
-    { value: 2, label: 'Вторник' },
-    { value: 3, label: 'Среда' },
-    { value: 4, label: 'Четверг' },
-    { value: 5, label: 'Пятница' },
-    { value: 6, label: 'Суббота' },
-    { value: 7, label: 'Воскресенье' }
-  ]
 
   const API_BASE = getApiBase()
 
@@ -161,7 +148,7 @@ export default function PurchasingClient() {
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/iiko/entities/products`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
+        fetch(`${API_BASE}/api/counterparties?kind=Поставщик`, { credentials: 'include' })
       ])
       
       console.log('[PurchasingClient] ingredientsRes status:', ingredientsRes.status)
@@ -1251,44 +1238,6 @@ export default function PurchasingClient() {
                 )}
               </div>
               
-              <div>
-                <Label>Дни заказа *</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {weekDays.map((day) => (
-                    <div key={day.value} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`orderDay-${day.value}`}
-                        checked={orderDays.includes(day.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setOrderDays([...orderDays, day.value].sort())
-                          } else {
-                            setOrderDays(orderDays.filter(d => d !== day.value))
-                          }
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <Label htmlFor={`orderDay-${day.value}`} className="font-normal">{day.label}</Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="deliveryDaysInput">Дней на доставку *</Label>
-                <Input 
-                  id="deliveryDaysInput"
-                  type="number" 
-                  placeholder="1"
-                  value={deliveryDays}
-                  onChange={(e) => setDeliveryDays(parseInt(e.target.value) || 1)}
-                  min="1"
-                  max="30"
-                />
-                <p className="text-xs text-gray-500 mt-1">Количество дней от заказа до доставки</p>
-              </div>
-              
               <div className="flex items-center space-x-2">
                 <input 
                   type="checkbox" 
@@ -1306,11 +1255,6 @@ export default function PurchasingClient() {
                     return
                   }
                   
-                  if (orderDays.length === 0) {
-                    alert('Выберите хотя бы один день заказа')
-                    return
-                  }
-                  
                   const isPrimary = (document.getElementById('newSupplierIsPrimary') as HTMLInputElement)?.checked || false
 
                   try {
@@ -1325,8 +1269,7 @@ export default function PurchasingClient() {
                         supplierId: selectedSupplierId,
                         isPrimary,
                         priority: 1,
-                        orderDays: orderDays.join(','), // Сохраняем как строку "1,3,5"
-                        deliveryDays,
+                        deliveryDays: 1,
                         price: null,
                         unit: 'кг',
                         isActive: true
@@ -1337,8 +1280,6 @@ export default function PurchasingClient() {
                       // Перезагружаем данные и очищаем форму
                       await loadData()
                       setSelectedSupplierId('')
-                      setOrderDays([1])
-                      setDeliveryDays(1)
                     } else {
                       const error = await response.json()
                       alert(`Ошибка: ${error.error || 'Не удалось добавить поставщика'}`)
@@ -1398,44 +1339,9 @@ export default function PurchasingClient() {
                 )}
               </SelectContent>
             </Select>
-          </div>
-          
-          <div>
-            <Label>Дни заказа *</Label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              {weekDays.map((day) => (
-                <div key={day.value} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`bulkOrderDay-${day.value}`}
-                    checked={orderDays.includes(day.value)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setOrderDays([...orderDays, day.value].sort())
-                      } else {
-                        setOrderDays(orderDays.filter(d => d !== day.value))
-                      }
-                    }}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor={`bulkOrderDay-${day.value}`} className="font-normal">{day.label}</Label>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <Label htmlFor="bulkDeliveryDaysInput">Дней на доставку *</Label>
-            <Input 
-              id="bulkDeliveryDaysInput"
-              type="number" 
-              placeholder="1"
-              value={deliveryDays}
-              onChange={(e) => setDeliveryDays(parseInt(e.target.value) || 1)}
-              min="1"
-              max="30"
-            />
-            <p className="text-xs text-gray-500 mt-1">Количество дней от заказа до доставки</p>
+            {counterparties.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1">Доступно поставщиков: {counterparties.length}</p>
+            )}
           </div>
           
           <div className="flex items-center space-x-2">
@@ -1457,11 +1363,6 @@ export default function PurchasingClient() {
             onClick={async () => {
               if (!selectedSupplierId) {
                 alert('Выберите поставщика')
-                return
-              }
-              
-              if (orderDays.length === 0) {
-                alert('Выберите хотя бы один день заказа')
                 return
               }
               
@@ -1487,8 +1388,7 @@ export default function PurchasingClient() {
                         supplierId: selectedSupplierId,
                         isPrimary,
                         priority: 1,
-                        orderDays: orderDays.join(','),
-                        deliveryDays,
+                        deliveryDays: 1,
                         price: null,
                         unit: 'кг',
                         isActive: true
@@ -1509,8 +1409,6 @@ export default function PurchasingClient() {
                 await loadData()
                 setSelectedIngredients(new Set())
                 setSelectedSupplierId('')
-                setOrderDays([1])
-                setDeliveryDays(1)
                 setShowBulkSuppliersDialog(false)
               } catch (error) {
                 console.error('Error bulk assigning suppliers:', error)
