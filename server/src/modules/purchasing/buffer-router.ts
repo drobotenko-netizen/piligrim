@@ -48,7 +48,7 @@ export function createBufferRouter(prisma: PrismaClient) {
       const body = {
         reportType: 'TRANSACTIONS',
         buildSummary: false,
-        groupByRowFields: ['Product.Id', 'DateTime.Typed'],
+        groupByRowFields: ['Product.Id', 'DateTime.Typed', 'TransactionType'],
         groupByColFields: [],
         aggregateFields: ['Amount'],
         filters: {
@@ -71,33 +71,51 @@ export function createBufferRouter(prisma: PrismaClient) {
 
       const consumption = await client.postOlap(body)
 
-      // Группируем по дням
+      // Группируем по дням с разбивкой по типам
       const dailyConsumption: { [date: string]: number } = {}
+      const dailyByType: { [date: string]: { salesRevenue: number; sessionWriteoff: number; writeoff: number } } = {}
       
       for (const row of consumption.data || []) {
         const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
         const amount = Number(row.Amount) || 0
+        const transactionType = row.TransactionType || ''
         
         // Пропускаем положительные значения (приход на склад)
-        // Нас интересует только расход (отрицательные значения)
         if (amount >= 0) continue
+        
+        const absAmount = Math.abs(amount)
         
         if (!dailyConsumption[dateKey]) {
           dailyConsumption[dateKey] = 0
         }
-        // Сохраняем абсолютное значение расхода
-        dailyConsumption[dateKey] += Math.abs(amount)
+        dailyConsumption[dateKey] += absAmount
+        
+        if (!dailyByType[dateKey]) {
+          dailyByType[dateKey] = { salesRevenue: 0, sessionWriteoff: 0, writeoff: 0 }
+        }
+        
+        if (transactionType === 'SALES_REVENUE') {
+          dailyByType[dateKey].salesRevenue += absAmount
+        } else if (transactionType === 'SESSION_WRITEOFF') {
+          dailyByType[dateKey].sessionWriteoff += absAmount
+        } else if (transactionType === 'WRITEOFF') {
+          dailyByType[dateKey].writeoff += absAmount
+        }
       }
 
       // Создаем массив дней с расходом (включая дни с нулевым расходом)
-      const days: { date: string; consumption: number }[] = []
+      const days: { date: string; consumption: number; salesRevenue: number; sessionWriteoff: number; writeoff: number }[] = []
       for (let i = 0; i < analysisWindowDays; i++) {
         const date = new Date(startDate)
         date.setDate(date.getDate() + i)
         const dateKey = date.toISOString().split('T')[0]
+        const byType = dailyByType[dateKey] || { salesRevenue: 0, sessionWriteoff: 0, writeoff: 0 }
         days.push({
           date: dateKey,
-          consumption: dailyConsumption[dateKey] || 0
+          consumption: dailyConsumption[dateKey] || 0,
+          salesRevenue: byType.salesRevenue,
+          sessionWriteoff: byType.sessionWriteoff,
+          writeoff: byType.writeoff
         })
       }
 
