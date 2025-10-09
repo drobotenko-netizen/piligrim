@@ -46,7 +46,6 @@ export default function BufferChartDialog({ open, onOpenChange, productId, produ
     return {
       date: new Date(day.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
       consumption: day.consumption,
-      salesRevenue: day.salesRevenue || 0,
       sessionWriteoff: day.sessionWriteoff || 0,
       writeoff: day.writeoff || 0,
       windowSum: windowData?.windowSum || null
@@ -89,9 +88,8 @@ export default function BufferChartDialog({ open, onOpenChange, productId, produ
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-2">Как читать график:</h4>
               <ul className="text-sm text-gray-700 space-y-1">
-                <li>• <span className="text-green-600 font-medium">Зеленый</span> — расход по техкартам (продажи)</li>
-                <li>• <span className="text-orange-600 font-medium">Оранжевый</span> — списание по смене</li>
-                <li>• <span className="text-yellow-600 font-medium">Желтый</span> — другие списания</li>
+                <li>• <span className="text-orange-600 font-medium">Оранжевый</span> — списание по смене (расход по техкартам)</li>
+                <li>• <span className="text-yellow-600 font-medium">Желтый</span> — ручные списания</li>
                 <li>• <span className="text-red-600 font-medium">Красная линия</span> — скользящая сумма за окно закупа ({data.purchaseWindowDays} дней)</li>
                 <li>• Буфер = максимальное значение красной линии ({data.maxWindowSum?.toFixed(1)} кг)</li>
               </ul>
@@ -110,9 +108,8 @@ export default function BufferChartDialog({ open, onOpenChange, productId, produ
                   <YAxis label={{ value: 'Количество (кг)', angle: -90, position: 'insideLeft' }} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="salesRevenue" stackId="a" fill="#10b981" name="Техкарты (продажи)" />
                   <Bar dataKey="sessionWriteoff" stackId="a" fill="#f97316" name="Списание по смене" />
-                  <Bar dataKey="writeoff" stackId="a" fill="#eab308" name="Другие списания" />
+                  <Bar dataKey="writeoff" stackId="a" fill="#eab308" name="Ручные списания" />
                   <Line 
                     type="monotone" 
                     dataKey="windowSum" 

@@ -62,10 +62,10 @@ export function createBufferRouter(prisma: PrismaClient) {
             filterType: 'IncludeValues',
             values: [productId]
           },
-          'TransactionType': {
-            filterType: 'IncludeValues',
-            values: ['SALES_REVENUE', 'SESSION_WRITEOFF', 'WRITEOFF']
-          }
+        'TransactionType': {
+          filterType: 'IncludeValues',
+          values: ['SESSION_WRITEOFF', 'WRITEOFF']
+        }
         }
       }
 
@@ -73,7 +73,7 @@ export function createBufferRouter(prisma: PrismaClient) {
 
       // Группируем по дням с разбивкой по типам
       const dailyConsumption: { [date: string]: number } = {}
-      const dailyByType: { [date: string]: { salesRevenue: number; sessionWriteoff: number; writeoff: number } } = {}
+      const dailyByType: { [date: string]: { sessionWriteoff: number; writeoff: number } } = {}
       
       for (const row of consumption.data || []) {
         const dateKey = row['DateTime.Typed']?.split('T')[0] || ''
@@ -91,12 +91,10 @@ export function createBufferRouter(prisma: PrismaClient) {
         dailyConsumption[dateKey] += absAmount
         
         if (!dailyByType[dateKey]) {
-          dailyByType[dateKey] = { salesRevenue: 0, sessionWriteoff: 0, writeoff: 0 }
+          dailyByType[dateKey] = { sessionWriteoff: 0, writeoff: 0 }
         }
         
-        if (transactionType === 'SALES_REVENUE') {
-          dailyByType[dateKey].salesRevenue += absAmount
-        } else if (transactionType === 'SESSION_WRITEOFF') {
+        if (transactionType === 'SESSION_WRITEOFF') {
           dailyByType[dateKey].sessionWriteoff += absAmount
         } else if (transactionType === 'WRITEOFF') {
           dailyByType[dateKey].writeoff += absAmount
@@ -104,16 +102,15 @@ export function createBufferRouter(prisma: PrismaClient) {
       }
 
       // Создаем массив дней с расходом (включая дни с нулевым расходом)
-      const days: { date: string; consumption: number; salesRevenue: number; sessionWriteoff: number; writeoff: number }[] = []
+      const days: { date: string; consumption: number; sessionWriteoff: number; writeoff: number }[] = []
       for (let i = 0; i < analysisWindowDays; i++) {
         const date = new Date(startDate)
         date.setDate(date.getDate() + i)
         const dateKey = date.toISOString().split('T')[0]
-        const byType = dailyByType[dateKey] || { salesRevenue: 0, sessionWriteoff: 0, writeoff: 0 }
+        const byType = dailyByType[dateKey] || { sessionWriteoff: 0, writeoff: 0 }
         days.push({
           date: dateKey,
           consumption: dailyConsumption[dateKey] || 0,
-          salesRevenue: byType.salesRevenue,
           sessionWriteoff: byType.sessionWriteoff,
           writeoff: byType.writeoff
         })
@@ -196,10 +193,10 @@ export function createBufferRouter(prisma: PrismaClient) {
             from: toIikoDateTime(startDate),
             to: toIikoDateTime(now)
           },
-          'TransactionType': {
-            filterType: 'IncludeValues',
-            values: ['SALES_REVENUE', 'SESSION_WRITEOFF', 'WRITEOFF']
-          }
+        'TransactionType': {
+          filterType: 'IncludeValues',
+          values: ['SESSION_WRITEOFF', 'WRITEOFF']
+        }
         }
       }
 
