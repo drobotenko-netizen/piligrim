@@ -125,23 +125,10 @@ export default function PurchasingClient() {
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
   const [showSuppliersDialog, setShowSuppliersDialog] = useState(false)
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
-  const [orderDays, setOrderDays] = useState<number[]>([1]) // Дни недели для заказа (1-7)
-  const [deliveryDays, setDeliveryDays] = useState<number>(1) // Количество дней на доставку
   
   // Множественный выбор ингредиентов
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set())
   const [showBulkSuppliersDialog, setShowBulkSuppliersDialog] = useState(false)
-  
-  // Названия дней недели
-  const weekDays = [
-    { value: 1, label: 'Понедельник' },
-    { value: 2, label: 'Вторник' },
-    { value: 3, label: 'Среда' },
-    { value: 4, label: 'Четверг' },
-    { value: 5, label: 'Пятница' },
-    { value: 6, label: 'Суббота' },
-    { value: 7, label: 'Воскресенье' }
-  ]
 
   const API_BASE = getApiBase()
 
@@ -265,11 +252,7 @@ export default function PurchasingClient() {
 
       if (counterpartiesRes.ok) {
         const data = await counterpartiesRes.json()
-        console.log('[PurchasingClient] Counterparties loaded:', data.items?.length || 0)
-        console.log('[PurchasingClient] Sample counterparty:', data.items?.[0])
         setCounterparties(data.items || [])
-      } else {
-        console.error('[PurchasingClient] Counterparties error:', counterpartiesRes.status)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -698,51 +681,9 @@ export default function PurchasingClient() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {ingredients.length > 0 && (
-              <div className="flex justify-between items-center">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (selectedIngredients.size === ingredients.length) {
-                        setSelectedIngredients(new Set())
-                      } else {
-                        setSelectedIngredients(new Set(ingredients.map(i => i.productId)))
-                      }
-                    }}
-                  >
-                    {selectedIngredients.size === ingredients.length ? 'Снять всё' : 'Выбрать всё'}
-                  </Button>
-                  {selectedIngredients.size > 0 && (
-                    <Button
-                      onClick={() => setShowBulkSuppliersDialog(true)}
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      Назначить поставщиков ({selectedIngredients.size})
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-            
             <Table>
               <THead>
                 <TR>
-                  <TH className="w-12">
-                    <input
-                      type="checkbox"
-                      checked={selectedIngredients.size === ingredients.length && ingredients.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIngredients(new Set(ingredients.map(i => i.productId)))
-                        } else {
-                          setSelectedIngredients(new Set())
-                        }
-                      }}
-                      className="w-4 h-4"
-                    />
-                  </TH>
                   <TH>Ингредиент</TH>
                   <TH>Общий остаток</TH>
                   <TH>Поставщики</TH>
@@ -755,26 +696,9 @@ export default function PurchasingClient() {
                     ps => ps.productId === ingredient.productId
                   )
                   const primarySupplier = ingredientSuppliers.find(ps => ps.isPrimary)
-                  const isSelected = selectedIngredients.has(ingredient.productId)
                   
                   return (
-                    <TR key={ingredient.productId} className={isSelected ? 'bg-blue-50' : ''}>
-                      <TD>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            const newSet = new Set(selectedIngredients)
-                            if (e.target.checked) {
-                              newSet.add(ingredient.productId)
-                            } else {
-                              newSet.delete(ingredient.productId)
-                            }
-                            setSelectedIngredients(newSet)
-                          }}
-                          className="w-4 h-4"
-                        />
-                      </TD>
+                    <TR key={ingredient.productId}>
                       <TD className="font-medium">{ingredient.productName}</TD>
                       <TD>{ingredient.totalStock.toFixed(1)}</TD>
                       <TD>
@@ -1229,66 +1153,48 @@ export default function PurchasingClient() {
             <h3 className="font-semibold mb-2">Добавить поставщика:</h3>
             <div className="space-y-3">
               <div>
-                <Label>Выберите поставщика *</Label>
-                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                  <SelectTrigger>
+                <Label htmlFor="newSupplier">Выберите поставщика</Label>
+                <Select>
+                  <SelectTrigger id="newSupplier">
                     <SelectValue placeholder="Выберите контрагента-поставщика" />
                   </SelectTrigger>
                   <SelectContent>
-                    {counterparties.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-gray-500">Загрузка...</div>
-                    ) : (
-                      counterparties.map((cp) => (
-                        <SelectItem key={cp.id} value={cp.id}>
-                          {cp.name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {counterparties.map((cp) => (
+                      <SelectItem key={cp.id} value={cp.id}>
+                        {cp.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {counterparties.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">Доступно поставщиков: {counterparties.length}</p>
-                )}
               </div>
-              
-              <div>
-                <Label>Дни заказа *</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {weekDays.map((day) => (
-                    <div key={day.value} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`orderDay-${day.value}`}
-                        checked={orderDays.includes(day.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setOrderDays([...orderDays, day.value].sort())
-                          } else {
-                            setOrderDays(orderDays.filter(d => d !== day.value))
-                          }
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <Label htmlFor={`orderDay-${day.value}`} className="font-normal">{day.label}</Label>
-                    </div>
-                  ))}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="newSupplierDeliveryDays">Дни доставки</Label>
+                  <Input 
+                    id="newSupplierDeliveryDays" 
+                    type="number" 
+                    placeholder="1"
+                    defaultValue={1}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="newSupplierPrice">Цена (копейки)</Label>
+                  <Input 
+                    id="newSupplierPrice" 
+                    type="number" 
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="newSupplierPriority">Приоритет</Label>
+                  <Input 
+                    id="newSupplierPriority" 
+                    type="number" 
+                    placeholder="1"
+                    defaultValue={1}
+                  />
                 </div>
               </div>
-              
-              <div>
-                <Label htmlFor="deliveryDaysInput">Дней на доставку *</Label>
-                <Input 
-                  id="deliveryDaysInput"
-                  type="number" 
-                  placeholder="1"
-                  value={deliveryDays}
-                  onChange={(e) => setDeliveryDays(parseInt(e.target.value) || 1)}
-                  min="1"
-                  max="30"
-                />
-                <p className="text-xs text-gray-500 mt-1">Количество дней от заказа до доставки</p>
-              </div>
-              
               <div className="flex items-center space-x-2">
                 <input 
                   type="checkbox" 
@@ -1301,16 +1207,16 @@ export default function PurchasingClient() {
                 onClick={async () => {
                   if (!selectedIngredient) return
                   
-                  if (!selectedSupplierId) {
+                  const supplierSelect = document.getElementById('newSupplier') as any
+                  const supplierId = supplierSelect?.value
+                  if (!supplierId) {
                     alert('Выберите поставщика')
                     return
                   }
                   
-                  if (orderDays.length === 0) {
-                    alert('Выберите хотя бы один день заказа')
-                    return
-                  }
-                  
+                  const deliveryDays = parseInt((document.getElementById('newSupplierDeliveryDays') as HTMLInputElement)?.value || '1')
+                  const price = parseInt((document.getElementById('newSupplierPrice') as HTMLInputElement)?.value || '0') || null
+                  const priority = parseInt((document.getElementById('newSupplierPriority') as HTMLInputElement)?.value || '1')
                   const isPrimary = (document.getElementById('newSupplierIsPrimary') as HTMLInputElement)?.checked || false
 
                   try {
@@ -1322,23 +1228,19 @@ export default function PurchasingClient() {
                       body: JSON.stringify({
                         productId: selectedIngredient.productId,
                         productName: selectedIngredient.productName,
-                        supplierId: selectedSupplierId,
+                        supplierId,
                         isPrimary,
-                        priority: 1,
-                        orderDays: orderDays.join(','), // Сохраняем как строку "1,3,5"
+                        priority,
                         deliveryDays,
-                        price: null,
+                        price,
                         unit: 'кг',
                         isActive: true
                       })
                     })
 
                     if (response.ok) {
-                      // Перезагружаем данные и очищаем форму
+                      // Перезагружаем данные
                       await loadData()
-                      setSelectedSupplierId('')
-                      setOrderDays([1])
-                      setDeliveryDays(1)
                     } else {
                       const error = await response.json()
                       alert(`Ошибка: ${error.error || 'Не удалось добавить поставщика'}`)
@@ -1362,166 +1264,6 @@ export default function PurchasingClient() {
         <DialogFooter>
           <Button variant="outline" onClick={() => setShowSuppliersDialog(false)}>
             Закрыть
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* Модальное окно для массового назначения поставщиков */}
-    <Dialog open={showBulkSuppliersDialog} onOpenChange={setShowBulkSuppliersDialog}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            Массовое назначение поставщика
-          </DialogTitle>
-          <DialogDescription>
-            Назначить поставщика для {selectedIngredients.size} ингредиентов
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          <div>
-            <Label>Выберите поставщика *</Label>
-            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Выберите контрагента-поставщика" />
-              </SelectTrigger>
-              <SelectContent>
-                {counterparties.length === 0 ? (
-                  <div className="px-2 py-1.5 text-sm text-gray-500">Загрузка...</div>
-                ) : (
-                  counterparties.map((cp) => (
-                    <SelectItem key={cp.id} value={cp.id}>
-                      {cp.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div>
-            <Label>Дни заказа *</Label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              {weekDays.map((day) => (
-                <div key={day.value} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`bulkOrderDay-${day.value}`}
-                    checked={orderDays.includes(day.value)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setOrderDays([...orderDays, day.value].sort())
-                      } else {
-                        setOrderDays(orderDays.filter(d => d !== day.value))
-                      }
-                    }}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor={`bulkOrderDay-${day.value}`} className="font-normal">{day.label}</Label>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <Label htmlFor="bulkDeliveryDaysInput">Дней на доставку *</Label>
-            <Input 
-              id="bulkDeliveryDaysInput"
-              type="number" 
-              placeholder="1"
-              value={deliveryDays}
-              onChange={(e) => setDeliveryDays(parseInt(e.target.value) || 1)}
-              min="1"
-              max="30"
-            />
-            <p className="text-xs text-gray-500 mt-1">Количество дней от заказа до доставки</p>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <input 
-              type="checkbox" 
-              id="bulkIsPrimary" 
-              className="w-4 h-4"
-              defaultChecked={true}
-            />
-            <Label htmlFor="bulkIsPrimary">Сделать основным поставщиком для всех</Label>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowBulkSuppliersDialog(false)}>
-            Отмена
-          </Button>
-          <Button 
-            onClick={async () => {
-              if (!selectedSupplierId) {
-                alert('Выберите поставщика')
-                return
-              }
-              
-              if (orderDays.length === 0) {
-                alert('Выберите хотя бы один день заказа')
-                return
-              }
-              
-              const isPrimary = (document.getElementById('bulkIsPrimary') as HTMLInputElement)?.checked || false
-
-              try {
-                setLoading(true)
-                let successCount = 0
-                let errorCount = 0
-                
-                for (const productId of selectedIngredients) {
-                  const ingredient = ingredients.find(i => i.productId === productId)
-                  if (!ingredient) continue
-                  
-                  try {
-                    const response = await fetch(`${API_BASE}/api/purchasing/product-suppliers`, {
-                      method: 'POST',
-                      credentials: 'include',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        productId: ingredient.productId,
-                        productName: ingredient.productName,
-                        supplierId: selectedSupplierId,
-                        isPrimary,
-                        priority: 1,
-                        orderDays: orderDays.join(','),
-                        deliveryDays,
-                        price: null,
-                        unit: 'кг',
-                        isActive: true
-                      })
-                    })
-
-                    if (response.ok) {
-                      successCount++
-                    } else {
-                      errorCount++
-                    }
-                  } catch (error) {
-                    errorCount++
-                  }
-                }
-
-                alert(`Готово! Успешно: ${successCount}, Ошибок: ${errorCount}`)
-                await loadData()
-                setSelectedIngredients(new Set())
-                setSelectedSupplierId('')
-                setOrderDays([1])
-                setDeliveryDays(1)
-                setShowBulkSuppliersDialog(false)
-              } catch (error) {
-                console.error('Error bulk assigning suppliers:', error)
-                alert('Ошибка при назначении поставщиков')
-              } finally {
-                setLoading(false)
-              }
-            }}
-            disabled={loading}
-          >
-            {loading ? 'Назначение...' : 'Назначить поставщика'}
           </Button>
         </DialogFooter>
       </DialogContent>

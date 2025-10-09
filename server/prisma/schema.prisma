@@ -691,7 +691,8 @@ model ProductSupplier {
   priority       Int       @default(1) // Приоритет среди запасных (1, 2, 3...)
   isActive       Boolean   @default(true)
   minOrderAmount Int?      // Минимальная сумма заказа в копейках
-  deliveryDays   Int       @default(1) // Дни доставки (1-7)
+  orderDays      String    @default("1") // Дни недели для заказа (1-7), через запятую: "1,3,5"
+  deliveryDays   Int       @default(1) // Количество дней на доставку
   price          Int?      // Цена за единицу в копейках (если фиксированная)
   unit           String    @default("кг") // Единица измерения
   notes          String?
