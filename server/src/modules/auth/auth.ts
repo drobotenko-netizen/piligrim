@@ -24,9 +24,11 @@ export function createAuthRouter(prisma: PrismaClient) {
       const token = signAccessToken({ sub: user.id, ten: tenant.id, roles }, 12 * 60 * 60)
       
       res.cookie('access_token', token, { 
-        httpOnly: true, 
+        httpOnly: false, 
         sameSite: 'lax', 
-        secure: process.env.NODE_ENV === 'production', 
+        secure: true,
+        domain: '.5-star-roi.ru',
+        path: '/',
         maxAge: 12 * 60 * 60 * 1000 
       })
       

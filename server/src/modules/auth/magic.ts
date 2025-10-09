@@ -76,7 +76,9 @@ export function createMagicRouter(prisma: PrismaClient) {
       res.cookie('access_token', access, { 
         httpOnly: false, 
         sameSite: 'lax', 
-        secure: true, 
+        secure: true,
+        domain: '.5-star-roi.ru',
+        path: '/',
         maxAge: 30 * 24 * 60 * 60 * 1000,
       })
       
@@ -142,7 +144,9 @@ export function createMagicRouter(prisma: PrismaClient) {
       res.cookie('access_token', access, { 
         httpOnly: false, 
         sameSite: 'lax', 
-        secure: true, 
+        secure: true,
+        domain: '.5-star-roi.ru',
+        path: '/',
         maxAge: 30 * 24 * 60 * 60 * 1000,
       })
       const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
@@ -187,7 +191,9 @@ export function createMagicRouter(prisma: PrismaClient) {
       res.cookie('access_token', access, { 
         httpOnly: false, 
         sameSite: 'lax', 
-        secure: true, 
+        secure: true,
+        domain: '.5-star-roi.ru',
+        path: '/',
         maxAge: 30 * 24 * 60 * 60 * 1000,
       })
       const frontendUrl = FRONTEND_BASE_URL || SERVER_PUBLIC_URL || 'http://localhost:3000'
