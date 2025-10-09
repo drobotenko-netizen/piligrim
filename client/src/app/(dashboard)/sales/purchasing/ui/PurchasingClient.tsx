@@ -148,7 +148,7 @@ export default function PurchasingClient() {
         fetch(`${API_BASE}/api/purchasing/product-suppliers`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/iiko/entities/products`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
+        fetch(`${API_BASE}/api/counterparties?type=supplier`, { credentials: 'include' })
       ])
       
       console.log('[PurchasingClient] ingredientsRes status:', ingredientsRes.status)
