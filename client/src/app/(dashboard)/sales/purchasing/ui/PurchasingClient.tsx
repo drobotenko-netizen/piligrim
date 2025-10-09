@@ -140,6 +140,8 @@ export default function PurchasingClient() {
       const dateWithData = lastDateData.date || '2024-12-15'
       const timestamp = `${dateWithData}T12:00:00.000`
       
+      console.log('[PurchasingClient] Loading ingredients with:', { timestamp, dateWithData })
+      
       const [calculationsRes, buffersRes, suppliersRes, ordersRes, ingredientsRes, counterpartiesRes] = await Promise.all([
         fetch(`${API_BASE}/api/purchasing/calculate-orders`, { credentials: 'include' }),
         fetch(`${API_BASE}/api/purchasing/buffers`, { credentials: 'include' }),
@@ -153,6 +155,8 @@ export default function PurchasingClient() {
         }),
         fetch(`${API_BASE}/api/counterparties?type=Поставщик`, { credentials: 'include' })
       ])
+      
+      console.log('[PurchasingClient] ingredientsRes status:', ingredientsRes.status)
 
       if (calculationsRes.ok) {
         const data = await calculationsRes.json()
@@ -176,7 +180,9 @@ export default function PurchasingClient() {
 
       if (ingredientsRes.ok) {
         const data = await ingredientsRes.json()
+        console.log('[PurchasingClient] Ingredients data:', data)
         const rows = data.rows || []
+        console.log('[PurchasingClient] First 3 rows:', rows.slice(0, 3))
         
         // Группируем по product (productId) и суммируем amount (остаток)
         const productsMap = new Map()
@@ -197,7 +203,11 @@ export default function PurchasingClient() {
           a.productName.localeCompare(b.productName)
         )
         
+        console.log('[PurchasingClient] Processed ingredients:', ingredients.length, 'items')
         setIngredients(ingredients)
+      } else {
+        const errorData = await ingredientsRes.json()
+        console.error('[PurchasingClient] Ingredients error:', errorData)
       }
 
       if (counterpartiesRes.ok) {
